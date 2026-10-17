@@ -7,7 +7,7 @@ Run the external autopilot with a custom phase range.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" run --repo . $ARGUMENTS`
+`ai-autopilot run --repo . $ARGUMENTS`
 
 Examples:
 

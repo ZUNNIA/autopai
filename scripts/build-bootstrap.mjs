@@ -26,8 +26,8 @@ Build and install a portable, CI-gated development orchestrator that:
 2. Create every file listed in the source inventory with the exact content provided.
 3. Adapt the platform files to the target coding tool using the platform guide. When the tool has no permission model, rely on the orchestrator verification described in the architecture.
 4. For every target repository, generate \`.autopilot.json\` by inspecting that repository. Do not assume a language, framework, or command. Follow the configuration schema.
-5. Replace the \`{{AUTOPILOT_HOME}}\` placeholder in the installed agent and command files with the absolute path where this system lives.
-6. Run \`npm ci\` and \`npm test\`. Then run a dry run and confirm no files are written outside the local state directory.
+5. Run \`npm ci\` and \`npm link\` so the \`ai-autopilot\` command is available globally. Run \`npm link\` again after moving the clone.
+6. Run \`npm test\`. Then run a dry run and confirm no files are written outside the local state directory.
 
 ## Hard constraints
 
@@ -43,10 +43,9 @@ Build and install a portable, CI-gated development orchestrator that:
 ## Verification checklist
 
 - \`npm test\` passes.
-- \`node src/cli.js status --repo <target>\` loads the generated configuration without errors.
-- \`node src/cli.js adopt --repo <target> --branch <branch> --dry-run\` reports the plan without pushing or merging.
-- \`node src/cli.js identify --repo <target> --scope branch:<branch> --dry-run\` reports the scope without running the auditor.
-- The installed agent and command files contain no placeholder left unreplaced.
+- \`ai-autopilot status --repo <target>\` works from a new shell and loads the generated configuration without errors.
+- \`ai-autopilot adopt --repo <target> --branch <branch> --dry-run\` reports the plan without pushing or merging.
+- \`ai-autopilot identify --repo <target> --scope branch:<branch> --dry-run\` reports the scope without running the auditor.
 - No file outside the target repository state directory changed during a dry run.
 
 ## Source inventory

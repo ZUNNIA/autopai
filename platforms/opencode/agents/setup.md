@@ -8,7 +8,7 @@ permission:
     ".gitignore": "allow"
   bash:
     "*": "deny"
-    "node *": "allow"
+    "ai-autopilot *": "allow"
     "git *": "allow"
     "gh *": "allow"
     "where *": "allow"
@@ -37,7 +37,7 @@ When the user asks you to initialize the autopilot and `.autopilot.json` is miss
 3. Write `.autopilot.json` with the schema below. Use the real integration branch and the real release branch.
 4. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
 5. Validate the file by running:
-   `node "{{AUTOPILOT_HOME}}/src/cli.js" status --repo .`
+   `ai-autopilot status --repo .`
    A configuration error means the file is wrong; fix it before reporting success.
 6. Do not create tickets, branches, commits, or pull requests during initialization.
 
@@ -45,7 +45,7 @@ When the user asks you to initialize the autopilot and `.autopilot.json` is miss
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" <command> --repo . $ARGUMENTS`
+`ai-autopilot <command> --repo . $ARGUMENTS`
 
 Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
 

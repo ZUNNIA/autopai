@@ -32,13 +32,19 @@ scripts/build-bootstrap.mjs  Regenerates BOOTSTRAP_PROMPT.md from the sources
 npm ci
 ```
 
-3. Install the OpenCode platform files. Copy or link:
+3. Make the orchestrator available as a global command:
+
+```text
+npm link
+```
+
+The `ai-autopilot` command now points at this clone. Run `npm link` again after moving the clone.
+
+4. Install the OpenCode platform files. Copy or link:
 
 - `platforms/opencode/agents/*` into `~/.config/opencode/agents/`.
 - `platforms/opencode/commands/*` into `~/.config/opencode/commands/`.
 - `AGENTS.md` into `~/.config/opencode/AGENTS.md`, or merge it with the existing file.
-
-4. Replace the `{{AUTOPILOT_HOME}}` placeholder in the copied agent and command files with the absolute path of this repository. On Windows PowerShell an absolute forward-slash path works in the CLI commands.
 
 ## Usage in a target repository
 
@@ -58,10 +64,10 @@ npm ci
 CLI equivalents:
 
 ```text
-node <AUTOPILOT_HOME>/src/cli.js adopt --repo . --branch <name>
-node <AUTOPILOT_HOME>/src/cli.js identify --repo . --scope branch:<name> --scope pr:<number>
-node <AUTOPILOT_HOME>/src/cli.js status --repo .
-node <AUTOPILOT_HOME>/src/cli.js resume --repo .
+ai-autopilot adopt --repo . --branch <name>
+ai-autopilot identify --repo . --scope branch:<name> --scope pr:<number>
+ai-autopilot status --repo .
+ai-autopilot resume --repo .
 ```
 
 Every command supports `--dry-run` where it makes sense. A run can start at any phase and stop at any phase.

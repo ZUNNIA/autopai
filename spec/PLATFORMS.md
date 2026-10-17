@@ -4,6 +4,7 @@ The orchestrator only needs two things from a coding tool: a non-interactive ses
 
 ## OpenCode (native)
 
+- Orchestrator: the `ai-autopilot` command, installed with `npm link` from this repository.
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
 - Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`.
 - Session: `opencode run --command <name> --auto --dir <repo> "<json>"`.

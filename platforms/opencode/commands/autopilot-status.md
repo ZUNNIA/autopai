@@ -5,6 +5,6 @@ agent: setup
 
 Run with the bash tool:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" status --repo .`
+`ai-autopilot status --repo .`
 
 Report the output verbatim.

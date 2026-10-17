@@ -19,8 +19,8 @@ Build and install a portable, CI-gated development orchestrator that:
 2. Create every file listed in the source inventory with the exact content provided.
 3. Adapt the platform files to the target coding tool using the platform guide. When the tool has no permission model, rely on the orchestrator verification described in the architecture.
 4. For every target repository, generate `.autopilot.json` by inspecting that repository. Do not assume a language, framework, or command. Follow the configuration schema.
-5. Replace the `{{AUTOPILOT_HOME}}` placeholder in the installed agent and command files with the absolute path where this system lives.
-6. Run `npm ci` and `npm test`. Then run a dry run and confirm no files are written outside the local state directory.
+5. Run `npm ci` and `npm link` so the `ai-autopilot` command is available globally. Run `npm link` again after moving the clone.
+6. Run `npm test`. Then run a dry run and confirm no files are written outside the local state directory.
 
 ## Hard constraints
 
@@ -36,10 +36,9 @@ Build and install a portable, CI-gated development orchestrator that:
 ## Verification checklist
 
 - `npm test` passes.
-- `node src/cli.js status --repo <target>` loads the generated configuration without errors.
-- `node src/cli.js adopt --repo <target> --branch <branch> --dry-run` reports the plan without pushing or merging.
-- `node src/cli.js identify --repo <target> --scope branch:<branch> --dry-run` reports the scope without running the auditor.
-- The installed agent and command files contain no placeholder left unreplaced.
+- `ai-autopilot status --repo <target>` works from a new shell and loads the generated configuration without errors.
+- `ai-autopilot adopt --repo <target> --branch <branch> --dry-run` reports the plan without pushing or merging.
+- `ai-autopilot identify --repo <target> --scope branch:<branch> --dry-run` reports the scope without running the auditor.
 - No file outside the target repository state directory changed during a dry run.
 
 ## Source inventory
@@ -131,7 +130,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **Justify tradeoffs**: when options differ, state the tradeoff explicitly and recommend the one that ages best.
 
 ## 9. Autopilot Orchestration (EXTERNAL)
-The autopilot is an external Node orchestrator at `$AUTOPILOT_HOME`. It starts fresh OpenCode sessions through the dedicated agents and keeps its state under the repository's local `tickets/.autopilot` directory.
+The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh OpenCode sessions through the dedicated agents and keeps its state under the repository's local `tickets/.autopilot` directory.
 
 - **Pre-authorized scope:** while an autopilot run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopilot` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
 - **Local artifacts:** tickets, ADRs, briefs, Identified findings, and audit evidence are local. Never commit, push, or reference them from Git artifacts. Do not create diagnostic reports.
@@ -282,6 +281,7 @@ The orchestrator only needs two things from a coding tool: a non-interactive ses
 
 ## OpenCode (native)
 
+- Orchestrator: the `ai-autopilot` command, installed with `npm link` from this repository.
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
 - Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`.
 - Session: `opencode run --command <name> --auto --dir <repo> "<json>"`.
@@ -486,7 +486,7 @@ permission:
     ".gitignore": "allow"
   bash:
     "*": "deny"
-    "node *": "allow"
+    "ai-autopilot *": "allow"
     "git *": "allow"
     "gh *": "allow"
     "where *": "allow"
@@ -515,7 +515,7 @@ When the user asks you to initialize the autopilot and `.autopilot.json` is miss
 3. Write `.autopilot.json` with the schema below. Use the real integration branch and the real release branch.
 4. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
 5. Validate the file by running:
-   `node "{{AUTOPILOT_HOME}}/src/cli.js" status --repo .`
+   `ai-autopilot status --repo .`
    A configuration error means the file is wrong; fix it before reporting success.
 6. Do not create tickets, branches, commits, or pull requests during initialization.
 
@@ -523,7 +523,7 @@ When the user asks you to initialize the autopilot and `.autopilot.json` is miss
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" <command> --repo . $ARGUMENTS`
+`ai-autopilot <command> --repo . $ARGUMENTS`
 
 Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
 
@@ -568,7 +568,7 @@ Run the external autopilot in adopt mode.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" adopt --repo . $ARGUMENTS`
+`ai-autopilot adopt --repo . $ARGUMENTS`
 
 The command finishes the current or given branch: it fixes policy violations, runs local gates, pushes, opens the pull request, waits for the required CI checks, and merges only when they pass. It never force-pushes and never merges with failing checks.
 
@@ -641,7 +641,7 @@ Run the external autopilot in identify mode.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" identify --repo . $ARGUMENTS`
+`ai-autopilot identify --repo . $ARGUMENTS`
 
 Scopes are passed as `--scope branch:<name>`, `--scope pr:<number>`, or `--scope dir:<path>`. The auditor is read-only over source and UX; it writes only local tickets under `tickets/identified/` and never creates a diagnostic report.
 
@@ -668,7 +668,7 @@ Inspect the repository and write `.autopilot.json`:
 6. Set `runtimeLogs` only when the application writes local logs. Use environment variables for machine-specific paths.
 7. Ensure the state directory and the ticket directories stay local, and add them to `.gitignore` when needed.
 8. Validate with:
-   `node "{{AUTOPILOT_HOME}}/src/cli.js" status --repo . $ARGUMENTS`
+   `ai-autopilot status --repo . $ARGUMENTS`
 9. Report the final configuration and any remaining uncertainty.
 
 Do not edit source, tests, CI, ADRs, or `AGENTS.md`. Do not create tickets, branches, commits, or pull requests.
@@ -684,7 +684,7 @@ agent: setup
 
 Run with the bash tool and a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" resume --repo . $ARGUMENTS`
+`ai-autopilot resume --repo . $ARGUMENTS`
 
 Report the CLI output verbatim. If the command fails, report the exact error and stop.
 ```
@@ -701,7 +701,7 @@ Run the external autopilot with a custom phase range.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" run --repo . $ARGUMENTS`
+`ai-autopilot run --repo . $ARGUMENTS`
 
 Examples:
 
@@ -725,7 +725,7 @@ agent: setup
 
 Run with the bash tool:
 
-`node "{{AUTOPILOT_HOME}}/src/cli.js" status --repo .`
+`ai-autopilot status --repo .`
 
 Report the output verbatim.
 ```
