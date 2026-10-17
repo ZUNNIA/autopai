@@ -1,4 +1,4 @@
-# Finish an existing autopilot branch
+# Finish an existing AutopAI branch
 
 The orchestrator invoked you with this JSON payload:
 

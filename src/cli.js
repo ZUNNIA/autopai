@@ -100,12 +100,12 @@ async function abortRun(stateStore) {
     await stateStore.save(state)
   }
   await stateStore.unlock()
-  process.stdout.write('Autopilot run marked as aborted and the lock was released.\n')
+  process.stdout.write('AutopAI run marked as aborted and the lock was released.\n')
 }
 
 function printStatus(state) {
   if (!state) {
-    process.stdout.write('No autopilot state found for this repository.\n')
+    process.stdout.write('No AutopAI state found for this repository.\n')
     return
   }
   const summary = {
@@ -123,7 +123,7 @@ function printStatus(state) {
 }
 
 function printHelp() {
-  process.stdout.write(`ai-autopilot
+  process.stdout.write(`autopai
 
 Usage:
   node src/cli.js adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
@@ -141,6 +141,6 @@ Usage:
 }
 
 main().catch(error => {
-  process.stderr.write(`autopilot: ${error.message}\n`)
+  process.stderr.write(`autopai: ${error.message}\n`)
   process.exitCode = 1
 })

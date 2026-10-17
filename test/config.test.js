@@ -6,9 +6,9 @@ import path from 'node:path'
 import { loadConfig } from '../src/lib/config.js'
 
 test('loads defaults and resolves the state directory', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-'))
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-'))
   await fs.mkdir(path.join(repo, 'tickets'), { recursive: true })
-  await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+  await fs.writeFile(path.join(repo, '.autopai.json'), JSON.stringify({
     runner: 'opencode',
     baseBranch: 'develop',
     releaseBranch: 'main',
@@ -20,21 +20,21 @@ test('loads defaults and resolves the state directory', async () => {
   assert.equal(config.baseBranch, 'develop')
   assert.equal(config.releaseBranch, 'main')
   assert.deepEqual(config.requiredChecks, ['Build and test'])
-  assert.equal(config.stateDir, path.join(repo, 'tickets', '.autopilot'))
+  assert.equal(config.stateDir, path.join(repo, 'tickets', '.autopai'))
   assert.equal(config.maxAttempts, 3)
   assert.equal(config.runner, 'opencode')
   assert.ok(config.protectedPaths.includes('.github/**'))
-  assert.ok(config.protectedPaths.includes('.autopilot.json'))
+  assert.ok(config.protectedPaths.includes('.autopai.json'))
 })
 
-test('fails when .autopilot.json is missing', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-missing-'))
-  await assert.rejects(() => loadConfig(repo), /autopilot-init/)
+test('fails when .autopai.json is missing', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-missing-'))
+  await assert.rejects(() => loadConfig(repo), /autopai-init/)
 })
 
 test('fails when the runner is missing', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-runner-'))
-  await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-runner-'))
+  await fs.writeFile(path.join(repo, '.autopai.json'), JSON.stringify({
     baseBranch: 'main',
     releaseBranch: 'main'
   }), 'utf8')

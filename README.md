@@ -1,8 +1,8 @@
-# ai-autopilot
+# AutopAI
 
 Portable, CI-gated development orchestrator for agentic coding tools. It coordinates work through resumable phases, keeps state in local files, and owns every Git write: branches, commit validation, pushes, pull requests, CI waits, and merges.
 
-The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopilot.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
+The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopai.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ spec/                        Architecture, policies, config schema, platform gui
 platforms/opencode/agents/   Bundled platform agent definitions
 platforms/opencode/commands/ Bundled platform command wrappers
 AGENTS.md                    Global rules for the coding tool
-BOOTSTRAP_PROMPT.md          Self-contained prompt to recreate this system in another tool
+BOOTSTRAP_PROMPT.md          Bootstrap prompt that guides an AI agent to install or port the system
 scripts/build-bootstrap.mjs  Regenerates BOOTSTRAP_PROMPT.md from the sources
 ```
 
@@ -40,7 +40,7 @@ npm ci
 npm link
 ```
 
-The `ai-autopilot` command now points at this clone. Run `npm link` again after moving the clone.
+The `autopai` command now points at this clone. Run `npm link` again after moving the clone.
 
 4. Install the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`. Copy or link:
 
@@ -79,28 +79,28 @@ opencode --version
 Clone the repository:
 
 ```powershell
-gh repo clone ZUNNIA/ai-autopilot "$env:USERPROFILE\ai-autopilot"
+gh repo clone ZUNNIA/autopai "$env:USERPROFILE\autopai"
 ```
 
 ```bash
-gh repo clone ZUNNIA/ai-autopilot ~/ai-autopilot
+gh repo clone ZUNNIA/autopai ~/autopai
 ```
 
 Install dependencies and link the command:
 
 ```powershell
-Set-Location "$env:USERPROFILE\ai-autopilot"
+Set-Location "$env:USERPROFILE\autopai"
 npm ci
 npm link
 ```
 
 ```bash
-cd ~/ai-autopilot
+cd ~/autopai
 npm ci
 npm link
 ```
 
-`npm link` creates the `ai-autopilot` command. On Windows the shim lives in `%APPDATA%\npm`, which must be on `PATH`.
+`npm link` creates the `autopai` command. On Windows the shim lives in `%APPDATA%\npm`, which must be on `PATH`.
 
 Install the bundled platform files:
 
@@ -117,38 +117,38 @@ cp platforms/opencode/commands/*.md ~/.config/opencode/commands/
 cp AGENTS.md ~/.config/opencode/AGENTS.md
 ```
 
-If `~/.config/opencode/AGENTS.md` already exists, merge the autopilot section instead of overwriting the whole file. When you use another coding tool, install its platform files in the location that tool reads instead.
+If `~/.config/opencode/AGENTS.md` already exists, merge the AutopAI section instead of overwriting the whole file. When you use another coding tool, install its platform files in the location that tool reads instead.
 
 Verify the installation:
 
 ```text
-ai-autopilot help
+autopai help
 ```
 
-Then open a target repository and run `/autopilot-init`. If you are an AI agent, `BOOTSTRAP_PROMPT.md` contains a self-contained prompt you can be given directly. It covers installing this repository and recreating the system in another coding tool.
+Then open a target repository and run `/autopai-init`. If you are an AI agent, `BOOTSTRAP_PROMPT.md` contains a bootstrap prompt you can be given directly. It references the repository files instead of duplicating them, so it works for installing this repository and for porting the system to another coding tool.
 
 ## Usage in a target repository
 
 1. Open the target repository in the coding tool.
-2. Run `/autopilot-init`. The setup agent inspects the repository and writes `.autopilot.json`. No language or framework is assumed.
-3. Review `.autopilot.json`.
+2. Run `/autopai-init`. The setup agent inspects the repository and writes `.autopai.json`. No language or framework is assumed.
+3. Review `.autopai.json`.
 4. Run the phase you need:
 
-- `/autopilot-adopt --branch <name>` finishes an existing branch through push, pull request, CI, and merge.
-- `/autopilot-run --from prepare --to prepare --feature <slug> --description "<idea>"` generates a brief and a backlog, then stops for review.
-- `/autopilot-run --from approve --to dev --feature <slug>` generates tickets and runs the development loop.
-- `/autopilot-identify --scope branch:<name> --scope pr:<number>` audits scopes and writes local findings.
-- `/autopilot-run --from refactor --to refactor --feature <slug>` executes refactor tickets.
-- `/autopilot-run --from release --to release --version <x.y.z>` prepares and merges a release.
-- `/autopilot-status` shows the current run.
+- `/autopai-adopt --branch <name>` finishes an existing branch through push, pull request, CI, and merge.
+- `/autopai-run --from prepare --to prepare --feature <slug> --description "<idea>"` generates a brief and a backlog, then stops for review.
+- `/autopai-run --from approve --to dev --feature <slug>` generates tickets and runs the development loop.
+- `/autopai-identify --scope branch:<name> --scope pr:<number>` audits scopes and writes local findings.
+- `/autopai-run --from refactor --to refactor --feature <slug>` executes refactor tickets.
+- `/autopai-run --from release --to release --version <x.y.z>` prepares and merges a release.
+- `/autopai-status` shows the current run.
 
 CLI equivalents:
 
 ```text
-ai-autopilot adopt --repo . --branch <name>
-ai-autopilot identify --repo . --scope branch:<name> --scope pr:<number>
-ai-autopilot status --repo .
-ai-autopilot resume --repo .
+autopai adopt --repo . --branch <name>
+autopai identify --repo . --scope branch:<name> --scope pr:<number>
+autopai status --repo .
+autopai resume --repo .
 ```
 
 Every command supports `--dry-run` where it makes sense. A run can start at any phase and stop at any phase.
@@ -166,8 +166,8 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 ## Known constraints
 
 - GitHub is a hard dependency: pull requests, checks, and merges use the `gh` CLI. The coding tool is replaceable through runners; the Git host is not, yet.
-- The bundled platform agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopilot`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
-- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, and `.autopilot.json`. Change it in `.autopilot.json` when the repository uses other protected files.
+- The bundled platform agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopai`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
+- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, and `.autopai.json`. Change it in `.autopai.json` when the repository uses other protected files.
 - `npm link` must be run again after moving the clone.
 
 ## Migrating to another tool
@@ -178,15 +178,15 @@ Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the port
 
 1. Add `src/runners/<tool>.js` exporting `runSession`.
 2. Register it in `src/runners/index.js`.
-3. Set `runner` in the target repository `.autopilot.json`.
+3. Set `runner` in the target repository `.autopai.json`.
 4. Recreate the agent roles and permissions under `platforms/<tool>/`.
 
 The core prompts, phases, state, policy, and merge logic do not change.
 
 ## Troubleshooting
 
-- `ai-autopilot` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\ai-autopilot.cmd`.
-- Two clones are linked: only one can own the `ai-autopilot` command. Run `npm link` in the clone you want to keep.
+- `autopai` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\autopai.cmd`.
+- Two clones are linked: only one can own the `autopai` command. Run `npm link` in the clone you want to keep.
 - The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
 
 ## Development

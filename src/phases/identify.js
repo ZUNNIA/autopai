@@ -64,7 +64,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
       prompt: 'identified',
       agent: config.agents.auditor,
       payload,
-      title: `autopilot identify ${resolved.name}`,
+      title: `AutopAI identify ${resolved.name}`,
       logFile: artifacts.path(`auditor-${slugify(resolved.name)}.log`),
       role: 'auditor'
     })

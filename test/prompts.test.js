@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { loadPrompt, renderPrompt } from '../src/lib/prompts.js'
 
 test('renders the payload into a core prompt', async () => {
-  const prompt = await loadPrompt('autopilot-finish', { mode: 'finish', branch: 'feat/example' })
+  const prompt = await loadPrompt('autopai-finish', { mode: 'finish', branch: 'feat/example' })
   assert.match(prompt, /"mode": "finish"/)
   assert.ok(!prompt.includes('{{PAYLOAD}}'))
 })

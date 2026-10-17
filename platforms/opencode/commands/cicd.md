@@ -1,10 +1,10 @@
 ---
-description: Manual CI/CD flow for a branch (fallback when the autopilot is not used)
+description: Manual CI/CD flow for a branch (fallback when AutopAI is not used)
 ---
 
 # Manual CI/CD Flow
 
-This command is the manual fallback. Prefer the external autopilot commands (`/autopilot-adopt`, `/autopilot-run`) for unattended work.
+This command is the manual fallback. Prefer AutopAI commands (`/autopai-adopt`, `/autopai-run`) for unattended work.
 
 ## PHASE 1: Implementation and Local Verification
 1. Implement the requested change following `AGENTS.md`.

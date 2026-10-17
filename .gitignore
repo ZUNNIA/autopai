@@ -1,6 +1,6 @@
 node_modules/
 *.log
-.autopilot/
+.autopai/
 tickets/
 .DS_Store
 Thumbs.db

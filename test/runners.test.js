@@ -20,7 +20,7 @@ test('rejects unknown runners', async () => {
 test('builds OpenCode arguments with agent and model', () => {
   const args = buildArgs({
     config: { repoPath: 'C:/repo', models: { executor: 'provider/model' } },
-    agent: 'autopilot',
+    agent: 'autopai',
     promptText: 'do work',
     title: 'task',
     role: 'executor'
@@ -33,7 +33,7 @@ test('builds OpenCode arguments with agent and model', () => {
     '--title',
     'task',
     '--agent',
-    'autopilot',
+    'autopai',
     '--model',
     'provider/model',
     'do work'

@@ -1,4 +1,4 @@
-# Implement one autopilot work item
+# Implement one AutopAI work item
 
 The orchestrator invoked you with this JSON payload:
 

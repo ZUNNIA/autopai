@@ -6,7 +6,7 @@ import path from 'node:path'
 import { listTickets, orderTickets, branchNameFor } from '../src/lib/tickets.js'
 
 test('parses front matter and orders tickets by dependency', async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-tickets-'))
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-tickets-'))
   await fs.writeFile(path.join(dir, '001-first.md'), [
     '---',
     'id: T1',

@@ -56,7 +56,7 @@ export class StateStore {
       const raw = await fs.readFile(this.lockFile, 'utf8')
       const lock = JSON.parse(raw)
       if (lock.pid && isAlive(lock.pid)) {
-        throw new Error(`Another autopilot run is active with pid ${lock.pid}. Run status or abort first.`)
+        throw new Error(`Another AutopAI run is active with pid ${lock.pid}. Run status or abort first.`)
       }
     } catch (error) {
       if (error.code !== 'ENOENT') throw error

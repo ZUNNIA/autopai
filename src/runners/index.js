@@ -3,14 +3,14 @@ const RUNNERS = {
 }
 
 /**
- * Resolves the session runner declared in `.autopilot.json`. Adding support
+ * Resolves the session runner declared in `.autopai.json`. Adding support
  * for another coding tool means adding one module here and one entry to the
  * map; the core never imports a concrete runner.
  */
 export async function resolveRunner(config) {
   const name = config.runner
   if (!name) {
-    throw new Error(`runner is required in .autopilot.json. Available runners: ${availableRunners().join(', ')}.`)
+    throw new Error(`runner is required in .autopai.json. Available runners: ${availableRunners().join(', ')}.`)
   }
   const loader = RUNNERS[name]
   if (!loader) {

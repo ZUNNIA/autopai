@@ -1,6 +1,6 @@
 /**
  * Matches repository-relative paths against the protected globs declared in
- * `.autopilot.json`. Patterns use `**` for any characters including slashes,
+ * `.autopai.json`. Patterns use `**` for any characters including slashes,
  * `*` for any characters except slashes, and `?` for one character.
  */
 export function findForbidden(files, patterns = []) {

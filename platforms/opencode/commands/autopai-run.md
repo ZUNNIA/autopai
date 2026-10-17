@@ -1,13 +1,13 @@
 ---
-description: Run a custom autopilot phase range
+description: Run a custom AutopAI phase range
 agent: setup
 ---
 
-Run the external autopilot with a custom phase range.
+Run AutopAI with a custom phase range.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`ai-autopilot run --repo . $ARGUMENTS`
+`autopai run --repo . $ARGUMENTS`
 
 Examples:
 

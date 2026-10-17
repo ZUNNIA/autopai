@@ -45,12 +45,12 @@ Document the complete workflow, intent, and business rules in these blocks — N
 
 ## 5. Git Operations (STRICT)
 - **NEVER execute** `git push`, `git merge`, or `git rebase` without explicit user permission.
-- **NEVER create branches** without explicit user permission. Interactive work branches off the repository integration branch; when the repository uses the autopilot, the base branch is declared in `.autopilot.json`.
+- **NEVER create branches** without explicit user permission. Interactive work branches off the repository integration branch; when the repository uses AutopAI, the base branch is declared in `.autopai.json`.
 - You MAY run `git status`, `git branch --show-current`, `git diff`, `git log` for analysis.
 - You MUST recommend creating a new branch and commit before taking any write action.
 - When changes for a commit are ready, STOP and ask: "Changes ready. Run `git add . && git commit -m 'message'`?"
 - Wait for explicit confirmation before executing any write Git command.
-- **Scoped exception:** an active external autopilot run is pre-authorized as described in section 9. Interactive sessions keep every rule above.
+- **Scoped exception:** an active AutopAI run is pre-authorized as described in section 9. Interactive sessions keep every rule above.
 
 ## 6. Architecture Decisions (MANDATORY)
 1. ALWAYS review the necessary ADRs before starting any task, regardless of its size: locate the ADR directory (`tickets/adr/`, `docs/adr/`, or the repo's convention) and read every ADR relevant to the code or feature you are about to touch.
@@ -72,7 +72,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **Branch & PR Naming:** Branches are `<type>/<kebab-case-description>`. Commit subjects and PR titles are `<type>: <description>`. No scope parentheses, no ticket identifiers, no ADR references, and no issue references such as `#123` in branches, commits, pull requests, or merge commits.
 - **Hard Constraints:**
   - NEVER merge a PR that has failing CI/CD checks.
-  - NEVER create new branches without explicit permission outside the autopilot flow.
+  - NEVER create new branches without explicit permission outside the AutopAI flow.
   - Never commit, push, or reference tickets, ADRs, briefs, Identified findings, or audit evidence from Git artifacts.
 
 ## 8. Engineering Judgment (Long-Term First)
@@ -81,13 +81,13 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **No throwaway code**: never ship hacks, dead code, or patterns that contradict the existing architecture; if a shortcut is unavoidable, state the debt and the proper follow-up.
 - **Justify tradeoffs**: when options differ, state the tradeoff explicitly and recommend the one that ages best.
 
-## 9. Autopilot Orchestration (EXTERNAL)
-The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh sessions through the dedicated agents of the configured coding tool and keeps its state under the repository's local `tickets/.autopilot` directory.
+## 9. AutopAI Orchestration (EXTERNAL)
+AutopAI is the `autopai` command, a Node orchestrator installed from the `ZUNNIA/autopai` repository. It starts fresh sessions through the dedicated agents of the configured coding tool and keeps its state under the repository's local `tickets/.autopai` directory.
 
-- **Pre-authorized scope:** while an autopilot run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopilot` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
+- **Pre-authorized scope:** while an AutopAI run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopai` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
 - **Local artifacts:** tickets, ADRs, briefs, Identified findings, and audit evidence are local. Never commit, push, or reference them from Git artifacts. Do not create diagnostic reports.
 - **Entry points:** a run may start at any phase (adopt, prepare, approve, dev, identify, refactor, release) and may stop at any phase. Starting mid-pipeline is normal.
-- **Agent scopes:** `planner` only writes `tickets/backlog/**`, `tickets/ready-for-dev/**`, and `tickets/ready-for-refactor/**`; `auditor` only writes `tickets/identified/**` and `tickets/ux/**` and is read-only over source and UX; `autopilot` writes source and tests only; `setup` only maintains `.autopilot.json` and `.gitignore`.
+- **Agent scopes:** `planner` only writes `tickets/backlog/**`, `tickets/ready-for-dev/**`, and `tickets/ready-for-refactor/**`; `auditor` only writes `tickets/identified/**` and `tickets/ux/**` and is read-only over source and UX; `autopai` writes source and tests only; `setup` only maintains `.autopai.json` and `.gitignore`.
 - **Commit style:** `<type>: <subject>` with no scope parentheses, no ticket or ADR references, and no issue references.
-- **Tests:** the autopilot may modify, add, or remove tests; the CI build, test suite, and coverage threshold are the quality gates.
+- **Tests:** AutopAI may modify, add, or remove tests; the CI build, test suite, and coverage threshold are the quality gates.
 - **Release:** release changes go through a `chore/release-v<version>` branch and a pull request into the release branch; tags are created after the merge.

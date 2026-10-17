@@ -1,10 +1,10 @@
 {
-  "name": "ai-autopilot",
+  "name": "autopai",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "ai-autopilot": "src/cli.js"
+    "autopai": "src/cli.js"
   },
   "scripts": {
     "test": "node --test",

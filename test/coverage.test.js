@@ -6,7 +6,7 @@ import path from 'node:path'
 import { readCoverage } from '../src/lib/coverage.js'
 
 test('aggregates Cobertura reports', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-coverage-'))
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-coverage-'))
   const dir = path.join(repo, 'TestResults', 'abc')
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(
@@ -21,6 +21,6 @@ test('aggregates Cobertura reports', async () => {
 })
 
 test('returns null when no report exists', async () => {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-coverage-empty-'))
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-coverage-empty-'))
   assert.equal(await readCoverage(repo), null)
 })

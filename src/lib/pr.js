@@ -161,7 +161,7 @@ export async function pushOpenWaitMerge({
         failureLogs,
         failedChecks: checks.checks.filter(check => FAILED_STATES.has(check.state))
       },
-      title: `autopilot fix ${branch} attempt ${attempt}`,
+      title: `AutopAI fix ${branch} attempt ${attempt}`,
       logFile: artifacts.path(`executor-fix-${attempt}.log`),
       role: 'executor'
     })
@@ -227,7 +227,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
     const message = formatViolations(violations)
     const execution = await runSession({
       config,
-      prompt: 'autopilot-finish',
+      prompt: 'autopai-finish',
       agent: config.agents.executor,
       payload: {
         ...executorPayload,
@@ -236,7 +236,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
         branch,
         baseBranch
       },
-      title: `autopilot policy fix ${branch}`,
+      title: `AutopAI policy fix ${branch}`,
       logFile: artifacts.path('executor-policy.log'),
       role: 'executor'
     })

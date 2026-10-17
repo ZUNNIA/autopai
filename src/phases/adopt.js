@@ -9,7 +9,7 @@ import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { findForbidden } from '../lib/forbidden.js'
 
-const ALLOWED_UNTRACKED = ['.autopilot.json', 'tickets/', '.autopilot/']
+const ALLOWED_UNTRACKED = ['.autopai.json', 'tickets/', '.autopai/']
 
 /**
  * Adopts an existing branch that already contains commits, finishes it, and
@@ -109,15 +109,15 @@ export async function runAdopt({ config, stateStore, options, log }) {
     testCommand: config.testCommand,
     stateDir: config.stateDir,
     prTitlePath: titleFile,
-    instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or autopilot configuration.'
+    instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or AutopAI configuration.'
   }
 
   const execution = await runSession({
     config,
-    prompt: 'autopilot-finish',
+    prompt: 'autopai-finish',
     agent: config.agents.executor,
     payload,
-    title: `autopilot finish ${branch}`,
+    title: `AutopAI finish ${branch}`,
     logFile: artifacts.path('executor-finish.log'),
     role: 'executor'
   })
@@ -162,7 +162,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     title,
     prBody,
     state,
-    executorPrompt: 'autopilot-finish',
+    executorPrompt: 'autopai-finish',
     executorPayload: payload,
     coverage: gates.coverage,
     log

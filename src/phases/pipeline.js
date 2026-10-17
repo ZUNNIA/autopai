@@ -29,7 +29,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
       prompt: 'feature-brief',
       agent: config.agents.planner,
       payload: { feature, description: String(options.description), briefPath },
-      title: `autopilot brief ${feature}`,
+      title: `AutopAI brief ${feature}`,
       logFile: artifacts.path('planner-brief.log'),
       role: 'planner'
     })
@@ -41,7 +41,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
     prompt: 'backlog',
     agent: config.agents.planner,
     payload: { feature, briefPath, outputDir: backlogDir },
-    title: `autopilot backlog ${feature}`,
+    title: `AutopAI backlog ${feature}`,
     logFile: artifacts.path('planner-backlog.log'),
     role: 'planner'
   })
@@ -71,7 +71,7 @@ export async function runApprove({ config, stateStore, options, log }) {
     prompt: 'ready-for-dev',
     agent: config.agents.planner,
     payload: { feature, backlogDir, outputDir: readyDir },
-    title: `autopilot ready-for-dev ${feature}`,
+    title: `AutopAI ready-for-dev ${feature}`,
     logFile: artifacts.path('planner-ready-for-dev.log'),
     role: 'planner'
   })
@@ -121,10 +121,10 @@ export async function runDev({ config, stateStore, options, log }) {
 
     const execution = await runSession({
       config,
-      prompt: 'autopilot-dev',
+      prompt: 'autopai-dev',
       agent: config.agents.executor,
       payload,
-      title: `autopilot dev ${ticket.id}`,
+      title: `AutopAI dev ${ticket.id}`,
       logFile: artifacts.path(`executor-${ticket.slug}.log`),
       role: 'executor'
     })
@@ -150,7 +150,7 @@ export async function runDev({ config, stateStore, options, log }) {
       title,
       prBody,
       state,
-      executorPrompt: 'autopilot-dev',
+      executorPrompt: 'autopai-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -206,10 +206,10 @@ export async function runRefactor({ config, stateStore, options, log }) {
 
     const execution = await runSession({
       config,
-      prompt: 'autopilot-dev',
+      prompt: 'autopai-dev',
       agent: config.agents.executor,
       payload,
-      title: `autopilot refactor ${ticket.id}`,
+      title: `AutopAI refactor ${ticket.id}`,
       logFile: artifacts.path(`refactor-${ticket.slug}.log`),
       role: 'executor'
     })
@@ -229,7 +229,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
       title,
       prBody: generatePrBody({ commits, coverage: gates.coverage }),
       state,
-      executorPrompt: 'autopilot-dev',
+      executorPrompt: 'autopai-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -273,7 +273,7 @@ export async function runRelease({ config, stateStore, options, log }) {
       testCommand: config.testCommand,
       stateDir: config.stateDir
     },
-    title: `autopilot release v${version}`,
+    title: `AutopAI release v${version}`,
     logFile: artifacts.path(`release-v${version}.log`),
     role: 'executor'
   })

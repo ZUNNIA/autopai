@@ -1,10 +1,10 @@
 # Architecture
 
-The autopilot is an external Node orchestrator that coordinates agentic coding tools through resumable phases. It owns state, Git writes, pull requests, CI waits, and merges. The coding tool owns implementation inside a fresh session per phase.
+AutopAI is an external Node orchestrator that coordinates agentic coding tools through resumable phases. It owns state, Git writes, pull requests, CI waits, and merges. The coding tool owns implementation inside a fresh session per phase.
 
 ## Design rules
 
-- The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `.autopilot.json` or from the repository itself.
+- The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `.autopai.json` or from the repository itself.
 - Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
 - Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
 - One session per phase or per ticket. No long-running conversation carries the run.
@@ -29,7 +29,7 @@ The autopilot is an external Node orchestrator that coordinates agentic coding t
 
 ## State
 
-`tickets/.autopilot/state.json` stores the run mode, phase, feature, branch, base branch, SHAs, pull request, merge commit, scopes, changed files, attempts, sessions, and blockers. Writes are atomic. A lock file prevents concurrent runs. Logs are JSONL and artifacts are per run.
+`tickets/.autopai/state.json` stores the run mode, phase, feature, branch, base branch, SHAs, pull request, merge commit, scopes, changed files, attempts, sessions, and blockers. Writes are atomic. A lock file prevents concurrent runs. Logs are JSONL and artifacts are per run.
 
 Reconciliation on resume checks the real branch, commits, pull request, and checks before continuing.
 
@@ -39,7 +39,7 @@ Local gates run restore, build, test, and the configured coverage threshold befo
 
 ## Protected paths
 
-The executor agent cannot edit tickets, ADRs, CI workflows, `.autopilot.json`, the repository `AGENTS.md`, or the coding tool configuration. The orchestrator re-checks protected paths before every push.
+The executor agent cannot edit tickets, ADRs, CI workflows, `.autopai.json`, the repository `AGENTS.md`, or the coding tool configuration. The orchestrator re-checks protected paths before every push.
 
 ## Known dependencies
 

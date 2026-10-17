@@ -6,7 +6,7 @@ import path from 'node:path'
 import { StateStore } from '../src/lib/state.js'
 
 test('creates, saves, and reloads state atomically', async () => {
-  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-state-'))
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-state-'))
   const store = new StateStore({ stateDir })
   const state = await store.create('adopt', { branch: 'feat/example', baseBranch: 'develop' })
   assert.equal(state.mode, 'adopt')
@@ -21,7 +21,7 @@ test('creates, saves, and reloads state atomically', async () => {
 })
 
 test('locks and unlocks a run', async () => {
-  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-lock-'))
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-lock-'))
   const store = new StateStore({ stateDir })
   await store.lock()
   await assert.rejects(() => store.lock(), /active/)

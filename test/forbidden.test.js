@@ -4,7 +4,7 @@ import { findForbidden, globToRegExp } from '../src/lib/forbidden.js'
 
 test('matches a protected path list', () => {
   const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json', 'src/app.js', 'README.md']
-  const patterns = ['.github/**', 'AGENTS.md', 'config/**', '.autopilot.json']
+  const patterns = ['.github/**', 'AGENTS.md', 'config/**', '.autopai.json']
   assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json'])
 })
 

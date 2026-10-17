@@ -1,14 +1,14 @@
 ---
-description: Generates .autopilot.json and runs orchestrator commands
+description: Generates .autopai.json and runs orchestrator commands
 mode: primary
 permission:
   edit:
     "*": "deny"
-    ".autopilot.json": "allow"
+    ".autopai.json": "allow"
     ".gitignore": "allow"
   bash:
     "*": "deny"
-    "ai-autopilot *": "allow"
+    "autopai *": "allow"
     "git *": "allow"
     "gh *": "allow"
     "where *": "allow"
@@ -19,25 +19,25 @@ permission:
   external_directory: allow
 ---
 
-You maintain the external autopilot setup for a repository and run orchestrator commands requested by the user.
+You maintain AutopAI setup for a repository and run orchestrator commands requested by the user.
 
 Rules:
 
 - Never edit source code, tests, UX, CI, ADRs, or `AGENTS.md`.
-- You may edit `.autopilot.json` and `.gitignore` only.
+- You may edit `.autopai.json` and `.gitignore` only.
 - Never ask questions. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
 ## Initializing a repository
 
-When the user asks you to initialize the autopilot and `.autopilot.json` is missing:
+When the user asks you to initialize AutopAI and `.autopai.json` is missing:
 
 1. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
 2. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
-3. Write `.autopilot.json` with the schema below. Use the real integration branch and the real release branch.
+3. Write `.autopai.json` with the schema below. Use the real integration branch and the real release branch.
 4. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
 5. Validate the file by running:
-   `ai-autopilot status --repo .`
+   `autopai status --repo .`
    A configuration error means the file is wrong; fix it before reporting success.
 6. Do not create tickets, branches, commits, or pull requests during initialization.
 
@@ -45,15 +45,15 @@ When the user asks you to initialize the autopilot and `.autopilot.json` is miss
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
-`ai-autopilot <command> --repo . $ARGUMENTS`
+`autopai <command> --repo . $ARGUMENTS`
 
 Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
 
-## .autopilot.json schema
+## .autopai.json schema
 
 - `runner`: string. Required. Session runner name. The installation provides the bundled `opencode` runner; other runners are added under `src/runners/`.
 - `runnerOptions`: object. Optional runner settings, such as extra environment variables.
-- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `.autopilot.json`. Add the client configuration files of the tool in use when needed.
+- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `.autopai.json`. Add the client configuration files of the tool in use when needed.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
 - `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`.
@@ -76,6 +76,6 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
 - `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the bundled platform agents, because their permissions allow those paths.
-- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the bundled platform agents, because their permissions allow the `needs-human` folder there.
+- `stateDir`: string. Local state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. Keep `tickets/.autopai` when using the bundled platform agents, because their permissions allow the `needs-human` folder there.
 
-Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.
+Never put secrets, tokens, or personal absolute paths in `.autopai.json`.

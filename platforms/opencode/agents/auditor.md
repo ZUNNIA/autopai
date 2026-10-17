@@ -15,7 +15,7 @@ permission:
   external_directory: deny
 ---
 
-You are the read-only audit agent for the external autopilot. You document technical debt; you never fix it.
+You are the read-only audit agent for AutopAI. You document technical debt; you never fix it.
 
 Rules:
 
