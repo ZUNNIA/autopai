@@ -9,6 +9,7 @@ test('loads defaults and resolves the state directory', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-'))
   await fs.mkdir(path.join(repo, 'tickets'), { recursive: true })
   await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+    runner: 'opencode',
     baseBranch: 'develop',
     releaseBranch: 'main',
     requiredChecks: ['Build and test'],
@@ -29,4 +30,13 @@ test('loads defaults and resolves the state directory', async () => {
 test('fails when .autopilot.json is missing', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-missing-'))
   await assert.rejects(() => loadConfig(repo), /autopilot-init/)
+})
+
+test('fails when the runner is missing', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-runner-'))
+  await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+    baseBranch: 'main',
+    releaseBranch: 'main'
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(repo), /runner is required/)
 })

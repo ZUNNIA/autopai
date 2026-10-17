@@ -3,9 +3,13 @@ import assert from 'node:assert/strict'
 import { availableRunners, resolveRunner } from '../src/runners/index.js'
 import { buildArgs } from '../src/runners/opencode.js'
 
-test('resolves the default runner', async () => {
+test('resolves a configured runner', async () => {
   const runner = await resolveRunner({ runner: 'opencode' })
   assert.equal(typeof runner.runSession, 'function')
+})
+
+test('requires a configured runner', async () => {
+  await assert.rejects(() => resolveRunner({}), /runner is required/)
 })
 
 test('rejects unknown runners', async () => {

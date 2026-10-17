@@ -2,13 +2,13 @@
 
 Portable, CI-gated development orchestrator for agentic coding tools. It coordinates work through resumable phases, keeps state in local files, and owns every Git write: branches, commit validation, pushes, pull requests, CI waits, and merges.
 
-The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopilot.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive OpenCode today and another tool tomorrow.
+The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopilot.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
 
 ## Requirements
 
 - Node.js 20 or newer.
 - Git and GitHub CLI (`gh`) authenticated.
-- OpenCode CLI on `PATH` for the native platform files.
+- The CLI of at least one supported coding tool. The bundled platform targets OpenCode; adding another tool is documented in `spec/PLATFORMS.md`.
 
 ## Repository layout
 
@@ -18,8 +18,8 @@ src/prompts/                 Core-owned task prompts, independent from any tool
 src/runners/                 Session runners, one module per coding tool
 test/                        Unit tests
 spec/                        Architecture, policies, config schema, platform guide
-platforms/opencode/agents/   Agent definitions with path-scoped permissions
-platforms/opencode/commands/ Manual command wrappers that call ai-autopilot
+platforms/opencode/agents/   Bundled platform agent definitions
+platforms/opencode/commands/ Bundled platform command wrappers
 AGENTS.md                    Global rules for the coding tool
 BOOTSTRAP_PROMPT.md          Self-contained prompt to recreate this system in another tool
 scripts/build-bootstrap.mjs  Regenerates BOOTSTRAP_PROMPT.md from the sources
@@ -42,7 +42,7 @@ npm link
 
 The `ai-autopilot` command now points at this clone. Run `npm link` again after moving the clone.
 
-4. Install the OpenCode platform files. Copy or link:
+4. Install the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`. Copy or link:
 
 - `platforms/opencode/agents/*` into `~/.config/opencode/agents/`.
 - `platforms/opencode/commands/*` into `~/.config/opencode/commands/`.
@@ -50,7 +50,7 @@ The `ai-autopilot` command now points at this clone. Run `npm link` again after 
 
 ## Install with an AI agent
 
-This section is written so a human or an AI agent can install the kit without guessing. The repository is private, so cloning requires an authenticated GitHub account with access.
+This section is written so a human or an AI agent can install the kit without guessing.
 
 Verify the prerequisites:
 
@@ -58,13 +58,21 @@ Verify the prerequisites:
 node --version
 git --version
 gh auth status
-opencode --version
 ```
 
 ```bash
 node --version
 git --version
 gh auth status
+```
+
+For the bundled platform, also verify its CLI:
+
+```powershell
+opencode --version
+```
+
+```bash
 opencode --version
 ```
 
@@ -94,7 +102,7 @@ npm link
 
 `npm link` creates the `ai-autopilot` command. On Windows the shim lives in `%APPDATA%\npm`, which must be on `PATH`.
 
-Install the OpenCode platform files:
+Install the bundled platform files:
 
 ```powershell
 Copy-Item .\platforms\opencode\agents\*.md "$env:USERPROFILE\.config\opencode\agents\" -Force
@@ -109,7 +117,7 @@ cp platforms/opencode/commands/*.md ~/.config/opencode/commands/
 cp AGENTS.md ~/.config/opencode/AGENTS.md
 ```
 
-If `~/.config/opencode/AGENTS.md` already exists, merge the autopilot section instead of overwriting the whole file.
+If `~/.config/opencode/AGENTS.md` already exists, merge the autopilot section instead of overwriting the whole file. When you use another coding tool, install its platform files in the location that tool reads instead.
 
 Verify the installation:
 
@@ -158,14 +166,13 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 ## Known constraints
 
 - GitHub is a hard dependency: pull requests, checks, and merges use the `gh` CLI. The coding tool is replaceable through runners; the Git host is not, yet.
-- The provided OpenCode agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopilot`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
-- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, `opencode.json`, `opencode.jsonc`, and `.autopilot.json`. Change it in `.autopilot.json` when the repository uses other protected files.
-- The repository is private. Cloning requires an authenticated GitHub account with access.
+- The bundled platform agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopilot`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
+- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, and `.autopilot.json`. Change it in `.autopilot.json` when the repository uses other protected files.
 - `npm link` must be run again after moving the clone.
 
 ## Migrating to another tool
 
-Installing this repository is not the same as using it with another coding tool. The kit ships the OpenCode platform. To run the orchestrator with Codex or another tool, follow the porting steps below.
+Installing this repository is not the same as using it with another coding tool. The kit ships one bundled platform. To run the orchestrator with another tool, follow the porting steps below.
 
 Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the portable piece. To support a new tool:
 
@@ -180,7 +187,7 @@ The core prompts, phases, state, policy, and merge logic do not change.
 
 - `ai-autopilot` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\ai-autopilot.cmd`.
 - Two clones are linked: only one can own the `ai-autopilot` command. Run `npm link` in the clone you want to keep.
-- The OpenCode commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart OpenCode.
+- The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
 
 ## Development
 

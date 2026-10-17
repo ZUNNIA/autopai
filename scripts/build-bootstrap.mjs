@@ -19,7 +19,7 @@ When the repository is already available, do not recreate the files. Follow \`RE
 4. Verify \`ai-autopilot help\`.
 5. In each target repository, generate \`.autopilot.json\` by inspecting it, then run \`ai-autopilot status --repo .\`.
 
-Installing the kit is not the same as porting it. The kit ships the OpenCode platform. To use another coding tool, follow \`spec/PLATFORMS.md\` and create the runner and agents for that tool.
+Installing the kit is not the same as porting it. The kit ships one bundled platform and a runner contract for any other tool. To use another coding tool, follow \`spec/PLATFORMS.md\` and create the runner and agents for that tool.
 
 ## Mission
 
@@ -95,8 +95,7 @@ async function collectFiles() {
     ['AGENTS.md'],
     ['package.json'],
     await sorted('spec'),
-    await sorted('platforms/opencode/agents'),
-    await sorted('platforms/opencode/commands'),
+    await sorted('platforms'),
     await sorted('src'),
     await sorted('test')
   ]

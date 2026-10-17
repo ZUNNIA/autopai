@@ -13,13 +13,10 @@ const DEFAULT_TICKET_DIRS = {
 const DEFAULT_PROTECTED_PATHS = [
   '.github/**',
   'AGENTS.md',
-  'opencode.json',
-  'opencode.jsonc',
   '.autopilot.json'
 ]
 
 const DEFAULTS = {
-  runner: 'opencode',
   runnerOptions: {},
   protectedPaths: DEFAULT_PROTECTED_PATHS,
   baseBranch: 'main',
@@ -85,7 +82,7 @@ export async function loadConfig(repoPath) {
   config.commitTypes = asArray(config.commitTypes)
   config.protectedPaths = asArray(config.protectedPaths)
 
-  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner must be a non-empty string')
+  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in .autopilot.json')
   assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')
   assert(config.baseBranch, 'baseBranch is required')
   assert(config.releaseBranch, 'releaseBranch is required')

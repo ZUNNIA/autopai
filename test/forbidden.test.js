@@ -2,10 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { findForbidden, globToRegExp } from '../src/lib/forbidden.js'
 
-test('matches the default protected paths', () => {
-  const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json', 'src/app.js', 'README.md']
-  const patterns = ['.github/**', 'AGENTS.md', 'opencode.json', 'opencode.jsonc', '.autopilot.json']
-  assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json'])
+test('matches a protected path list', () => {
+  const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json', 'src/app.js', 'README.md']
+  const patterns = ['.github/**', 'AGENTS.md', 'config/**', '.autopilot.json']
+  assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json'])
 })
 
 test('supports a custom protected list', () => {

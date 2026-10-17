@@ -4,9 +4,9 @@ The configuration file lives at the root of each target repository. It is genera
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `runner` | string | Session runner name. Default `opencode`. Add new runners under `src/runners/`. |
+| `runner` | string | Required. Session runner name. The installation provides the bundled `opencode` runner; add new runners under `src/runners/`. |
 | `runnerOptions` | object | Optional runner settings, such as extra environment variables. |
-| `protectedPaths` | string array | Repository-relative globs the executor must never modify. |
+| `protectedPaths` | string array | Repository-relative globs the executor must never modify. Defaults to `.github/**`, `AGENTS.md`, and `.autopilot.json`. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
 | `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. |
@@ -28,7 +28,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `setup`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `setup`. |
-| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths. |
+| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the bundled platform agents, because their permissions allow those paths. |
 | `stateDir` | string | Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:

@@ -8,7 +8,10 @@ const RUNNERS = {
  * map; the core never imports a concrete runner.
  */
 export async function resolveRunner(config) {
-  const name = config.runner ?? 'opencode'
+  const name = config.runner
+  if (!name) {
+    throw new Error(`runner is required in .autopilot.json. Available runners: ${availableRunners().join(', ')}.`)
+  }
   const loader = RUNNERS[name]
   if (!loader) {
     throw new Error(`Unknown runner "${name}". Available runners: ${availableRunners().join(', ')}.`)

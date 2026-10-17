@@ -12,7 +12,7 @@ When the repository is already available, do not recreate the files. Follow `REA
 4. Verify `ai-autopilot help`.
 5. In each target repository, generate `.autopilot.json` by inspecting it, then run `ai-autopilot status --repo .`.
 
-Installing the kit is not the same as porting it. The kit ships the OpenCode platform. To use another coding tool, follow `spec/PLATFORMS.md` and create the runner and agents for that tool.
+Installing the kit is not the same as porting it. The kit ships one bundled platform and a runner contract for any other tool. To use another coding tool, follow `spec/PLATFORMS.md` and create the runner and agents for that tool.
 
 ## Mission
 
@@ -247,9 +247,9 @@ The configuration file lives at the root of each target repository. It is genera
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `runner` | string | Session runner name. Default `opencode`. Add new runners under `src/runners/`. |
+| `runner` | string | Required. Session runner name. The installation provides the bundled `opencode` runner; add new runners under `src/runners/`. |
 | `runnerOptions` | object | Optional runner settings, such as extra environment variables. |
-| `protectedPaths` | string array | Repository-relative globs the executor must never modify. |
+| `protectedPaths` | string array | Repository-relative globs the executor must never modify. Defaults to `.github/**`, `AGENTS.md`, and `.autopilot.json`. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
 | `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. |
@@ -271,7 +271,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `setup`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `setup`. |
-| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths. |
+| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the bundled platform agents, because their permissions allow those paths. |
 | `stateDir` | string | Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:
@@ -304,37 +304,29 @@ The orchestrator only needs two things from a coding tool: a non-interactive ses
 
 ## Runner interface
 
-The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `.autopilot.json` (`runner`, default `opencode`).
+The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `.autopilot.json`. `runner` is required; the installation provides the bundled `opencode` runner.
 
 A runner module exports `runSession({ config, agent, promptText, title, logFile, role })` and maps the call to its CLI. Adding a tool means adding `src/runners/<name>.js` and one entry to the map in `src/runners/index.js`. The prompts, phases, state, policy, and merge logic stay unchanged.
 
-## OpenCode (native)
+## Bundled platform
 
-- Orchestrator: the `ai-autopilot` command, installed with `npm link` from this repository.
+The repository includes one bundled platform as a reference implementation:
+
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
 - Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`. These are manual wrappers that call `ai-autopilot`.
 - Session: `opencode run --agent <agent> --auto --dir <repo> "<prompt>"`.
 - Permissions: path-scoped `edit` rules and command patterns under `bash`.
 - Global rules: the repository `AGENTS.md`.
 
-## Codex (adaptation guide)
+## Adding another tool
 
-Do not assume feature parity. Recreate the roles with the current Codex capabilities:
+Do not assume feature parity. Recreate the roles with the capabilities of the target tool:
 
-- Global and project rules: `AGENTS.md`, shared through the repository.
-- Reusable instructions: Codex skills. Custom prompts existed but are deprecated in favor of skills, so build the work-item instructions as skills and keep the orchestrator as the owner of the prompt payloads.
-- Non-interactive sessions: `codex exec` streams results to stdout or JSONL and can resume sessions. Use it the same way the orchestrator uses `opencode run`.
-- Approvals and sandbox: `--ask-for-approval` and `--sandbox` keep the executor inside the workspace. The orchestrator still performs every push, pull request, and merge.
-- Command blocking: Codex exec policy rules can pre-approve, prompt, or block commands. Use them to forbid `git push`, `git merge`, and `gh pr merge` in the executor session.
-- Configuration layers: `~/.codex/config.toml` and per-profile files. Keep repository-specific values in `.autopilot.json`, not in the global config.
-
-## Another tool (checklist)
-
-1. Identify the non-interactive session command and its working directory, model, and approval flags.
-2. Map the four roles to the tool's agent or skill mechanism.
+1. Find the non-interactive session command and its working directory, model, and approval or sandbox flags.
+2. Map the four roles (`executor`, `planner`, `auditor`, `setup`) to the tool's agent, skill, or system-prompt mechanism.
 3. Recreate the protected-path rules with the tool's permission model when it has one. When it does not, rely on the orchestrator diff verification.
-4. Keep the orchestrator as the only component allowed to push, open pull requests, and merge.
-5. Confirm the tool can run from a prompt payload that is supplied by the orchestrator and not registered inside the tool.
+4. Block `git push`, `git merge`, rebase, force-push, and the Git host merge command in the executor session.
+5. Confirm the tool accepts a prompt supplied by the orchestrator at session start. It must not require prompts registered inside the tool.
 6. Run the verification checklist in `BOOTSTRAP_PROMPT.md` before trusting the port.
 ```
 
@@ -558,9 +550,9 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 
 ## .autopilot.json schema
 
-- `runner`: string. Session runner name. Default `opencode`. Other runners are added under `src/runners/`.
+- `runner`: string. Required. Session runner name. The installation provides the bundled `opencode` runner; other runners are added under `src/runners/`.
 - `runnerOptions`: object. Optional runner settings, such as extra environment variables.
-- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `opencode.json`, `opencode.jsonc`, `.autopilot.json`.
+- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `.autopilot.json`. Add the client configuration files of the tool in use when needed.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
 - `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`.
@@ -582,8 +574,8 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `commitTypes`: string array. Allowed Conventional Commit types.
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
-- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths.
-- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the provided OpenCode agents, because their permissions allow the `needs-human` folder there.
+- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the bundled platform agents, because their permissions allow those paths.
+- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the bundled platform agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.
 ```
@@ -1076,13 +1068,10 @@ const DEFAULT_TICKET_DIRS = {
 const DEFAULT_PROTECTED_PATHS = [
   '.github/**',
   'AGENTS.md',
-  'opencode.json',
-  'opencode.jsonc',
   '.autopilot.json'
 ]
 
 const DEFAULTS = {
-  runner: 'opencode',
   runnerOptions: {},
   protectedPaths: DEFAULT_PROTECTED_PATHS,
   baseBranch: 'main',
@@ -1148,7 +1137,7 @@ export async function loadConfig(repoPath) {
   config.commitTypes = asArray(config.commitTypes)
   config.protectedPaths = asArray(config.protectedPaths)
 
-  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner must be a non-empty string')
+  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in .autopilot.json')
   assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')
   assert(config.baseBranch, 'baseBranch is required')
   assert(config.releaseBranch, 'releaseBranch is required')
@@ -2064,7 +2053,7 @@ import { resolveRunner } from '../runners/index.js'
 /**
  * Runs one non-interactive coding-tool session with a core-owned prompt. The
  * runner maps the call to the configured CLI, so the core stays independent
- * from OpenCode, Codex, or any other client.
+ * from any specific client.
  */
 export async function runSession({ config, prompt, agent, payload, title, logFile, role }) {
   const promptText = await loadPrompt(prompt, payload)
@@ -3665,7 +3654,10 @@ const RUNNERS = {
  * map; the core never imports a concrete runner.
  */
 export async function resolveRunner(config) {
-  const name = config.runner ?? 'opencode'
+  const name = config.runner
+  if (!name) {
+    throw new Error(`runner is required in .autopilot.json. Available runners: ${availableRunners().join(', ')}.`)
+  }
   const loader = RUNNERS[name]
   if (!loader) {
     throw new Error(`Unknown runner "${name}". Available runners: ${availableRunners().join(', ')}.`)
@@ -3721,6 +3713,7 @@ test('loads defaults and resolves the state directory', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-'))
   await fs.mkdir(path.join(repo, 'tickets'), { recursive: true })
   await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+    runner: 'opencode',
     baseBranch: 'develop',
     releaseBranch: 'main',
     requiredChecks: ['Build and test'],
@@ -3741,6 +3734,15 @@ test('loads defaults and resolves the state directory', async () => {
 test('fails when .autopilot.json is missing', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-missing-'))
   await assert.rejects(() => loadConfig(repo), /autopilot-init/)
+})
+
+test('fails when the runner is missing', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-config-runner-'))
+  await fs.writeFile(path.join(repo, '.autopilot.json'), JSON.stringify({
+    baseBranch: 'main',
+    releaseBranch: 'main'
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(repo), /runner is required/)
 })
 ```
 
@@ -3782,10 +3784,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { findForbidden, globToRegExp } from '../src/lib/forbidden.js'
 
-test('matches the default protected paths', () => {
-  const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json', 'src/app.js', 'README.md']
-  const patterns = ['.github/**', 'AGENTS.md', 'opencode.json', 'opencode.jsonc', '.autopilot.json']
-  assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json'])
+test('matches a protected path list', () => {
+  const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json', 'src/app.js', 'README.md']
+  const patterns = ['.github/**', 'AGENTS.md', 'config/**', '.autopilot.json']
+  assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'config/client.json'])
 })
 
 test('supports a custom protected list', () => {
@@ -3891,9 +3893,13 @@ import assert from 'node:assert/strict'
 import { availableRunners, resolveRunner } from '../src/runners/index.js'
 import { buildArgs } from '../src/runners/opencode.js'
 
-test('resolves the default runner', async () => {
+test('resolves a configured runner', async () => {
   const runner = await resolveRunner({ runner: 'opencode' })
   assert.equal(typeof runner.runSession, 'function')
+})
+
+test('requires a configured runner', async () => {
+  await assert.rejects(() => resolveRunner({}), /runner is required/)
 })
 
 test('rejects unknown runners', async () => {
