@@ -51,6 +51,9 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 
 ## .autopilot.json schema
 
+- `runner`: string. Session runner name. Default `opencode`. Other runners are added under `src/runners/`.
+- `runnerOptions`: object. Optional runner settings, such as extra environment variables.
+- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `opencode.json`, `opencode.jsonc`, `.autopilot.json`.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
 - `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`.
@@ -73,6 +76,6 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
 - `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths.
-- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`.
+- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the provided OpenCode agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.

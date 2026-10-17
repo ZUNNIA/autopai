@@ -1,11 +1,8 @@
----
-description: Finish, review, or policy-fix an existing autopilot branch
-agent: autopilot
----
+# Finish an existing autopilot branch
 
 The orchestrator invoked you with this JSON payload:
 
-$ARGUMENTS
+{{PAYLOAD}}
 
 Tasks:
 
@@ -17,6 +14,6 @@ Tasks:
 - Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. If nothing changed, do not commit.
 - When `prTitlePath` is present, write exactly one line to that path with the proposed PR title for the whole branch. It must follow `<type>: <subject>` and contain no scope, ticket, ADR, or issue reference.
 - Never push, merge, rebase, or run `gh`.
-- If you cannot finish, write a blocker JSON under `tickets/.autopilot/needs-human/` and stop.
+- If you cannot finish, write a blocker JSON under the `needs-human` folder inside the payload `stateDir` and stop.
 
 End with a short summary: what changed, the commit subject if any, and the PR title you wrote.

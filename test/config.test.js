@@ -21,6 +21,9 @@ test('loads defaults and resolves the state directory', async () => {
   assert.deepEqual(config.requiredChecks, ['Build and test'])
   assert.equal(config.stateDir, path.join(repo, 'tickets', '.autopilot'))
   assert.equal(config.maxAttempts, 3)
+  assert.equal(config.runner, 'opencode')
+  assert.ok(config.protectedPaths.includes('.github/**'))
+  assert.ok(config.protectedPaths.includes('.autopilot.json'))
 })
 
 test('fails when .autopilot.json is missing', async () => {

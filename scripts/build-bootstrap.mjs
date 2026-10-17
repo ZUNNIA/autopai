@@ -17,7 +17,8 @@ Build and install a portable, CI-gated development orchestrator that:
 - Keeps state in local files, never in a conversation.
 - Owns every Git write: branch creation, push, pull request, CI wait, and merge.
 - Merges only after the configured required checks pass.
-- Is language, framework, and repository agnostic. Every command comes from the target repository configuration.
+- Is language, framework, repository, and coding-tool agnostic. Every command comes from the target repository configuration.
+- Keeps task prompts in the core and runs sessions through a configurable runner, so the coding tool is a replaceable adapter.
 - Writes all generated artifacts in English. Never detect or switch languages.
 
 ## How to use this document

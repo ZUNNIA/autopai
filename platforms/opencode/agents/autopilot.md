@@ -33,7 +33,7 @@ You execute exactly one autopilot work item. The message contains a JSON payload
 Rules:
 
 - Work only in the current repository and the current branch.
-- Never ask questions. If something blocks you, write a JSON file under `tickets/.autopilot/needs-human/` with the reason, the files involved, and what a human must decide, then stop.
+- Never ask questions. If something blocks you, write a JSON file under the `needs-human` folder inside the state directory, `tickets/.autopilot` by default, with the reason, the files involved, and what a human must decide, then stop.
 - Never push, fetch new branches, merge, rebase, force-push, or run `gh`.
 - Never edit tickets, ADRs, `.github`, `AGENTS.md`, `opencode.json*`, or `.autopilot.json`.
 - Follow the repository `AGENTS.md` and every ADR relevant to the files you touch.

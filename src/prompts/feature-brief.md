@@ -1,15 +1,10 @@
----
-description: Convert the agreed feature discussion into a local brief
-agent: planner
----
-
 # Feature Brief
 
-The orchestrator may invoke you with a JSON payload:
+The orchestrator invoked you with this JSON payload:
 
-$ARGUMENTS
+{{PAYLOAD}}
 
-When the payload is present, write the brief at `briefPath` from `feature` and `description`. When it is absent, use the current conversation and the path the user provides.
+Write the brief at `briefPath` from `feature` and `description`.
 
 You only write the brief file. Never edit source, tests, UX, CI, ADRs, or configuration.
 

@@ -10,7 +10,8 @@ Build and install a portable, CI-gated development orchestrator that:
 - Keeps state in local files, never in a conversation.
 - Owns every Git write: branch creation, push, pull request, CI wait, and merge.
 - Merges only after the configured required checks pass.
-- Is language, framework, and repository agnostic. Every command comes from the target repository configuration.
+- Is language, framework, repository, and coding-tool agnostic. Every command comes from the target repository configuration.
+- Keeps task prompts in the core and runs sessions through a configurable runner, so the coding tool is a replaceable adapter.
 - Writes all generated artifacts in English. Never detect or switch languages.
 
 ## How to use this document
@@ -130,7 +131,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **Justify tradeoffs**: when options differ, state the tradeoff explicitly and recommend the one that ages best.
 
 ## 9. Autopilot Orchestration (EXTERNAL)
-The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh OpenCode sessions through the dedicated agents and keeps its state under the repository's local `tickets/.autopilot` directory.
+The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh sessions through the dedicated agents of the configured coding tool and keeps its state under the repository's local `tickets/.autopilot` directory.
 
 - **Pre-authorized scope:** while an autopilot run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopilot` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
 - **Local artifacts:** tickets, ADRs, briefs, Identified findings, and audit evidence are local. Never commit, push, or reference them from Git artifacts. Do not create diagnostic reports.
@@ -173,7 +174,9 @@ The autopilot is an external Node orchestrator that coordinates agentic coding t
 
 ## Design rules
 
-- The orchestrator is language, framework, and repository agnostic. Every command comes from `.autopilot.json` or from the repository itself.
+- The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `.autopilot.json` or from the repository itself.
+- Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
+- Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
 - One session per phase or per ticket. No long-running conversation carries the run.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop after a backlog, identify debt, refactor, or release.
 - State lives outside any conversation, in local files, and survives crashes.
@@ -208,6 +211,11 @@ Local gates run restore, build, test, and the configured coverage threshold befo
 
 The executor agent cannot edit tickets, ADRs, CI workflows, `.autopilot.json`, the repository `AGENTS.md`, or the coding tool configuration. The orchestrator re-checks protected paths before every push.
 
+## Known dependencies
+
+- GitHub is a hard dependency today: pull requests, checks, and merges go through the `gh` CLI. The coding tool is replaceable through runners; the Git host is a separate axis and would need its own adapter layer.
+- Node.js 20 or newer is required to run the orchestrator.
+
 ## Policy verification
 
 The orchestrator validates branch names, commit subjects, added code, repository file contents, pull request titles, and pull request bodies:
@@ -227,6 +235,9 @@ The configuration file lives at the root of each target repository. It is genera
 
 | Key | Type | Meaning |
 | --- | --- | --- |
+| `runner` | string | Session runner name. Default `opencode`. Add new runners under `src/runners/`. |
+| `runnerOptions` | object | Optional runner settings, such as extra environment variables. |
+| `protectedPaths` | string array | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
 | `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. |
@@ -269,7 +280,7 @@ Generation rules:
 - Set `coverageThreshold` only when CI enforces one.
 - Set `runtimeLogs` only when the application writes local logs.
 - Keep tickets and state local; add them to `.gitignore` when needed.
-- Validate with `node <AUTOPILOT_HOME>/src/cli.js status --repo .` after writing.
+- Validate with `ai-autopilot status --repo .` after writing.
 ````
 
 ### spec/PLATFORMS.md
@@ -279,12 +290,18 @@ Generation rules:
 
 The orchestrator only needs two things from a coding tool: a non-interactive session that accepts a prompt, and a permission model that keeps the executor away from Git writes and protected paths. Everything else is platform glue.
 
+## Runner interface
+
+The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `.autopilot.json` (`runner`, default `opencode`).
+
+A runner module exports `runSession({ config, agent, promptText, title, logFile, role })` and maps the call to its CLI. Adding a tool means adding `src/runners/<name>.js` and one entry to the map in `src/runners/index.js`. The prompts, phases, state, policy, and merge logic stay unchanged.
+
 ## OpenCode (native)
 
 - Orchestrator: the `ai-autopilot` command, installed with `npm link` from this repository.
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
-- Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`.
-- Session: `opencode run --command <name> --auto --dir <repo> "<json>"`.
+- Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`. These are manual wrappers that call `ai-autopilot`.
+- Session: `opencode run --agent <agent> --auto --dir <repo> "<prompt>"`.
 - Permissions: path-scoped `edit` rules and command patterns under `bash`.
 - Global rules: the repository `AGENTS.md`.
 
@@ -421,7 +438,7 @@ You execute exactly one autopilot work item. The message contains a JSON payload
 Rules:
 
 - Work only in the current repository and the current branch.
-- Never ask questions. If something blocks you, write a JSON file under `tickets/.autopilot/needs-human/` with the reason, the files involved, and what a human must decide, then stop.
+- Never ask questions. If something blocks you, write a JSON file under the `needs-human` folder inside the state directory, `tickets/.autopilot` by default, with the reason, the files involved, and what a human must decide, then stop.
 - Never push, fetch new branches, merge, rebase, force-push, or run `gh`.
 - Never edit tickets, ADRs, `.github`, `AGENTS.md`, `opencode.json*`, or `.autopilot.json`.
 - Follow the repository `AGENTS.md` and every ADR relevant to the files you touch.
@@ -529,6 +546,9 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 
 ## .autopilot.json schema
 
+- `runner`: string. Session runner name. Default `opencode`. Other runners are added under `src/runners/`.
+- `runnerOptions`: object. Optional runner settings, such as extra environment variables.
+- `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `opencode.json`, `opencode.jsonc`, `.autopilot.json`.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
 - `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`.
@@ -551,7 +571,7 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
 - `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths.
-- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`.
+- `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the provided OpenCode agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.
 ```
@@ -573,60 +593,6 @@ Use the bash tool with a timeout of at least 3600000 ms:
 The command finishes the current or given branch: it fixes policy violations, runs local gates, pushes, opens the pull request, waits for the required CI checks, and merges only when they pass. It never force-pushes and never merges with failing checks.
 
 Report the CLI output verbatim. If the command fails, report the exact error and stop.
-```
-
-### platforms/opencode/commands/autopilot-dev.md
-
-```
----
-description: Implement one autopilot work item (dev or refactor ticket)
-agent: autopilot
----
-
-The orchestrator invoked you with this JSON payload:
-
-$ARGUMENTS
-
-Tasks:
-
-- Parse the payload. `mode` is `dev` or `refactor`.
-- Read the ticket file at `ticketFile` and every ADR relevant to the files you will touch.
-- Implement only that ticket. For `refactor`, stay inside the files named by the ticket and keep the existing behavior covered by tests.
-- Run the repository restore, build, and tests. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands. Fix what your change breaks.
-- Stage only the files you changed. Never run `git add -A` or `git add .`.
-- Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. Split into more than one commit only when the ticket demands it.
-- Never push, merge, rebase, or run `gh`. The orchestrator handles the pull request and the merge.
-- If the ticket requires an architecture decision, a change outside its scope, or a human choice, write a blocker JSON under `tickets/.autopilot/needs-human/` and stop.
-- Follow the repository `AGENTS.md`: no numbered comments, no restated-code comments.
-
-End with a short summary: files changed, commit subjects, test results, and any blocker.
-```
-
-### platforms/opencode/commands/autopilot-finish.md
-
-```
----
-description: Finish, review, or policy-fix an existing autopilot branch
-agent: autopilot
----
-
-The orchestrator invoked you with this JSON payload:
-
-$ARGUMENTS
-
-Tasks:
-
-- Parse the payload. `mode` is `finish`, `title`, or `policy-fix`.
-- Read the patch at `patchPath` and the current source of every file listed in `changedFiles`.
-- When `violations` or `gateFailure` are present, fix only what is needed to clear them. Remove every ticket or ADR reference from code and comments.
-- Run the repository restore, build, and tests before committing. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands.
-- Stage only the files you changed. Never run `git add -A` or `git add .`.
-- Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. If nothing changed, do not commit.
-- When `prTitlePath` is present, write exactly one line to that path with the proposed PR title for the whole branch. It must follow `<type>: <subject>` and contain no scope, ticket, ADR, or issue reference.
-- Never push, merge, rebase, or run `gh`.
-- If you cannot finish, write a blocker JSON under `tickets/.autopilot/needs-human/` and stop.
-
-End with a short summary: what changed, the commit subject if any, and the PR title you wrote.
 ```
 
 ### platforms/opencode/commands/autopilot-identify.md
@@ -734,70 +700,15 @@ Report the output verbatim.
 
 ```
 ---
-description: Generate a technical backlog from a feature request
-agent: planner
+description: Generate a brief and a backlog through the autopilot
+agent: setup
 ---
 
-# Technical Backlog Generation
+Run the orchestrator with the bash tool and a timeout of at least 3600000 ms:
 
-The orchestrator may invoke you with a JSON payload:
+`ai-autopilot run --from prepare --to prepare --feature <slug> --description "<idea>" $ARGUMENTS`
 
-$ARGUMENTS
-
-When the payload is present, read the brief at `briefPath` and write the backlog under `outputDir` using the `feature` slug. When it is absent, use the user's request and the agreed path.
-
-You never edit source, tests, UX, CI, ADRs, or configuration. Tickets are local artifacts.
-
-## PHASE 1: Research (MANDATORY)
-Before writing a single line of the backlog, you must research the topic requested by the user.
-1. Conduct in-depth research to find and read **exclusively** official documentation, technical blogs from the creators, or official repositories.
-2. **Specifically gather official links to any external APIs, libraries, or third-party services** that will be needed for the implementation.
-3. Do not use your internal memory if there is any doubt.
-
-## PHASE 2: Backlog Generation
-Once the research is complete, create a markdown file with the backlog following this structure exactly. Save the file in English in the path the user indicates, in the payload `outputDir`, or by default in `tickets/backlog/[feature-name]/backlog.md`.
-
-Never cite ticket files or ADR numbers from code snippets or branch examples inside the backlog. Open questions that a human must resolve belong in a final "Open questions" section.
-
-### Document Structure
-
-## 0. Classification
-Select and briefly justify the priority level:
-* [ ] 🔴 Urgent: Core functionality.
-* [ ] 🟡 Important: Extra functionality.
-* [ ] 🔵 Minor: Visual/UX improvements.
-
-## 1. Objective
-* **Problem to solve (Problema a resolver):** What pain point does the user or business have?
-* **Proposed solution (Solución propuesta):** Clear description of the main functionality.
-* **Expected value (Valor esperado):** What metric or benefit does it provide?
-
-## 2. Work Organization
-The backlog is divided into main tasks (large blocks) and subtasks (concrete actions).
-
-### 1: [Large Block Name]
-* **Description:** What will be done and why.
-* **Files/Modules affected:** List of files. *(Note: If the exact files are not known at this planning stage, indicate the module or general area, e.g., "Rendering queue system").*
-* **Dependencies:** What other tasks must be completed first (e.g., "Depends on 1A").
-* **External API/Service Links:** One or more links to the official documentation of external APIs or third-party services required for this task.
-* **Acceptance Criteria:** How we will know this is finished (technical conditions, validations, tests).
-
-#### Subtasks:
-* **1A)** [Concrete action 1]
-  * *External API/Service Links:* [URLs to relevant official docs]
-* **1B)** [Concrete action 2]
-  * *External API/Service Links:* [URLs to relevant official docs]
-* **1C)** [Concrete action 3]
-  * *External API/Service Links:* [URLs to relevant official docs]
-
-*(Repeat the structure for Task 2, Task 3, etc., numbering their subtasks as 2A, 2B...)*
-
-## 3. Golden Rules for a Backlog
-* Each main task must be a clearly understandable block.
-* Each subtask must be an atomic and concrete action (e.g., "Create X interface," not "Implement X").
-* **MANDATORY:** Every task and/or subtask MUST include one or more links to the official documentation of external APIs or third-party services involved. If a task does not use any external service, explicitly state "N/A - Internal logic only".
-* If a task depends on another, it must be explicitly indicated.
-* If a task requires validations or tests, they must be explicitly described in the Acceptance Criteria.
+The orchestrator writes the feature brief and the backlog, then stops for review. Report the output verbatim and the backlog path.
 ```
 
 ### platforms/opencode/commands/cicd.md
@@ -837,364 +748,64 @@ This command is the manual fallback. Prefer the external autopilot commands (`/a
 4. Never merge with failing checks. Never use the GitHub default merge message.
 ```
 
-### platforms/opencode/commands/feature-brief.md
-
-```
----
-description: Convert the agreed feature discussion into a local brief
-agent: planner
----
-
-# Feature Brief
-
-The orchestrator may invoke you with a JSON payload:
-
-$ARGUMENTS
-
-When the payload is present, write the brief at `briefPath` from `feature` and `description`. When it is absent, use the current conversation and the path the user provides.
-
-You only write the brief file. Never edit source, tests, UX, CI, ADRs, or configuration.
-
-## Brief Structure
-
-# Feature Brief: [Name]
-
-## Problem
-What pain point or opportunity the feature addresses.
-
-## Scope
-What the feature includes, in concrete terms.
-
-## Non-goals
-What the feature explicitly does not include.
-
-## Constraints
-Technical, product, and repository constraints. Include the base branch when known.
-
-## Acceptance Criteria
-Observable conditions that prove the feature works.
-
-## External References
-Official links for every external API, library, or service the feature may need. Write "N/A" when the feature is internal only.
-
-## Open Questions
-Decisions a human must resolve before implementation.
-
-Write the brief in English. Never reference ticket files or ADR numbers from code snippets, branch names, or commit examples.
-```
-
 ### platforms/opencode/commands/identified.md
 
 ```
 ---
-description: Document identified technical debt in local tickets
-agent: auditor
+description: Audit scopes and write local Identified tickets through the autopilot
+agent: setup
 ---
 
-# Technical Debt Identification
+Run the orchestrator with the bash tool and a timeout of at least 3600000 ms:
 
-The orchestrator may invoke you with a JSON payload:
+`ai-autopilot identify --repo . --scope branch:<name> --scope pr:<number> $ARGUMENTS`
 
-$ARGUMENTS
-
-When the payload is present, `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `outputDir` describe the audit. When it is absent, audit what the user requested.
-
-## PHASE 0: Evidence and Scope (MANDATORY)
-1. When a payload is present, read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
-2. When no payload is present, verify the debt in the actual code with your reading and search tools. If the user points at a file or module, read it. If the user asks for a category of debt, search the critical areas. Never read the entire project at once.
-3. The evidence file may reference compiler warnings, test output, and recent runtime logs. Use it as evidence; do not create any diagnostic report.
-4. You may only write inside the output directory under `tickets/identified/`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
-
-## PHASE 1: Strict Verification
-Obtain exact line numbers, actual function or class names, and the directly affected files from the current code. Never invent paths or lines. If a datapoint cannot be verified, say so instead of guessing.
-
-## PHASE 2: Writing
-For each debt, create one independent Markdown file in English under the output directory, using the repository naming convention or `[number]-[short-name].md`.
-
-### Document Structure
-
-## 0. Classification
-Select and briefly justify the type of debt:
-* [ ] 🧩 **Code Smell:** duplication, giant methods, confusing names, god classes.
-* [ ] 🧱 **Unnecessary Complexity:** over-engineered logic, deep nesting, coupling.
-* [ ] 🧪 **Lack of Coverage:** critical modules without tests or insufficient coverage.
-* [ ] 📦 **Outdated Library:** outdated, deprecated, or vulnerable dependencies.
-* [ ] 🏗️ **Architecture:** design principle violations, poorly distributed responsibility.
-* [ ] 📝 **Missing Documentation:** critical code without comments or outdated docs.
-
-Select and briefly justify the priority level:
-* [ ] 🔴 Urgent: causing recurring bugs, blocking features, or compromising security or performance.
-* [ ] 🟡 Important: hinders development, increases implementation time, or causes confusion.
-* [ ] 🔵 Minor: improves long-term maintainability without impacting the current pace.
-
-## 1. Objective
-Document and classify the detected debt before it becomes a real problem. It must be clear what is wrong, where it is, and what risk it implies.
-
-## 2. Evidence
-### Location
-* **File(s):** exact path verified in the code.
-* **Line(s) / Block:** exact line range or name of the function, class, or module.
-
-### Problem Description
-What is wrong and why it is a problem. Concrete and technical.
-
-### Current Symptoms
-* [ ] Recurring errors in QA or bugs.
-* [ ] Inflated development time in this area.
-* [ ] Difficulty or impossibility to write tests.
-* [ ] Frequent conflicts in pull requests.
-* [ ] Others: specify.
-
-### Metrics
-Only when extractable from code: coverage, complexity or size, library version.
-
-## 3. Impact
-### Affected Files
-* **Direct:** files involved in the problem.
-* **Indirect (Risk):** files that could break if this fails or during a refactor.
-
-### Dependent Modules
-What parts of the application consume or depend on the defective code.
-
-### Risk of Inaction
-* **Short term:** observable consequence.
-* **Medium term:** larger consequence.
-
-## 4. References
-Related issues, previous pull requests, and resources. Never reference a ticket file or an ADR number from code snippets.
-
-## GOLDEN RULES (NON-NEGOTIABLE)
-1. **ZERO SOLUTIONS:** never propose refactors, new architectures, or complete solutions. Only the finding is documented.
-2. **ATOMICITY:** one file equals one specific problem. Multiple debts in the same file become multiple files.
-3. **TRUTHFULNESS:** if you cannot verify the exact lines or files with your tools, write "To be verified in IDE" instead of guessing.
-4. **READ-ONLY:** never edit source, tests, UX, CI, ADRs, or configuration. Never implement a UX change. If you find a UX improvement, document it as an observation in your final message, not as a code change.
-5. **NO DIAGNOSTIC REPORT:** do not create a separate diagnostics artifact. The evidence is an input.
-6. **LOCAL ONLY:** these tickets are local artifacts. Do not commit, push, or reference them from Git.
-
-End with a short summary: scope, files written, and debts found per severity.
+The auditor is read-only over source and UX. It writes only local tickets under `tickets/identified/` and never creates a diagnostic report. Report the output verbatim and the produced ticket paths.
 ```
 
 ### platforms/opencode/commands/ready-for-dev.md
 
-````
----
-description: Generate Ready-for-Dev tickets from a backlog
-agent: planner
----
-
-# "Ready for Dev" Ticket Generation
-
-The orchestrator may invoke you with a JSON payload:
-
-$ARGUMENTS
-
-When the payload is present, read the backlog under `backlogDir` and write tickets under `outputDir` using the `feature` slug. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
-
-## PHASE 1: Analysis and Context (MANDATORY)
-Before writing any tickets, you must understand the current project context.
-1. Read the Backlog provided by the user.
-2. Use your file-reading tools to explore the project's current structure. Identify the existing architecture, code patterns, and conventions.
-3. Do not assume file or class names; verify them in the codebase.
-
-## PHASE 2: Ticket Generation
-For each main task (or complex sub-task) in the Backlog, generate an independent technical ticket.
-**OUTPUT INSTRUCTION:** Create an independent Markdown file for each ticket in English and in the path indicated by the user (or by default in `tickets/ready-for-dev/[feature]/[number-of-ticket]-[ticket-name].md`).
-
-## Front Matter (MANDATORY)
-Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
-
-```yaml
----
-id: [unique-short-id]
-feature: [feature-slug]
-type: [feat|fix|refactor|perf|test|docs|chore]
-priority: [urgent|important|minor]
-depends_on: [id-or-empty-list]
----
 ```
+---
+description: Generate ready-for-dev tickets and run the development loop
+agent: setup
+---
 
-Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
+Run the orchestrator with the bash tool and a timeout of at least 3600000 ms:
 
-## Structure of each Ticket
+`ai-autopilot run --from approve --to dev --feature <slug> $ARGUMENTS`
 
-## 0. Classification
-Select and briefly justify the priority level:
-* [ ] 🔴 Urgent: Core functionality.
-* [ ] 🟡 Important: Extra functionality.
-* [ ] 🔵 Minor: Visual/UX improvements.
-
-## 1. Objective
-What is to be built or solved, in one or two clear sentences.
-
-## 2. Files
-### New files
-* List of new files to be created (with their full paths).
-### Modified files
-* List of existing files to be touched (with their full paths). *Verify that they exist in the project.*
-
-## 3. Implementation (Technical Specification)
-Detailed technical description of how it should work. It must be so clear that a junior developer (or an AI) can code it without asking questions.
-* **Interfaces / Types:** Define the necessary data structures, interfaces, or types.
-* **Classes / Functions:** Suggested names, signatures, and responsibilities.
-* **Main Flow:** Step-by-step execution logic for the happy path.
-* **Validations and Thresholds:** Which data is validated and what the limits are.
-* **Edge cases:** How it behaves in extreme situations or error scenarios.
-
-## 4. Acceptance Criteria (Definition of Done)
-Technical and functional conditions that must be met to close the ticket.
-* The code compiles without errors or critical warnings.
-* Unit tests have been written for the new logic.
-* The UI (if applicable) respects the design across all breakpoints/states.
-* There are no console.log statements, print statements, or commented-out code.
-
-## 5. Technical Notes
-Important details for implementation:
-* **Dependencies/Libraries:** Which external packages are required (and versions if applicable).
-* **Design decisions:** Why this approach was chosen over another.
-* **Error handling:** How and where errors should be caught and thrown.
-* **Architecture Impact:** If this implementation introduces a new framework, database, or core pattern, you MUST trigger the `adr.md` workflow to document the decision before proceeding.
-````
+The orchestrator generates the tickets, implements them one by one, and merges each pull request only after the required checks pass. Report the output verbatim.
+```
 
 ### platforms/opencode/commands/ready-for-refactor.md
 
-````
----
-description: Generate refactor tickets from an Identified document
-agent: planner
----
-
-# Ready for Refactor Ticket Generation
-
-The orchestrator may invoke you with a JSON payload:
-
-$ARGUMENTS
-
-When the payload is present, read the Identified tickets and the scope patch or file list it provides, and write tickets under the payload `outputDir`. Stay inside the provided scope. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
-
-## PHASE 1: Context and Code Analysis (MANDATORY)
-Before writing the plan, you must understand the original problem and the current code.
-1. Read the source `📌Identified` document provided by the user.
-2. Use your reading tools to analyze the current source code files involved.
-3. Identify what tests currently exist for that code (if any).
-4. **Do not write refactoring code yet.** Your only job in this phase is to create the plan.
-
-## PHASE 2: Plan Generation and Saving
-For each main task (or complex sub-task) in the Identified, generate an independent technical ticket.
-**OUTPUT INSTRUCTION:** Create an independent Markdown file for each ticket in English and in the path indicated by the user (or by default in `tickets/ready-for-refactor/[feature]/[number-of-ticket]-[ticket-name].md`).
-
-## Front Matter (MANDATORY)
-Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
-
-```yaml
----
-id: [unique-short-id]
-feature: [feature-slug]
-type: refactor
-priority: [urgent|important|minor]
-depends_on: [id-or-empty-list]
----
 ```
+---
+description: Execute ready-for-refactor tickets through the autopilot
+agent: setup
+---
 
-Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
+Run the orchestrator with the bash tool and a timeout of at least 3600000 ms:
 
-## Document Structure
+`ai-autopilot run --from refactor --to refactor --feature <slug> $ARGUMENTS`
 
-## 0. Classification
-Select and briefly justify the type of debt:
-* [ ] 🧩 **Code Smell:** (duplication, giant methods, confusing names, god classes).
-* [ ] 🧱 **Unnecessary Complexity:** (over-engineered logic, deep nesting, coupling).
-* [ ] 🧪 **Lack of Coverage:** (critical modules without tests or insufficient coverage).
-* [ ] 📦 **Outdated Library:** (outdated, deprecated, or vulnerable dependencies).
-* [ ] 🏗️ **Architecture:** (design principle violations, poorly distributed responsibility).
-* [ ] 📝 **Missing Documentation:** (critical code without comments or outdated docs).
-
-Select and briefly justify the priority level:
-* [ ] 🔴 Urgent: Technical debt is causing recurring bugs, blocking features, or compromising security/performance.
-* [ ] 🟡 Important: Hinders development, increases implementation time, or causes confusion.
-* [ ] 🔵 Minor: Improves long-term maintainability but does not impact the current workflow pace.
-
-## 1. Objective
-Clearly describe what technical debt will be resolved, how it will be refactored, and what measures will be taken to ensure that current functionality does not break.
-
-## 2. Files
-### Files to modify
-* [Exact path] - [Brief description of what will be cleaned/restructured]
-### Files to delete
-* [Exact path] - [Reason why it becomes obsolete]
-### New files
-* [Exact path] - [Responsibility this new file will assume]
-
-## 3. Refactoring Strategy
-Technical description of the chosen approach.
-* **Pattern or technique to apply:** (e.g., Extract Class, Strategy Pattern, Strangler Fig).
-* **Execution steps:** (Numbered list of logical and atomic steps to get from the current state to the desired state).
-* **API/Contract changes:** (If function signatures, interfaces, or endpoints change, detail how).
-
-## 4. Risk Mitigation Plan (CRITICAL)
-Since the goal is not to break current functionality, detail how stability will be ensured:
-* **Tests to add BEFORE touching code (Characterization Tests):** What current behaviors we must test to have a safety net.
-* **Tests to modify after the refactor:** Which existing tests will have to change their assertion or mock due to the new structure.
-* **Rollback / Feature Flags Strategy:** How the change will be hidden or reverted if something fails in production (if applicable).
-
-## 5. Acceptance Criteria (Definition of Done)
-* [ ] The original problem from the `Identified` document has been completely eliminated.
-* [ ] All existing tests pass 100% without modifying their original assertion (unless the test was poorly written).
-* [ ] Test coverage remains the same or increases (never decreases).
-* [ ] No new unnecessary dependencies have been introduced.
-* [ ] The code passes the linter and static quality rules without new warnings.
-
-## 6. Technical Notes and Design Decisions
-* **Discarded alternatives:** Brief explanation of why this strategy was chosen over others.
-* **Accepted trade-offs:** Temporary complexity assumed to solve the problem in the long term.
-* **Performance/Memory impact:** Whether the new structure consumes more/fewer resources.
-````
+The orchestrator reads the local refactor tickets, implements them in order, and merges each pull request only after the required checks pass. Report the output verbatim.
+```
 
 ### platforms/opencode/commands/release.md
 
 ```
 ---
-description: Calculate the version, update the changelog, and prepare a release
-agent: autopilot
+description: Prepare, merge, and tag a release through the autopilot
+agent: setup
 ---
 
-# Release and Changelog Generation
+Run the orchestrator with the bash tool and a timeout of at least 3600000 ms:
 
-The orchestrator may invoke you with a JSON payload:
+`ai-autopilot run --from release --to release --version <x.y.z> $ARGUMENTS`
 
-$ARGUMENTS
-
-When the payload is present, `mode` is `release`, `version`, `branch`, `baseBranch`, and `releaseBranch` are provided. When it is absent, calculate the version from the commits and stop before writing anything until the user approves it.
-
-## PHASE 1: Analysis (READ-ONLY)
-1. Inspect the project root and locate its version manifest and changelog.
-2. Read `baseBranch` and `releaseBranch` from `.autopilot.json` when present; otherwise detect the integration branch and the release branch from the repository.
-3. Get the last tag with `git describe --tags --abbrev=0`. If no tag exists, use the full commit log; otherwise log the commits since the last tag.
-4. Parse commit subjects with Conventional Commits (`feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`). Ignore merge commits.
-
-## PHASE 2: Version Calculation
-Calculate the semantic version:
-- `BREAKING CHANGE` or `feat!` bumps MAJOR.
-- At least one `feat` bumps MINOR.
-- Only `fix`, `refactor`, `perf`, `test`, `docs`, or `chore` bumps PATCH.
-An explicit `version` in the payload wins over the calculation.
-
-## PHASE 3: Changelog and Manifest
-Generate a new `CHANGELOG.md` section:
-
-## [New Version] - YYYY-MM-DD
-### Added
-- From `feat` commits.
-### Fixed
-- From `fix` commits.
-### Changed
-- From `refactor`, `perf`, `test`, `docs`, and `chore` commits.
-
-Update the version in the manifest file.
-
-## PHASE 4: Execution
-- When invoked by the orchestrator, write the changes and commit with `chore: release v<version>`. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands to verify the repository before committing. Never push, merge, or tag; the orchestrator handles the pull request, the merge, and the tag.
-- When invoked interactively, update the files and STOP before committing. Report the proposed version and changes, then wait for explicit approval.
-- Never reference tickets, ADRs, or issues in commit messages or changelog entries. No scope parentheses.
+The orchestrator updates the version and the changelog, opens the release pull request, waits for the required checks, merges, and tags the release. Report the output verbatim.
 ```
 
 ### platforms/opencode/commands/ux-review.md
@@ -1450,7 +1061,18 @@ const DEFAULT_TICKET_DIRS = {
   done: 'tickets/done'
 }
 
+const DEFAULT_PROTECTED_PATHS = [
+  '.github/**',
+  'AGENTS.md',
+  'opencode.json',
+  'opencode.jsonc',
+  '.autopilot.json'
+]
+
 const DEFAULTS = {
+  runner: 'opencode',
+  runnerOptions: {},
+  protectedPaths: DEFAULT_PROTECTED_PATHS,
   baseBranch: 'main',
   releaseBranch: 'main',
   requiredChecks: [],
@@ -1512,7 +1134,10 @@ export async function loadConfig(repoPath) {
   config.requiredChecks = asArray(config.requiredChecks)
   config.ignoredChecks = asArray(config.ignoredChecks)
   config.commitTypes = asArray(config.commitTypes)
+  config.protectedPaths = asArray(config.protectedPaths)
 
+  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner must be a non-empty string')
+  assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')
   assert(config.baseBranch, 'baseBranch is required')
   assert(config.releaseBranch, 'releaseBranch is required')
   validateCommand(config.restoreCommand, 'restoreCommand')
@@ -1578,15 +1203,34 @@ export function formatCoverage(coverage) {
 ### src/lib/forbidden.js
 
 ```
-const FORBIDDEN_PATHS = [
-  /^\.github\//,
-  /^AGENTS\.md$/,
-  /^opencode\.jsonc?$/,
-  /^\.autopilot\.json$/
-]
+/**
+ * Matches repository-relative paths against the protected globs declared in
+ * `.autopilot.json`. Patterns use `**` for any characters including slashes,
+ * `*` for any characters except slashes, and `?` for one character.
+ */
+export function findForbidden(files, patterns = []) {
+  const matchers = patterns.map(globToRegExp)
+  return (files ?? []).filter(file => matchers.some(regex => regex.test(file)))
+}
 
-export function findForbidden(files) {
-  return (files ?? []).filter(file => FORBIDDEN_PATHS.some(pattern => pattern.test(file)))
+export function globToRegExp(pattern) {
+  let source = ''
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index]
+    if (char === '*') {
+      if (pattern[index + 1] === '*') {
+        source += '.*'
+        index += 1
+      } else {
+        source += '[^/]*'
+      }
+    } else if (char === '?') {
+      source += '[^/]'
+    } else {
+      source += char.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    }
+  }
+  return new RegExp(`^${source}$`)
 }
 ```
 
@@ -1838,39 +1482,6 @@ export function runIdFromUrl(url) {
 }
 ```
 
-### src/lib/opencode.js
-
-```
-import { runCommand } from './runner.js'
-
-/**
- * Runs a custom OpenCode command in a fresh non-interactive session. The
- * command file selects the agent and permissions; this helper only supplies the
- * repository, title, and a single JSON payload as the message.
- */
-export async function runOpenCode({ config, command, payload, title, logFile, role }) {
-  const args = [
-    'run',
-    '--command',
-    command,
-    '--auto',
-    '--dir',
-    config.repoPath,
-    '--title',
-    title
-  ]
-  const model = role ? config.models?.[role] : null
-  if (model) args.push('--model', model)
-  if (payload !== undefined) args.push(JSON.stringify(payload))
-  return runCommand('opencode', args, {
-    cwd: config.repoPath,
-    env: { OPENCODE_DISABLE_AUTOUPDATE: '1' },
-    timeoutMs: config.sessionTimeoutMinutes * 60000,
-    logFile
-  })
-}
-```
-
 ### src/lib/policy.js
 
 ```
@@ -2069,7 +1680,7 @@ export async function scanRepositoryFiles(repoPath, files) {
 ```
 import * as git from './git.js'
 import * as github from './github.js'
-import { runOpenCode } from './opencode.js'
+import { runSession } from './session.js'
 import { scanBranch, scanRepositoryFiles, formatViolations, validatePrBody } from './policy.js'
 import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
@@ -2177,7 +1788,7 @@ export async function pushOpenWaitMerge({
   title,
   prBody,
   state,
-  executorCommand,
+  executorPrompt,
   executorPayload,
   coverage,
   log
@@ -2220,9 +1831,10 @@ export async function pushOpenWaitMerge({
     const failureLogs = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
     await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: executorCommand,
+      prompt: executorPrompt,
+      agent: config.agents.executor,
       payload: {
         ...executorPayload,
         attempt,
@@ -2283,7 +1895,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
   const commits = await git.logCommits(config.repoPath, range)
   const diff = await git.diff(config.repoPath, range)
   const files = await git.diffNames(config.repoPath, range)
-  const forbidden = findForbidden(files)
+  const forbidden = findForbidden(files, config.protectedPaths)
   if (forbidden.length > 0) {
     throw new Error(`The branch modifies protected paths:\n${forbidden.join('\n')}`)
   }
@@ -2293,9 +1905,10 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
   if (violations.length === 0) return { fixed: false, violations: [] }
   if (violations.length > 0) {
     const message = formatViolations(violations)
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-finish',
+      prompt: 'autopilot-finish',
+      agent: config.agents.executor,
       payload: {
         ...executorPayload,
         mode: 'policy-fix',
@@ -2322,6 +1935,40 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
   }
 }
 ```
+
+### src/lib/prompts.js
+
+````
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const PROMPTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'prompts')
+const NAME_PATTERN = /^[a-z0-9-]+$/
+
+/**
+ * Loads a core-owned prompt and substitutes the JSON payload. Core-owned
+ * prompts keep the orchestrator independent from any coding tool.
+ */
+export async function loadPrompt(name, payload) {
+  if (!NAME_PATTERN.test(String(name))) throw new Error(`Invalid prompt name: ${name}`)
+  const file = path.join(PROMPTS_DIR, `${name}.md`)
+  const template = await fs.readFile(file, 'utf8')
+  return renderPrompt(template, payload)
+}
+
+export function renderPrompt(template, payload) {
+  if (payload === undefined || payload === null) {
+    return String(template).replaceAll('{{PAYLOAD}}', '')
+  }
+  const block = ['```json', JSON.stringify(payload, null, 2), '```'].join('\n')
+  return String(template).replaceAll('{{PAYLOAD}}', block)
+}
+
+export function promptsDirectory() {
+  return PROMPTS_DIR
+}
+````
 
 ### src/lib/runner.js
 
@@ -2393,6 +2040,24 @@ export function killTree(child) {
     return
   }
   child.kill('SIGKILL')
+}
+```
+
+### src/lib/session.js
+
+```
+import { loadPrompt } from './prompts.js'
+import { resolveRunner } from '../runners/index.js'
+
+/**
+ * Runs one non-interactive coding-tool session with a core-owned prompt. The
+ * runner maps the call to the configured CLI, so the core stays independent
+ * from OpenCode, Codex, or any other client.
+ */
+export async function runSession({ config, prompt, agent, payload, title, logFile, role }) {
+  const promptText = await loadPrompt(prompt, payload)
+  const runner = await resolveRunner(config)
+  return runner.runSession({ config, agent, promptText, title, logFile, role })
 }
 ```
 
@@ -2816,7 +2481,7 @@ export function truncate(value, limit = 12000) {
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { scanBranch, scanRepositoryFiles, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { deriveTitle, generatePrBody, resolveTitle } from '../lib/title.js'
@@ -2865,7 +2530,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   const diff = await git.diff(config.repoPath, range)
   const changedFiles = await git.diffNames(config.repoPath, range)
 
-  const forbidden = findForbidden(changedFiles)
+  const forbidden = findForbidden(changedFiles, config.protectedPaths)
   if (forbidden.length > 0) {
     throw new Error(`The branch changes protected paths and cannot be adopted automatically:\n${forbidden.join('\n')}`)
   }
@@ -2922,13 +2587,15 @@ export async function runAdopt({ config, stateStore, options, log }) {
     restoreCommand: config.restoreCommand,
     buildCommand: config.buildCommand,
     testCommand: config.testCommand,
+    stateDir: config.stateDir,
     prTitlePath: titleFile,
     instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or autopilot configuration.'
   }
 
-  const execution = await runOpenCode({
+  const execution = await runSession({
     config,
-    command: 'autopilot-finish',
+    prompt: 'autopilot-finish',
+    agent: config.agents.executor,
     payload,
     title: `autopilot finish ${branch}`,
     logFile: artifacts.path('executor-finish.log'),
@@ -2975,7 +2642,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     title,
     prBody,
     state,
-    executorCommand: 'autopilot-finish',
+    executorPrompt: 'autopilot-finish',
     executorPayload: payload,
     coverage: gates.coverage,
     log
@@ -3007,7 +2674,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
 import * as github from '../lib/github.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
@@ -3064,9 +2731,10 @@ export async function runIdentify({ config, stateStore, options, log }) {
       outputDir,
       instructions: 'Write one Identified ticket per debt under outputDir. No source edits, no UX changes, no diagnostic report.'
     }
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'identified',
+      prompt: 'identified',
+      agent: config.agents.auditor,
       payload,
       title: `autopilot identify ${resolved.name}`,
       logFile: artifacts.path(`auditor-${slugify(resolved.name)}.log`),
@@ -3198,7 +2866,7 @@ function escapeRegExp(value) {
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, resolveTitle } from '../lib/title.js'
@@ -3221,9 +2889,10 @@ export async function runPrepare({ config, stateStore, options, log }) {
     if (!options.description) {
       throw new Error(`Missing ${briefPath}. Provide --description or run /feature-brief before prepare.`)
     }
-    const briefRun = await runOpenCode({
+    const briefRun = await runSession({
       config,
-      command: 'feature-brief',
+      prompt: 'feature-brief',
+      agent: config.agents.planner,
       payload: { feature, description: String(options.description), briefPath },
       title: `autopilot brief ${feature}`,
       logFile: artifacts.path('planner-brief.log'),
@@ -3232,9 +2901,10 @@ export async function runPrepare({ config, stateStore, options, log }) {
     if (briefRun.code !== 0) throw new Error('The planner could not write the feature brief.')
   }
 
-  const backlogRun = await runOpenCode({
+  const backlogRun = await runSession({
     config,
-    command: 'backlog',
+    prompt: 'backlog',
+    agent: config.agents.planner,
     payload: { feature, briefPath, outputDir: backlogDir },
     title: `autopilot backlog ${feature}`,
     logFile: artifacts.path('planner-backlog.log'),
@@ -3261,9 +2931,10 @@ export async function runApprove({ config, stateStore, options, log }) {
   const artifacts = new Artifacts(config, `approve-${Date.now()}`)
   await artifacts.init()
 
-  const generated = await runOpenCode({
+  const generated = await runSession({
     config,
-    command: 'ready-for-dev',
+    prompt: 'ready-for-dev',
+    agent: config.agents.planner,
     payload: { feature, backlogDir, outputDir: readyDir },
     title: `autopilot ready-for-dev ${feature}`,
     logFile: artifacts.path('planner-ready-for-dev.log'),
@@ -3309,12 +2980,14 @@ export async function runDev({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      stateDir: config.stateDir,
       instructions: 'Implement only this ticket. Do not push or merge. Commit with type: subject, no scope, no ticket or ADR references.'
     }
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-dev',
+      prompt: 'autopilot-dev',
+      agent: config.agents.executor,
       payload,
       title: `autopilot dev ${ticket.id}`,
       logFile: artifacts.path(`executor-${ticket.slug}.log`),
@@ -3342,7 +3015,7 @@ export async function runDev({ config, stateStore, options, log }) {
       title,
       prBody,
       state,
-      executorCommand: 'autopilot-dev',
+      executorPrompt: 'autopilot-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -3392,12 +3065,14 @@ export async function runRefactor({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      stateDir: config.stateDir,
       instructions: 'Refactor only the files in the ticket scope. Keep tests green. Do not push or merge.'
     }
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-dev',
+      prompt: 'autopilot-dev',
+      agent: config.agents.executor,
       payload,
       title: `autopilot refactor ${ticket.id}`,
       logFile: artifacts.path(`refactor-${ticket.slug}.log`),
@@ -3419,7 +3094,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
       title,
       prBody: generatePrBody({ commits, coverage: gates.coverage }),
       state,
-      executorCommand: 'autopilot-dev',
+      executorPrompt: 'autopilot-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -3448,9 +3123,10 @@ export async function runRelease({ config, stateStore, options, log }) {
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
-  const execution = await runOpenCode({
+  const execution = await runSession({
     config,
-    command: 'release',
+    prompt: 'release',
+    agent: config.agents.executor,
     payload: {
       mode: 'release',
       version,
@@ -3459,7 +3135,8 @@ export async function runRelease({ config, stateStore, options, log }) {
       releaseBranch: config.releaseBranch,
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
-      testCommand: config.testCommand
+      testCommand: config.testCommand,
+      stateDir: config.stateDir
     },
     title: `autopilot release v${version}`,
     logFile: artifacts.path(`release-v${version}.log`),
@@ -3481,8 +3158,8 @@ export async function runRelease({ config, stateStore, options, log }) {
     title,
     prBody: generatePrBody({ commits, coverage: gates.coverage }),
     state,
-    executorCommand: 'release',
-    executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch },
+    executorPrompt: 'release',
+    executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch, stateDir: config.stateDir },
     coverage: gates.coverage,
     log
   })
@@ -3518,6 +3195,506 @@ async function exists(target) {
 }
 ```
 
+### src/prompts/autopilot-dev.md
+
+```
+# Implement one autopilot work item
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Tasks:
+
+- Parse the payload. `mode` is `dev` or `refactor`.
+- Read the ticket file at `ticketFile` and every ADR relevant to the files you will touch.
+- Implement only that ticket. For `refactor`, stay inside the files named by the ticket and keep the existing behavior covered by tests.
+- Run the repository restore, build, and tests. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands. Fix what your change breaks.
+- Stage only the files you changed. Never run `git add -A` or `git add .`.
+- Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. Split into more than one commit only when the ticket demands it.
+- Never push, merge, rebase, or run `gh`. The orchestrator handles the pull request and the merge.
+- If the ticket requires an architecture decision, a change outside its scope, or a human choice, write a blocker JSON under the `needs-human` folder inside the payload `stateDir` and stop.
+- Follow the repository `AGENTS.md`: no numbered comments, no restated-code comments.
+
+End with a short summary: files changed, commit subjects, test results, and any blocker.
+```
+
+### src/prompts/autopilot-finish.md
+
+```
+# Finish an existing autopilot branch
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Tasks:
+
+- Parse the payload. `mode` is `finish`, `title`, or `policy-fix`.
+- Read the patch at `patchPath` and the current source of every file listed in `changedFiles`.
+- When `violations` or `gateFailure` are present, fix only what is needed to clear them. Remove every ticket or ADR reference from code and comments.
+- Run the repository restore, build, and tests before committing. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands.
+- Stage only the files you changed. Never run `git add -A` or `git add .`.
+- Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. If nothing changed, do not commit.
+- When `prTitlePath` is present, write exactly one line to that path with the proposed PR title for the whole branch. It must follow `<type>: <subject>` and contain no scope, ticket, ADR, or issue reference.
+- Never push, merge, rebase, or run `gh`.
+- If you cannot finish, write a blocker JSON under the `needs-human` folder inside the payload `stateDir` and stop.
+
+End with a short summary: what changed, the commit subject if any, and the PR title you wrote.
+```
+
+### src/prompts/backlog.md
+
+```
+# Technical Backlog Generation
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Read the brief at `briefPath` and write the backlog under `outputDir` using the `feature` slug.
+
+You never edit source, tests, UX, CI, ADRs, or configuration. Tickets are local artifacts.
+
+## PHASE 1: Research (MANDATORY)
+Before writing a single line of the backlog, research the topic.
+1. Read exclusively official documentation, technical blogs from the creators, or official repositories.
+2. Gather official links for every external API, library, or third-party service the implementation may need.
+3. Do not rely on internal memory when there is any doubt.
+
+## PHASE 2: Backlog Generation
+Once the research is complete, create the backlog file following this structure exactly. Save it in English under the payload `outputDir` as `backlog.md`.
+
+Never cite ticket files or ADR numbers from code snippets or branch examples inside the backlog. Open questions that a human must resolve belong in a final "Open questions" section.
+
+### Document Structure
+
+## 0. Classification
+Select and briefly justify the priority level:
+* [ ] 🔴 Urgent: Core functionality.
+* [ ] 🟡 Important: Extra functionality.
+* [ ] 🔵 Minor: Visual or UX improvements.
+
+## 1. Objective
+* **Problem to solve:** What pain point does the user or business have?
+* **Proposed solution:** Clear description of the main functionality.
+* **Expected value:** What metric or benefit does it provide?
+
+## 2. Work Organization
+The backlog is divided into main tasks (large blocks) and subtasks (concrete actions).
+
+### 1: [Large Block Name]
+* **Description:** What will be done and why.
+* **Files/Modules affected:** List of files. If the exact files are unknown at this stage, name the module or general area.
+* **Dependencies:** What other tasks must be completed first.
+* **External API/Service Links:** One or more links to the official documentation of external APIs or third-party services required for this task.
+* **Acceptance Criteria:** How we will know this is finished.
+
+#### Subtasks:
+* **1A)** [Concrete action 1]
+  * *External API/Service Links:* [URLs to relevant official docs]
+* **1B)** [Concrete action 2]
+  * *External API/Service Links:* [URLs to relevant official docs]
+* **1C)** [Concrete action 3]
+  * *External API/Service Links:* [URLs to relevant official docs]
+
+Repeat the structure for Task 2, Task 3, and so on, numbering their subtasks as 2A, 2B, and so on.
+
+## 3. Golden Rules for a Backlog
+* Each main task must be a clearly understandable block.
+* Each subtask must be an atomic and concrete action, for example "Create X interface", not "Implement X".
+* **MANDATORY:** Every task and subtask must include one or more links to the official documentation of the external APIs or third-party services involved. If a task does not use any external service, explicitly state "N/A - Internal logic only".
+* If a task depends on another, indicate it explicitly.
+* If a task requires validations or tests, describe them explicitly in the Acceptance Criteria.
+```
+
+### src/prompts/feature-brief.md
+
+```
+# Feature Brief
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Write the brief at `briefPath` from `feature` and `description`.
+
+You only write the brief file. Never edit source, tests, UX, CI, ADRs, or configuration.
+
+## Brief Structure
+
+# Feature Brief: [Name]
+
+## Problem
+What pain point or opportunity the feature addresses.
+
+## Scope
+What the feature includes, in concrete terms.
+
+## Non-goals
+What the feature explicitly does not include.
+
+## Constraints
+Technical, product, and repository constraints. Include the base branch when known.
+
+## Acceptance Criteria
+Observable conditions that prove the feature works.
+
+## External References
+Official links for every external API, library, or service the feature may need. Write "N/A" when the feature is internal only.
+
+## Open Questions
+Decisions a human must resolve before implementation.
+
+Write the brief in English. Never reference ticket files or ADR numbers from code snippets, branch names, or commit examples.
+```
+
+### src/prompts/identified.md
+
+```
+# Technical Debt Identification
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `outputDir`.
+
+## PHASE 0: Evidence and Scope (MANDATORY)
+1. Read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
+2. The evidence file may reference compiler warnings, test output, and recent runtime logs. Use it as evidence; do not create any diagnostic report.
+3. You may only write inside the output directory under `tickets/identified/`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
+
+## PHASE 1: Strict Verification
+Obtain exact line numbers, actual function or class names, and the directly affected files from the current code. Never invent paths or lines. If a datapoint cannot be verified, say so instead of guessing.
+
+## PHASE 2: Writing
+For each debt, create one independent Markdown file in English under the output directory, using the repository naming convention or `[number]-[short-name].md`.
+
+### Document Structure
+
+## 0. Classification
+Select and briefly justify the type of debt:
+* [ ] 🧩 **Code Smell:** duplication, giant methods, confusing names, god classes.
+* [ ] 🧱 **Unnecessary Complexity:** over-engineered logic, deep nesting, coupling.
+* [ ] 🧪 **Lack of Coverage:** critical modules without tests or insufficient coverage.
+* [ ] 📦 **Outdated Library:** outdated, deprecated, or vulnerable dependencies.
+* [ ] 🏗️ **Architecture:** design principle violations, poorly distributed responsibility.
+* [ ] 📝 **Missing Documentation:** critical code without comments or outdated docs.
+
+Select and briefly justify the priority level:
+* [ ] 🔴 Urgent: causing recurring bugs, blocking features, or compromising security or performance.
+* [ ] 🟡 Important: hinders development, increases implementation time, or causes confusion.
+* [ ] 🔵 Minor: improves long-term maintainability without impacting the current pace.
+
+## 1. Objective
+Document and classify the detected debt before it becomes a real problem. It must be clear what is wrong, where it is, and what risk it implies.
+
+## 2. Evidence
+### Location
+* **File(s):** exact path verified in the code.
+* **Line(s) / Block:** exact line range or name of the function, class, or module.
+
+### Problem Description
+What is wrong and why it is a problem. Concrete and technical.
+
+### Current Symptoms
+* [ ] Recurring errors in QA or bugs.
+* [ ] Inflated development time in this area.
+* [ ] Difficulty or impossibility to write tests.
+* [ ] Frequent conflicts in pull requests.
+* [ ] Others: specify.
+
+### Metrics
+Only when extractable from code: coverage, complexity or size, library version.
+
+## 3. Impact
+### Affected Files
+* **Direct:** files involved in the problem.
+* **Indirect (Risk):** files that could break if this fails or during a refactor.
+
+### Dependent Modules
+What parts of the application consume or depend on the defective code.
+
+### Risk of Inaction
+* **Short term:** observable consequence.
+* **Medium term:** larger consequence.
+
+## 4. References
+Related issues, previous pull requests, and resources. Never reference a ticket file or an ADR number from code snippets.
+
+## GOLDEN RULES (NON-NEGOTIABLE)
+1. **ZERO SOLUTIONS:** never propose refactors, new architectures, or complete solutions. Only the finding is documented.
+2. **ATOMICITY:** one file equals one specific problem. Multiple debts in the same file become multiple files.
+3. **TRUTHFULNESS:** if you cannot verify the exact lines or files with your tools, write "To be verified in IDE" instead of guessing.
+4. **READ-ONLY:** never edit source, tests, UX, CI, ADRs, or configuration. Never implement a UX change. If you find a UX improvement, document it as an observation in your final message, not as a code change.
+5. **NO DIAGNOSTIC REPORT:** do not create a separate diagnostics artifact. The evidence is an input.
+6. **LOCAL ONLY:** these tickets are local artifacts. Do not commit, push, or reference them from Git.
+
+End with a short summary: scope, files written, and debts found per severity.
+```
+
+### src/prompts/ready-for-dev.md
+
+````
+# Ready for Dev Ticket Generation
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Read the backlog under `backlogDir` and write tickets under `outputDir` using the `feature` slug. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
+
+## PHASE 1: Analysis and Context (MANDATORY)
+Before writing any tickets, understand the current project context.
+1. Read the backlog.
+2. Explore the project structure. Identify the existing architecture, code patterns, and conventions.
+3. Do not assume file or class names; verify them in the codebase.
+
+## PHASE 2: Ticket Generation
+For each main task, or complex subtask, in the backlog, generate an independent technical ticket.
+**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-dev/[feature]/[number-of-ticket]-[ticket-name].md`.
+
+## Front Matter (MANDATORY)
+Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
+
+```yaml
+---
+id: [unique-short-id]
+feature: [feature-slug]
+type: [feat|fix|refactor|perf|test|docs|chore]
+priority: [urgent|important|minor]
+depends_on: [id-or-empty-list]
+---
+```
+
+Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
+
+## Structure of each Ticket
+
+## 0. Classification
+Select and briefly justify the priority level:
+* [ ] 🔴 Urgent: Core functionality.
+* [ ] 🟡 Important: Extra functionality.
+* [ ] 🔵 Minor: Visual or UX improvements.
+
+## 1. Objective
+What is to be built or solved, in one or two clear sentences.
+
+## 2. Files
+### New files
+* List of new files to be created with their full paths.
+### Modified files
+* List of existing files to be touched with their full paths. Verify that they exist in the project.
+
+## 3. Implementation (Technical Specification)
+Detailed technical description of how it should work. It must be clear enough for a junior developer or an AI to code it without asking questions.
+* **Interfaces / Types:** Define the necessary data structures, interfaces, or types.
+* **Classes / Functions:** Suggested names, signatures, and responsibilities.
+* **Main Flow:** Step-by-step execution logic for the happy path.
+* **Validations and Thresholds:** Which data is validated and what the limits are.
+* **Edge cases:** How it behaves in extreme situations or error scenarios.
+
+## 4. Acceptance Criteria (Definition of Done)
+Technical and functional conditions that must be met to close the ticket.
+* The code compiles without errors or critical warnings.
+* Unit tests have been written for the new logic.
+* The UI, if applicable, respects the design across all breakpoints and states.
+* There are no console.log statements, print statements, or commented-out code.
+
+## 5. Technical Notes
+Important details for implementation:
+* **Dependencies/Libraries:** Which external packages are required, with versions when applicable.
+* **Design decisions:** Why this approach was chosen over another.
+* **Error handling:** How and where errors should be caught and thrown.
+* **Architecture Impact:** If this implementation introduces a new framework, database, or core pattern, stop and ask for an architecture decision record before proceeding.
+````
+
+### src/prompts/ready-for-refactor.md
+
+````
+# Ready for Refactor Ticket Generation
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Read the Identified tickets and the scope patch or file list the payload provides, and write tickets under the payload `outputDir`. Stay inside the provided scope. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
+
+## PHASE 1: Context and Code Analysis (MANDATORY)
+Before writing the plan, understand the original problem and the current code.
+1. Read the Identified documents in scope.
+2. Analyze the current source code files involved.
+3. Identify what tests currently exist for that code, if any.
+4. Do not write refactoring code yet. Your only job in this phase is to create the plan.
+
+## PHASE 2: Plan Generation and Saving
+For each main task, or complex subtask, in the Identified documents, generate an independent technical ticket.
+**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-refactor/[feature]/[number-of-ticket]-[ticket-name].md`.
+
+## Front Matter (MANDATORY)
+Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
+
+```yaml
+---
+id: [unique-short-id]
+feature: [feature-slug]
+type: refactor
+priority: [urgent|important|minor]
+depends_on: [id-or-empty-list]
+---
+```
+
+Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
+
+## Document Structure
+
+## 0. Classification
+Select and briefly justify the type of debt:
+* [ ] 🧩 **Code Smell:** duplication, giant methods, confusing names, god classes.
+* [ ] 🧱 **Unnecessary Complexity:** over-engineered logic, deep nesting, coupling.
+* [ ] 🧪 **Lack of Coverage:** critical modules without tests or insufficient coverage.
+* [ ] 📦 **Outdated Library:** outdated, deprecated, or vulnerable dependencies.
+* [ ] 🏗️ **Architecture:** design principle violations, poorly distributed responsibility.
+* [ ] 📝 **Missing Documentation:** critical code without comments or outdated docs.
+
+Select and briefly justify the priority level:
+* [ ] 🔴 Urgent: Technical debt is causing recurring bugs, blocking features, or compromising security or performance.
+* [ ] 🟡 Important: Hinders development, increases implementation time, or causes confusion.
+* [ ] 🔵 Minor: Improves long-term maintainability but does not impact the current workflow pace.
+
+## 1. Objective
+Clearly describe what technical debt will be resolved, how it will be refactored, and what measures will be taken to ensure that current functionality does not break.
+
+## 2. Files
+### Files to modify
+* [Exact path] - [Brief description of what will be cleaned or restructured]
+### Files to delete
+* [Exact path] - [Reason why it becomes obsolete]
+### New files
+* [Exact path] - [Responsibility this new file will assume]
+
+## 3. Refactoring Strategy
+Technical description of the chosen approach.
+* **Pattern or technique to apply:** for example Extract Class, Strategy Pattern, Strangler Fig.
+* **Execution steps:** ordered list of logical and atomic steps from the current state to the desired state.
+* **API/Contract changes:** if function signatures, interfaces, or endpoints change, detail how.
+
+## 4. Risk Mitigation Plan (CRITICAL)
+Since the goal is not to break current functionality, detail how stability will be ensured:
+* **Tests to add before touching code (Characterization Tests):** current behaviors that must be covered as a safety net.
+* **Tests to modify after the refactor:** existing tests that must change their assertion or mock due to the new structure.
+* **Rollback or Feature Flags Strategy:** how the change will be hidden or reverted if something fails in production, when applicable.
+
+## 5. Acceptance Criteria (Definition of Done)
+* [ ] The original problem from the Identified document has been completely eliminated.
+* [ ] All existing tests pass without modifying their original assertion, unless the test was poorly written.
+* [ ] Test coverage remains the same or increases, never decreases.
+* [ ] No new unnecessary dependencies have been introduced.
+* [ ] The code passes the linter and static quality rules without new warnings.
+
+## 6. Technical Notes and Design Decisions
+* **Discarded alternatives:** brief explanation of why this strategy was chosen over others.
+* **Accepted trade-offs:** temporary complexity assumed to solve the problem in the long term.
+* **Performance/Memory impact:** whether the new structure consumes more or fewer resources.
+````
+
+### src/prompts/release.md
+
+```
+# Release and Changelog Generation
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+The payload provides `mode`, `version`, `branch`, `baseBranch`, and `releaseBranch`.
+
+## PHASE 1: Analysis (READ-ONLY)
+1. Inspect the project root and locate its version manifest and changelog.
+2. Read `baseBranch` and `releaseBranch` from the payload.
+3. Get the last tag with `git describe --tags --abbrev=0`. If no tag exists, use the full commit log; otherwise log the commits since the last tag.
+4. Parse commit subjects with Conventional Commits (`feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`). Ignore merge commits.
+
+## PHASE 2: Version Calculation
+The explicit `version` in the payload wins. When it is missing, calculate the semantic version:
+- `BREAKING CHANGE` or `feat!` bumps MAJOR.
+- At least one `feat` bumps MINOR.
+- Only `fix`, `refactor`, `perf`, `test`, `docs`, or `chore` bumps PATCH.
+
+## PHASE 3: Changelog and Manifest
+Generate a new `CHANGELOG.md` section:
+
+## [New Version] - YYYY-MM-DD
+### Added
+- From `feat` commits.
+### Fixed
+- From `fix` commits.
+### Changed
+- From `refactor`, `perf`, `test`, `docs`, and `chore` commits.
+
+Update the version in the manifest file.
+
+## PHASE 4: Execution
+- Write the changes and commit with `chore: release v<version>`. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands to verify the repository before committing. Never push, merge, or tag; the orchestrator handles the pull request, the merge, and the tag.
+- Never reference tickets, ADRs, or issues in commit messages or changelog entries. No scope parentheses.
+```
+
+### src/runners/index.js
+
+```
+const RUNNERS = {
+  opencode: () => import('./opencode.js')
+}
+
+/**
+ * Resolves the session runner declared in `.autopilot.json`. Adding support
+ * for another coding tool means adding one module here and one entry to the
+ * map; the core never imports a concrete runner.
+ */
+export async function resolveRunner(config) {
+  const name = config.runner ?? 'opencode'
+  const loader = RUNNERS[name]
+  if (!loader) {
+    throw new Error(`Unknown runner "${name}". Available runners: ${availableRunners().join(', ')}.`)
+  }
+  return loader()
+}
+
+export function availableRunners() {
+  return Object.keys(RUNNERS)
+}
+```
+
+### src/runners/opencode.js
+
+```
+import { runCommand } from '../lib/runner.js'
+
+/**
+ * Builds the OpenCode CLI arguments for one non-interactive session. The
+ * agent selects the permissions; the prompt text is owned by the core.
+ */
+export function buildArgs({ config, agent, promptText, title, role }) {
+  const args = ['run', '--auto', '--dir', config.repoPath, '--title', title]
+  if (agent) args.push('--agent', agent)
+  const model = role ? config.models?.[role] : null
+  if (model) args.push('--model', model)
+  args.push(promptText)
+  return args
+}
+
+export async function runSession({ config, agent, promptText, title, logFile, role }) {
+  const args = buildArgs({ config, agent, promptText, title, role })
+  return runCommand('opencode', args, {
+    cwd: config.repoPath,
+    env: { ...(config.runnerOptions?.env ?? {}), OPENCODE_DISABLE_AUTOUPDATE: '1' },
+    timeoutMs: config.sessionTimeoutMinutes * 60000,
+    logFile
+  })
+}
+```
+
 ### test/config.test.js
 
 ```
@@ -3544,6 +3721,9 @@ test('loads defaults and resolves the state directory', async () => {
   assert.deepEqual(config.requiredChecks, ['Build and test'])
   assert.equal(config.stateDir, path.join(repo, 'tickets', '.autopilot'))
   assert.equal(config.maxAttempts, 3)
+  assert.equal(config.runner, 'opencode')
+  assert.ok(config.protectedPaths.includes('.github/**'))
+  assert.ok(config.protectedPaths.includes('.autopilot.json'))
 })
 
 test('fails when .autopilot.json is missing', async () => {
@@ -3580,6 +3760,30 @@ test('aggregates Cobertura reports', async () => {
 test('returns null when no report exists', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-coverage-empty-'))
   assert.equal(await readCoverage(repo), null)
+})
+```
+
+### test/forbidden.test.js
+
+```
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { findForbidden, globToRegExp } from '../src/lib/forbidden.js'
+
+test('matches the default protected paths', () => {
+  const files = ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json', 'src/app.js', 'README.md']
+  const patterns = ['.github/**', 'AGENTS.md', 'opencode.json', 'opencode.jsonc', '.autopilot.json']
+  assert.deepEqual(findForbidden(files, patterns), ['.github/workflows/ci.yml', 'AGENTS.md', 'opencode.json'])
+})
+
+test('supports a custom protected list', () => {
+  assert.deepEqual(findForbidden(['docs/secret.md', 'src/app.js'], ['docs/**']), ['docs/secret.md'])
+})
+
+test('globToRegExp handles single-star and double-star', () => {
+  assert.ok(globToRegExp('src/*.js').test('src/app.js'))
+  assert.ok(!globToRegExp('src/*.js').test('src/nested/app.js'))
+  assert.ok(globToRegExp('src/**').test('src/nested/app.js'))
 })
 ```
 
@@ -3642,6 +3846,70 @@ test('does not flag hexadecimal colors as issue references', () => {
     '+<Setter Property="Background" Value="#0AFFFFFF"/>'
   ].join('\n')
   assert.equal(scanAddedLines(diff).length, 0)
+})
+```
+
+### test/prompts.test.js
+
+```
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { loadPrompt, renderPrompt } from '../src/lib/prompts.js'
+
+test('renders the payload into a core prompt', async () => {
+  const prompt = await loadPrompt('autopilot-finish', { mode: 'finish', branch: 'feat/example' })
+  assert.match(prompt, /"mode": "finish"/)
+  assert.ok(!prompt.includes('{{PAYLOAD}}'))
+})
+
+test('rejects invalid prompt names', async () => {
+  await assert.rejects(() => loadPrompt('../etc/passwd', {}), /Invalid prompt name/)
+})
+
+test('renderPrompt removes the placeholder when there is no payload', () => {
+  assert.equal(renderPrompt('A {{PAYLOAD}} B', undefined), 'A  B')
+})
+```
+
+### test/runners.test.js
+
+```
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { availableRunners, resolveRunner } from '../src/runners/index.js'
+import { buildArgs } from '../src/runners/opencode.js'
+
+test('resolves the default runner', async () => {
+  const runner = await resolveRunner({ runner: 'opencode' })
+  assert.equal(typeof runner.runSession, 'function')
+})
+
+test('rejects unknown runners', async () => {
+  await assert.rejects(() => resolveRunner({ runner: 'unknown' }), /Unknown runner/)
+  assert.deepEqual(availableRunners(), ['opencode'])
+})
+
+test('builds OpenCode arguments with agent and model', () => {
+  const args = buildArgs({
+    config: { repoPath: 'C:/repo', models: { executor: 'provider/model' } },
+    agent: 'autopilot',
+    promptText: 'do work',
+    title: 'task',
+    role: 'executor'
+  })
+  assert.deepEqual(args, [
+    'run',
+    '--auto',
+    '--dir',
+    'C:/repo',
+    '--title',
+    'task',
+    '--agent',
+    'autopilot',
+    '--model',
+    'provider/model',
+    'do work'
+  ])
 })
 ```
 

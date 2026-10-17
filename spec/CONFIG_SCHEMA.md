@@ -4,6 +4,9 @@ The configuration file lives at the root of each target repository. It is genera
 
 | Key | Type | Meaning |
 | --- | --- | --- |
+| `runner` | string | Session runner name. Default `opencode`. Add new runners under `src/runners/`. |
+| `runnerOptions` | object | Optional runner settings, such as extra environment variables. |
+| `protectedPaths` | string array | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
 | `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. |
@@ -46,4 +49,4 @@ Generation rules:
 - Set `coverageThreshold` only when CI enforces one.
 - Set `runtimeLogs` only when the application writes local logs.
 - Keep tickets and state local; add them to `.gitignore` when needed.
-- Validate with `node <AUTOPILOT_HOME>/src/cli.js status --repo .` after writing.
+- Validate with `ai-autopilot status --repo .` after writing.

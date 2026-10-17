@@ -1,6 +1,6 @@
 import * as git from './git.js'
 import * as github from './github.js'
-import { runOpenCode } from './opencode.js'
+import { runSession } from './session.js'
 import { scanBranch, scanRepositoryFiles, formatViolations, validatePrBody } from './policy.js'
 import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
@@ -108,7 +108,7 @@ export async function pushOpenWaitMerge({
   title,
   prBody,
   state,
-  executorCommand,
+  executorPrompt,
   executorPayload,
   coverage,
   log
@@ -151,9 +151,10 @@ export async function pushOpenWaitMerge({
     const failureLogs = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
     await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: executorCommand,
+      prompt: executorPrompt,
+      agent: config.agents.executor,
       payload: {
         ...executorPayload,
         attempt,
@@ -214,7 +215,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
   const commits = await git.logCommits(config.repoPath, range)
   const diff = await git.diff(config.repoPath, range)
   const files = await git.diffNames(config.repoPath, range)
-  const forbidden = findForbidden(files)
+  const forbidden = findForbidden(files, config.protectedPaths)
   if (forbidden.length > 0) {
     throw new Error(`The branch modifies protected paths:\n${forbidden.join('\n')}`)
   }
@@ -224,9 +225,10 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
   if (violations.length === 0) return { fixed: false, violations: [] }
   if (violations.length > 0) {
     const message = formatViolations(violations)
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-finish',
+      prompt: 'autopilot-finish',
+      agent: config.agents.executor,
       payload: {
         ...executorPayload,
         mode: 'policy-fix',

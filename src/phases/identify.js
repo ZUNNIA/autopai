@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
 import * as github from '../lib/github.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
@@ -59,9 +59,10 @@ export async function runIdentify({ config, stateStore, options, log }) {
       outputDir,
       instructions: 'Write one Identified ticket per debt under outputDir. No source edits, no UX changes, no diagnostic report.'
     }
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'identified',
+      prompt: 'identified',
+      agent: config.agents.auditor,
       payload,
       title: `autopilot identify ${resolved.name}`,
       logFile: artifacts.path(`auditor-${slugify(resolved.name)}.log`),

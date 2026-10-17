@@ -4,7 +4,9 @@ The autopilot is an external Node orchestrator that coordinates agentic coding t
 
 ## Design rules
 
-- The orchestrator is language, framework, and repository agnostic. Every command comes from `.autopilot.json` or from the repository itself.
+- The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `.autopilot.json` or from the repository itself.
+- Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
+- Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
 - One session per phase or per ticket. No long-running conversation carries the run.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop after a backlog, identify debt, refactor, or release.
 - State lives outside any conversation, in local files, and survives crashes.
@@ -38,6 +40,11 @@ Local gates run restore, build, test, and the configured coverage threshold befo
 ## Protected paths
 
 The executor agent cannot edit tickets, ADRs, CI workflows, `.autopilot.json`, the repository `AGENTS.md`, or the coding tool configuration. The orchestrator re-checks protected paths before every push.
+
+## Known dependencies
+
+- GitHub is a hard dependency today: pull requests, checks, and merges go through the `gh` CLI. The coding tool is replaceable through runners; the Git host is a separate axis and would need its own adapter layer.
+- Node.js 20 or newer is required to run the orchestrator.
 
 ## Policy verification
 

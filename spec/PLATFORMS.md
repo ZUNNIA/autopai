@@ -2,12 +2,18 @@
 
 The orchestrator only needs two things from a coding tool: a non-interactive session that accepts a prompt, and a permission model that keeps the executor away from Git writes and protected paths. Everything else is platform glue.
 
+## Runner interface
+
+The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `.autopilot.json` (`runner`, default `opencode`).
+
+A runner module exports `runSession({ config, agent, promptText, title, logFile, role })` and maps the call to its CLI. Adding a tool means adding `src/runners/<name>.js` and one entry to the map in `src/runners/index.js`. The prompts, phases, state, policy, and merge logic stay unchanged.
+
 ## OpenCode (native)
 
 - Orchestrator: the `ai-autopilot` command, installed with `npm link` from this repository.
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
-- Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`.
-- Session: `opencode run --command <name> --auto --dir <repo> "<json>"`.
+- Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`. These are manual wrappers that call `ai-autopilot`.
+- Session: `opencode run --agent <agent> --auto --dir <repo> "<prompt>"`.
 - Permissions: path-scoped `edit` rules and command patterns under `bash`.
 - Global rules: the repository `AGENTS.md`.
 

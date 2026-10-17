@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { scanBranch, scanRepositoryFiles, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { deriveTitle, generatePrBody, resolveTitle } from '../lib/title.js'
@@ -50,7 +50,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   const diff = await git.diff(config.repoPath, range)
   const changedFiles = await git.diffNames(config.repoPath, range)
 
-  const forbidden = findForbidden(changedFiles)
+  const forbidden = findForbidden(changedFiles, config.protectedPaths)
   if (forbidden.length > 0) {
     throw new Error(`The branch changes protected paths and cannot be adopted automatically:\n${forbidden.join('\n')}`)
   }
@@ -107,13 +107,15 @@ export async function runAdopt({ config, stateStore, options, log }) {
     restoreCommand: config.restoreCommand,
     buildCommand: config.buildCommand,
     testCommand: config.testCommand,
+    stateDir: config.stateDir,
     prTitlePath: titleFile,
     instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or autopilot configuration.'
   }
 
-  const execution = await runOpenCode({
+  const execution = await runSession({
     config,
-    command: 'autopilot-finish',
+    prompt: 'autopilot-finish',
+    agent: config.agents.executor,
     payload,
     title: `autopilot finish ${branch}`,
     logFile: artifacts.path('executor-finish.log'),
@@ -160,7 +162,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     title,
     prBody,
     state,
-    executorCommand: 'autopilot-finish',
+    executorPrompt: 'autopilot-finish',
     executorPayload: payload,
     coverage: gates.coverage,
     log

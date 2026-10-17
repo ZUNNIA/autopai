@@ -82,7 +82,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **Justify tradeoffs**: when options differ, state the tradeoff explicitly and recommend the one that ages best.
 
 ## 9. Autopilot Orchestration (EXTERNAL)
-The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh OpenCode sessions through the dedicated agents and keeps its state under the repository's local `tickets/.autopilot` directory.
+The autopilot is the `ai-autopilot` command, a Node orchestrator installed from the `ZUNNIA/ai-autopilot` repository. It starts fresh sessions through the dedicated agents of the configured coding tool and keeps its state under the repository's local `tickets/.autopilot` directory.
 
 - **Pre-authorized scope:** while an autopilot run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopilot` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
 - **Local artifacts:** tickets, ADRs, briefs, Identified findings, and audit evidence are local. Never commit, push, or reference them from Git artifacts. Do not create diagnostic reports.

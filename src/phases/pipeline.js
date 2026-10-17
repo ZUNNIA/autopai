@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
-import { runOpenCode } from '../lib/opencode.js'
+import { runSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, resolveTitle } from '../lib/title.js'
@@ -24,9 +24,10 @@ export async function runPrepare({ config, stateStore, options, log }) {
     if (!options.description) {
       throw new Error(`Missing ${briefPath}. Provide --description or run /feature-brief before prepare.`)
     }
-    const briefRun = await runOpenCode({
+    const briefRun = await runSession({
       config,
-      command: 'feature-brief',
+      prompt: 'feature-brief',
+      agent: config.agents.planner,
       payload: { feature, description: String(options.description), briefPath },
       title: `autopilot brief ${feature}`,
       logFile: artifacts.path('planner-brief.log'),
@@ -35,9 +36,10 @@ export async function runPrepare({ config, stateStore, options, log }) {
     if (briefRun.code !== 0) throw new Error('The planner could not write the feature brief.')
   }
 
-  const backlogRun = await runOpenCode({
+  const backlogRun = await runSession({
     config,
-    command: 'backlog',
+    prompt: 'backlog',
+    agent: config.agents.planner,
     payload: { feature, briefPath, outputDir: backlogDir },
     title: `autopilot backlog ${feature}`,
     logFile: artifacts.path('planner-backlog.log'),
@@ -64,9 +66,10 @@ export async function runApprove({ config, stateStore, options, log }) {
   const artifacts = new Artifacts(config, `approve-${Date.now()}`)
   await artifacts.init()
 
-  const generated = await runOpenCode({
+  const generated = await runSession({
     config,
-    command: 'ready-for-dev',
+    prompt: 'ready-for-dev',
+    agent: config.agents.planner,
     payload: { feature, backlogDir, outputDir: readyDir },
     title: `autopilot ready-for-dev ${feature}`,
     logFile: artifacts.path('planner-ready-for-dev.log'),
@@ -112,12 +115,14 @@ export async function runDev({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      stateDir: config.stateDir,
       instructions: 'Implement only this ticket. Do not push or merge. Commit with type: subject, no scope, no ticket or ADR references.'
     }
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-dev',
+      prompt: 'autopilot-dev',
+      agent: config.agents.executor,
       payload,
       title: `autopilot dev ${ticket.id}`,
       logFile: artifacts.path(`executor-${ticket.slug}.log`),
@@ -145,7 +150,7 @@ export async function runDev({ config, stateStore, options, log }) {
       title,
       prBody,
       state,
-      executorCommand: 'autopilot-dev',
+      executorPrompt: 'autopilot-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -195,12 +200,14 @@ export async function runRefactor({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      stateDir: config.stateDir,
       instructions: 'Refactor only the files in the ticket scope. Keep tests green. Do not push or merge.'
     }
 
-    const execution = await runOpenCode({
+    const execution = await runSession({
       config,
-      command: 'autopilot-dev',
+      prompt: 'autopilot-dev',
+      agent: config.agents.executor,
       payload,
       title: `autopilot refactor ${ticket.id}`,
       logFile: artifacts.path(`refactor-${ticket.slug}.log`),
@@ -222,7 +229,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
       title,
       prBody: generatePrBody({ commits, coverage: gates.coverage }),
       state,
-      executorCommand: 'autopilot-dev',
+      executorPrompt: 'autopilot-dev',
       executorPayload: payload,
       coverage: gates.coverage,
       log
@@ -251,9 +258,10 @@ export async function runRelease({ config, stateStore, options, log }) {
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
-  const execution = await runOpenCode({
+  const execution = await runSession({
     config,
-    command: 'release',
+    prompt: 'release',
+    agent: config.agents.executor,
     payload: {
       mode: 'release',
       version,
@@ -262,7 +270,8 @@ export async function runRelease({ config, stateStore, options, log }) {
       releaseBranch: config.releaseBranch,
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
-      testCommand: config.testCommand
+      testCommand: config.testCommand,
+      stateDir: config.stateDir
     },
     title: `autopilot release v${version}`,
     logFile: artifacts.path(`release-v${version}.log`),
@@ -284,8 +293,8 @@ export async function runRelease({ config, stateStore, options, log }) {
     title,
     prBody: generatePrBody({ commits, coverage: gates.coverage }),
     state,
-    executorCommand: 'release',
-    executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch },
+    executorPrompt: 'release',
+    executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch, stateDir: config.stateDir },
     coverage: gates.coverage,
     log
   })

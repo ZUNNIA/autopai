@@ -2,7 +2,7 @@
 
 Portable, CI-gated development orchestrator for agentic coding tools. It coordinates work through resumable phases, keeps state in local files, and owns every Git write: branches, commit validation, pushes, pull requests, CI waits, and merges.
 
-The orchestrator is language and repository agnostic. Every build, test, and check comes from a `.autopilot.json` that the AI generates inside each target repository.
+The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopilot.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive OpenCode today and another tool tomorrow.
 
 ## Requirements
 
@@ -14,10 +14,12 @@ The orchestrator is language and repository agnostic. Every build, test, and che
 
 ```text
 src/                         Node orchestrator
+src/prompts/                 Core-owned task prompts, independent from any tool
+src/runners/                 Session runners, one module per coding tool
 test/                        Unit tests
 spec/                        Architecture, policies, config schema, platform guide
 platforms/opencode/agents/   Agent definitions with path-scoped permissions
-platforms/opencode/commands/ Command prompts
+platforms/opencode/commands/ Manual command wrappers that call ai-autopilot
 AGENTS.md                    Global rules for the coding tool
 BOOTSTRAP_PROMPT.md          Self-contained prompt to recreate this system in another tool
 scripts/build-bootstrap.mjs  Regenerates BOOTSTRAP_PROMPT.md from the sources
@@ -84,7 +86,14 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 
 ## Migrating to another tool
 
-Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the portable piece; the agent and command files are platform glue.
+Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the portable piece. To support a new tool:
+
+1. Add `src/runners/<tool>.js` exporting `runSession`.
+2. Register it in `src/runners/index.js`.
+3. Set `runner` in the target repository `.autopilot.json`.
+4. Recreate the agent roles and permissions under `platforms/<tool>/`.
+
+The core prompts, phases, state, policy, and merge logic do not change.
 
 ## Development
 
