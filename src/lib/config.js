@@ -1,0 +1,95 @@
+import path from 'node:path'
+import { expandEnv, exists, readJson, assert } from './util.js'
+
+const DEFAULT_TICKET_DIRS = {
+  backlog: 'tickets/backlog',
+  readyForDev: 'tickets/ready-for-dev',
+  identified: 'tickets/identified',
+  readyForRefactor: 'tickets/ready-for-refactor',
+  ux: 'tickets/ux',
+  done: 'tickets/done'
+}
+
+const DEFAULTS = {
+  baseBranch: 'main',
+  releaseBranch: 'main',
+  requiredChecks: [],
+  ignoredChecks: [],
+  restoreCommand: null,
+  buildCommand: null,
+  testCommand: null,
+  coverageThreshold: null,
+  maxAttempts: 3,
+  maxMinutes: 240,
+  commandTimeoutMinutes: 30,
+  sessionTimeoutMinutes: 90,
+  checkPollSeconds: 30,
+  checkTimeoutMinutes: 30,
+  autoMerge: true,
+  approvalRequired: true,
+  prTitle: null,
+  runtimeLogs: [],
+  commitTypes: ['feat', 'fix', 'refactor', 'perf', 'test', 'docs', 'chore'],
+  agents: {
+    executor: 'autopilot',
+    planner: 'planner',
+    auditor: 'auditor',
+    setup: 'setup'
+  },
+  models: {
+    executor: null,
+    planner: null,
+    auditor: null,
+    setup: null
+  }
+}
+
+/**
+ * Loads and normalizes the per-repository autopilot configuration.
+ */
+export async function loadConfig(repoPath) {
+  const resolvedRepo = path.resolve(repoPath)
+  const configPath = path.join(resolvedRepo, '.autopilot.json')
+  const raw = await readJson(configPath)
+  assert(raw, `Missing .autopilot.json at ${configPath}. Run /autopilot-init first.`)
+
+  const config = { ...DEFAULTS, ...expandEnv(raw) }
+  config.repoPath = resolvedRepo
+  config.configPath = configPath
+  config.ticketDirs = { ...DEFAULT_TICKET_DIRS, ...(config.ticketDirs ?? {}) }
+  config.agents = { ...DEFAULTS.agents, ...(config.agents ?? {}) }
+  config.models = { ...DEFAULTS.models, ...(config.models ?? {}) }
+
+  if (!config.stateDir) {
+    config.stateDir = await exists(path.join(resolvedRepo, 'tickets'))
+      ? path.join(resolvedRepo, 'tickets', '.autopilot')
+      : path.join(resolvedRepo, '.autopilot')
+  } else {
+    config.stateDir = path.resolve(resolvedRepo, config.stateDir)
+  }
+
+  config.runtimeLogs = (config.runtimeLogs ?? []).map(pattern => path.resolve(resolvedRepo, pattern))
+  config.requiredChecks = asArray(config.requiredChecks)
+  config.ignoredChecks = asArray(config.ignoredChecks)
+  config.commitTypes = asArray(config.commitTypes)
+
+  assert(config.baseBranch, 'baseBranch is required')
+  assert(config.releaseBranch, 'releaseBranch is required')
+  validateCommand(config.restoreCommand, 'restoreCommand')
+  validateCommand(config.buildCommand, 'buildCommand')
+  validateCommand(config.testCommand, 'testCommand')
+  assert(config.maxAttempts > 0, 'maxAttempts must be greater than zero')
+
+  return config
+}
+
+function asArray(value) {
+  if (value == null) return []
+  return Array.isArray(value) ? value : [value]
+}
+
+function validateCommand(command, name) {
+  if (command == null) return
+  assert(Array.isArray(command) && command.length > 0, `${name} must be an array of arguments`)
+  assert(command.every(item => typeof item === 'string'), `${name} arguments must be strings`)
+}
