@@ -8,7 +8,7 @@ import { loadConfig } from '../src/lib/config.js'
 test('loads defaults and resolves the state directory', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-'))
   await fs.mkdir(path.join(repo, 'tickets'), { recursive: true })
-  await fs.writeFile(path.join(repo, '.autopai.json'), JSON.stringify({
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
     runner: 'opencode',
     baseBranch: 'develop',
     releaseBranch: 'main',
@@ -24,17 +24,17 @@ test('loads defaults and resolves the state directory', async () => {
   assert.equal(config.maxAttempts, 3)
   assert.equal(config.runner, 'opencode')
   assert.ok(config.protectedPaths.includes('.github/**'))
-  assert.ok(config.protectedPaths.includes('.autopai.json'))
+  assert.ok(config.protectedPaths.includes('autopai.json'))
 })
 
-test('fails when .autopai.json is missing', async () => {
+test('fails when autopai.json is missing', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-missing-'))
   await assert.rejects(() => loadConfig(repo), /autopai-init/)
 })
 
 test('fails when the runner is missing', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-runner-'))
-  await fs.writeFile(path.join(repo, '.autopai.json'), JSON.stringify({
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
     baseBranch: 'main',
     releaseBranch: 'main'
   }), 'utf8')

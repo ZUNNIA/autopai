@@ -13,7 +13,7 @@ const DEFAULT_TICKET_DIRS = {
 const DEFAULT_PROTECTED_PATHS = [
   '.github/**',
   'AGENTS.md',
-  '.autopai.json'
+  'autopai.json'
 ]
 
 const DEFAULTS = {
@@ -57,9 +57,9 @@ const DEFAULTS = {
  */
 export async function loadConfig(repoPath) {
   const resolvedRepo = path.resolve(repoPath)
-  const configPath = path.join(resolvedRepo, '.autopai.json')
+  const configPath = path.join(resolvedRepo, 'autopai.json')
   const raw = await readJson(configPath)
-  assert(raw, `Missing .autopai.json at ${configPath}. Run /autopai-init first.`)
+  assert(raw, `Missing autopai.json at ${configPath}. Run /autopai-init first.`)
 
   const config = { ...DEFAULTS, ...expandEnv(raw) }
   config.repoPath = resolvedRepo
@@ -82,7 +82,7 @@ export async function loadConfig(repoPath) {
   config.commitTypes = asArray(config.commitTypes)
   config.protectedPaths = asArray(config.protectedPaths)
 
-  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in .autopai.json')
+  assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in autopai.json')
   assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')
   assert(config.baseBranch, 'baseBranch is required')
   assert(config.releaseBranch, 'releaseBranch is required')

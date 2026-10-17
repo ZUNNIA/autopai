@@ -45,7 +45,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 
 ## 5. Git Operations (STRICT)
 - **NEVER execute** `git push`, `git merge`, or `git rebase` without explicit user permission.
-- **NEVER create branches** without explicit user permission. Interactive work branches off the repository integration branch; when the repository uses AutopAI, the base branch is declared in `.autopai.json`.
+- **NEVER create branches** without explicit user permission. Interactive work branches off the repository integration branch; when the repository uses AutopAI, the base branch is declared in `autopai.json`.
 - You MAY run `git status`, `git branch --show-current`, `git diff`, `git log` for analysis.
 - You MUST recommend creating a new branch and commit before taking any write action.
 - When changes for a commit are ready, STOP and ask: "Changes ready. Run `git add . && git commit -m 'message'`?"
@@ -87,7 +87,7 @@ AutopAI is the `autopai` command, a Node orchestrator installed from the `ZUNNIA
 - **Pre-authorized scope:** while an AutopAI run is active, the orchestrator may push branches, open pull requests, and merge them only after the configured required checks pass. The `autopai` agent may commit but never push, merge, rebase, or force-push. Interactive sessions are not covered by this exception.
 - **Local artifacts:** tickets, ADRs, briefs, Identified findings, and audit evidence are local. Never commit, push, or reference them from Git artifacts. Do not create diagnostic reports.
 - **Entry points:** a run may start at any phase (adopt, prepare, approve, dev, identify, refactor, release) and may stop at any phase. Starting mid-pipeline is normal.
-- **Agent scopes:** `planner` only writes `tickets/backlog/**`, `tickets/ready-for-dev/**`, and `tickets/ready-for-refactor/**`; `auditor` only writes `tickets/identified/**` and `tickets/ux/**` and is read-only over source and UX; `autopai` writes source and tests only; `setup` only maintains `.autopai.json` and `.gitignore`.
+- **Agent scopes:** `planner` only writes `tickets/backlog/**`, `tickets/ready-for-dev/**`, and `tickets/ready-for-refactor/**`; `auditor` only writes `tickets/identified/**` and `tickets/ux/**` and is read-only over source and UX; `autopai` writes source and tests only; `setup` only maintains `autopai.json` and `.gitignore`.
 - **Commit style:** `<type>: <subject>` with no scope parentheses, no ticket or ADR references, and no issue references.
 - **Tests:** AutopAI may modify, add, or remove tests; the CI build, test suite, and coverage threshold are the quality gates.
 - **Release:** release changes go through a `chore/release-v<version>` branch and a pull request into the release branch; tags are created after the merge.

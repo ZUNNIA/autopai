@@ -2,7 +2,7 @@
 
 Portable, CI-gated development orchestrator for agentic coding tools. It coordinates work through resumable phases, keeps state in local files, and owns every Git write: branches, commit validation, pushes, pull requests, CI waits, and merges.
 
-The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `.autopai.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
+The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `autopai.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
 
 ## Requirements
 
@@ -130,8 +130,8 @@ Then open a target repository and run `/autopai-init`. If you are an AI agent, `
 ## Usage in a target repository
 
 1. Open the target repository in the coding tool.
-2. Run `/autopai-init`. The setup agent inspects the repository and writes `.autopai.json`. No language or framework is assumed.
-3. Review `.autopai.json`.
+2. Run `/autopai-init`. The setup agent inspects the repository and writes `autopai.json`. No language or framework is assumed.
+3. Review `autopai.json`.
 4. Run the phase you need:
 
 - `/autopai-adopt --branch <name>` finishes an existing branch through push, pull request, CI, and merge.
@@ -167,7 +167,7 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 
 - GitHub is a hard dependency: pull requests, checks, and merges use the `gh` CLI. The coding tool is replaceable through runners; the Git host is not, yet.
 - The bundled platform agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopai`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
-- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, and `.autopai.json`. Change it in `.autopai.json` when the repository uses other protected files.
+- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, and `autopai.json`. Change it in `autopai.json` when the repository uses other protected files.
 - `npm link` must be run again after moving the clone.
 
 ## Migrating to another tool
@@ -178,7 +178,7 @@ Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the port
 
 1. Add `src/runners/<tool>.js` exporting `runSession`.
 2. Register it in `src/runners/index.js`.
-3. Set `runner` in the target repository `.autopai.json`.
+3. Set `runner` in the target repository `autopai.json`.
 4. Recreate the agent roles and permissions under `platforms/<tool>/`.
 
 The core prompts, phases, state, policy, and merge logic do not change.

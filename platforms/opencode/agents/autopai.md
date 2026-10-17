@@ -6,7 +6,7 @@ permission:
     "*": "allow"
     "tickets/**": "deny"
     ".github/**": "deny"
-    ".autopai.json": "deny"
+    "autopai.json": "deny"
     "AGENTS.md": "deny"
     "opencode.json": "deny"
     "opencode.jsonc": "deny"
@@ -35,7 +35,7 @@ Rules:
 - Work only in the current repository and the current branch.
 - Never ask questions. If something blocks you, write a JSON file under the `needs-human` folder inside the state directory, `tickets/.autopai` by default, with the reason, the files involved, and what a human must decide, then stop.
 - Never push, fetch new branches, merge, rebase, force-push, or run `gh`.
-- Never edit tickets, ADRs, `.github`, `AGENTS.md`, `opencode.json*`, or `.autopai.json`.
+- Never edit tickets, ADRs, `.github`, `AGENTS.md`, `opencode.json*`, or `autopai.json`.
 - Follow the repository `AGENTS.md` and every ADR relevant to the files you touch.
 - Read the payload fields carefully. `mode` tells you what kind of work item this is: `finish`, `title`, `policy-fix`, `dev`, or `refactor`.
 - For `finish`, `policy-fix`, and `title`, review the existing branch diff and fix only what the payload requires. When the payload includes `prTitlePath`, write one line with the proposed PR title there. The title must summarize the whole branch, follow `<type>: <subject>`, and contain no scope, ticket reference, ADR reference, or issue reference.

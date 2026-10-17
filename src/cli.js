@@ -126,17 +126,17 @@ function printHelp() {
   process.stdout.write(`autopai
 
 Usage:
-  node src/cli.js adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-  node src/cli.js identify --repo <path> --scope branch:<name> [--scope pr:<number>] [--scope dir:<path>]
-  node src/cli.js prepare --repo <path> --feature <slug> [--description <text>]
-  node src/cli.js approve --repo <path> --feature <slug>
-  node src/cli.js dev --repo <path> --feature <slug>
-  node src/cli.js refactor --repo <path> --feature <slug>
-  node src/cli.js release --repo <path> --version <x.y.z>
-  node src/cli.js run --repo <path> --from <phase> --to <phase> [--feature <slug>]
-  node src/cli.js status --repo <path>
-  node src/cli.js resume --repo <path>
-  node src/cli.js abort --repo <path>
+  autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
+  autopai identify --repo <path> --scope branch:<name> [--scope pr:<number>] [--scope dir:<path>]
+  autopai prepare --repo <path> --feature <slug> [--description <text>]
+  autopai approve --repo <path> --feature <slug>
+  autopai dev --repo <path> --feature <slug>
+  autopai refactor --repo <path> --feature <slug>
+  autopai release --repo <path> --version <x.y.z>
+  autopai run --repo <path> --from <phase> --to <phase> [--feature <slug>]
+  autopai status --repo <path>
+  autopai resume --repo <path>
+  autopai abort --repo <path>
 `)
 }
 

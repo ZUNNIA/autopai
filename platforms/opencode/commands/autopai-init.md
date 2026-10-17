@@ -1,11 +1,11 @@
 ---
-description: Generate .autopai.json for this repository
+description: Generate autopai.json for this repository
 agent: setup
 ---
 
 Initialize AutopAI for this repository.
 
-Inspect the repository and write `.autopai.json`:
+Inspect the repository and write `autopai.json`:
 
 1. Read the root manifests, build files, test configuration, and `.github/workflows/*.yml`.
 2. Determine the integration branch (`baseBranch`) and the production branch (`releaseBranch`) from the repository and its CI workflows.

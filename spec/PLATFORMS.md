@@ -4,7 +4,7 @@ The orchestrator only needs two things from a coding tool: a non-interactive ses
 
 ## Runner interface
 
-The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `.autopai.json`. `runner` is required; the installation provides the bundled `opencode` runner.
+The core never imports a concrete coding tool. It calls `runSession` from `src/lib/session.js`, which loads a core-owned prompt from `src/prompts/` and resolves the runner declared in `autopai.json`. `runner` is required; the installation provides the bundled `opencode` runner.
 
 A runner module exports `runSession({ config, agent, promptText, title, logFile, role })` and maps the call to its CLI. Adding a tool means adding `src/runners/<name>.js` and one entry to the map in `src/runners/index.js`. The prompts, phases, state, policy, and merge logic stay unchanged.
 

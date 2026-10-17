@@ -9,7 +9,7 @@ import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { findForbidden } from '../lib/forbidden.js'
 
-const ALLOWED_UNTRACKED = ['.autopai.json', 'tickets/', '.autopai/']
+const ALLOWED_UNTRACKED = ['autopai.json', 'tickets/', '.autopai/']
 
 /**
  * Adopts an existing branch that already contains commits, finishes it, and
