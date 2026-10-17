@@ -48,6 +48,77 @@ The `ai-autopilot` command now points at this clone. Run `npm link` again after 
 - `platforms/opencode/commands/*` into `~/.config/opencode/commands/`.
 - `AGENTS.md` into `~/.config/opencode/AGENTS.md`, or merge it with the existing file.
 
+## Install with an AI agent
+
+This section is written so a human or an AI agent can install the kit without guessing. The repository is private, so cloning requires an authenticated GitHub account with access.
+
+Verify the prerequisites:
+
+```powershell
+node --version
+git --version
+gh auth status
+opencode --version
+```
+
+```bash
+node --version
+git --version
+gh auth status
+opencode --version
+```
+
+Clone the repository:
+
+```powershell
+gh repo clone ZUNNIA/ai-autopilot "$env:USERPROFILE\ai-autopilot"
+```
+
+```bash
+gh repo clone ZUNNIA/ai-autopilot ~/ai-autopilot
+```
+
+Install dependencies and link the command:
+
+```powershell
+Set-Location "$env:USERPROFILE\ai-autopilot"
+npm ci
+npm link
+```
+
+```bash
+cd ~/ai-autopilot
+npm ci
+npm link
+```
+
+`npm link` creates the `ai-autopilot` command. On Windows the shim lives in `%APPDATA%\npm`, which must be on `PATH`.
+
+Install the OpenCode platform files:
+
+```powershell
+Copy-Item .\platforms\opencode\agents\*.md "$env:USERPROFILE\.config\opencode\agents\" -Force
+Copy-Item .\platforms\opencode\commands\*.md "$env:USERPROFILE\.config\opencode\commands\" -Force
+Copy-Item .\AGENTS.md "$env:USERPROFILE\.config\opencode\AGENTS.md" -Force
+```
+
+```bash
+mkdir -p ~/.config/opencode/agents ~/.config/opencode/commands
+cp platforms/opencode/agents/*.md ~/.config/opencode/agents/
+cp platforms/opencode/commands/*.md ~/.config/opencode/commands/
+cp AGENTS.md ~/.config/opencode/AGENTS.md
+```
+
+If `~/.config/opencode/AGENTS.md` already exists, merge the autopilot section instead of overwriting the whole file.
+
+Verify the installation:
+
+```text
+ai-autopilot help
+```
+
+Then open a target repository and run `/autopilot-init`. If you are an AI agent, `BOOTSTRAP_PROMPT.md` contains a self-contained prompt you can be given directly. It covers installing this repository and recreating the system in another coding tool.
+
 ## Usage in a target repository
 
 1. Open the target repository in the coding tool.
@@ -84,7 +155,17 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 - No diagnostic reports. Audit evidence stays local.
 - Generated artifacts are written in English. No language detection.
 
+## Known constraints
+
+- GitHub is a hard dependency: pull requests, checks, and merges use the `gh` CLI. The coding tool is replaceable through runners; the Git host is not, yet.
+- The provided OpenCode agents assume the default ticket and state paths: `tickets/**` and `tickets/.autopilot`. If you change `ticketDirs` or `stateDir`, adjust the agent permissions under `platforms/opencode/agents/`.
+- `protectedPaths` defaults to `.github/**`, `AGENTS.md`, `opencode.json`, `opencode.jsonc`, and `.autopilot.json`. Change it in `.autopilot.json` when the repository uses other protected files.
+- The repository is private. Cloning requires an authenticated GitHub account with access.
+- `npm link` must be run again after moving the clone.
+
 ## Migrating to another tool
+
+Installing this repository is not the same as using it with another coding tool. The kit ships the OpenCode platform. To run the orchestrator with Codex or another tool, follow the porting steps below.
 
 Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the portable piece. To support a new tool:
 
@@ -94,6 +175,12 @@ Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the port
 4. Recreate the agent roles and permissions under `platforms/<tool>/`.
 
 The core prompts, phases, state, policy, and merge logic do not change.
+
+## Troubleshooting
+
+- `ai-autopilot` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\ai-autopilot.cmd`.
+- Two clones are linked: only one can own the `ai-autopilot` command. Run `npm link` in the clone you want to keep.
+- The OpenCode commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart OpenCode.
 
 ## Development
 

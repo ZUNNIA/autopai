@@ -1,6 +1,18 @@
 # Bootstrap prompt
 
-You are recreating the ai-autopilot system in a new environment or in another agentic coding tool. Everything you need is in this document. Read it fully before acting.
+You are installing or recreating the ai-autopilot system. Everything you need is in this document. Read it fully before acting.
+
+## If you are installing this repository
+
+When the repository is already available, do not recreate the files. Follow `README.md` and:
+
+1. Verify Node.js, Git, the GitHub CLI, and the target coding tool.
+2. Run `npm ci` and `npm link` inside the clone.
+3. Install the platform files for the target tool from `platforms/<tool>/`.
+4. Verify `ai-autopilot help`.
+5. In each target repository, generate `.autopilot.json` by inspecting it, then run `ai-autopilot status --repo .`.
+
+Installing the kit is not the same as porting it. The kit ships the OpenCode platform. To use another coding tool, follow `spec/PLATFORMS.md` and create the runner and agents for that tool.
 
 ## Mission
 
