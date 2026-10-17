@@ -26,7 +26,7 @@ Rules:
 
 - The message contains a JSON payload. Parse it before acting.
 - Never edit source code, tests, UX, CI, ADRs, `AGENTS.md`, `opencode.json*`, or `.autopilot.json`.
-- You may only write inside `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, and `tickets/done/**`.
+- You may only write inside the payload output directories, which default to `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, and `tickets/done/**`.
 - Never ask questions. If the payload is incomplete, state what is missing in your final message and stop.
 - Research external APIs, libraries, and services with official sources before writing a backlog. The payload usually includes a brief path with the agreed scope.
 - Write artifacts in English. Do not detect or switch languages.

@@ -9,7 +9,7 @@ The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `
 ## PHASE 0: Evidence and Scope (MANDATORY)
 1. Read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
 2. The evidence file may reference compiler warnings, test output, and recent runtime logs. Use it as evidence; do not create any diagnostic report.
-3. You may only write inside the output directory under `tickets/identified/`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
+3. You may only write inside the payload `outputDir`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
 
 ## PHASE 1: Strict Verification
 Obtain exact line numbers, actual function or class names, and the directly affected files from the current code. Never invent paths or lines. If a datapoint cannot be verified, say so instead of guessing.

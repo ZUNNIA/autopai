@@ -28,7 +28,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `setup`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `setup`. |
-| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. |
+| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths. |
 | `stateDir` | string | Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:

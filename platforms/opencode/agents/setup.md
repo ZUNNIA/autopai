@@ -75,7 +75,7 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `commitTypes`: string array. Allowed Conventional Commit types.
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
-- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths.
+- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths.
 - `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the provided OpenCode agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.

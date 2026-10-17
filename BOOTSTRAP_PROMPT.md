@@ -259,7 +259,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `setup`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `setup`. |
-| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. |
+| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths. |
 | `stateDir` | string | Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:
@@ -393,7 +393,7 @@ Rules:
 
 - The message contains a JSON payload with a scope name, a patch path, a changed-file list, an evidence file, and an output directory.
 - Read the patch, the evidence, and the current source. Verify every file path and line number against the current code; never guess.
-- You may only write Markdown files inside the output directory under `tickets/identified/**`. Never edit source, tests, UX, CI, ADRs, or configuration.
+- You may only write Markdown files inside the payload output directory, under `tickets/identified/**` by default. Never edit source, tests, UX, CI, ADRs, or configuration.
 - Never create a diagnostic report. The evidence file is input, not output.
 - Write one file per debt in English. Include classification, priority, exact evidence, affected files, impact, and references. Do not propose solutions.
 - Never ask questions. If a finding cannot be verified, omit it and say so in your final message.
@@ -482,7 +482,7 @@ Rules:
 
 - The message contains a JSON payload. Parse it before acting.
 - Never edit source code, tests, UX, CI, ADRs, `AGENTS.md`, `opencode.json*`, or `.autopilot.json`.
-- You may only write inside `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, and `tickets/done/**`.
+- You may only write inside the payload output directories, which default to `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, and `tickets/done/**`.
 - Never ask questions. If the payload is incomplete, state what is missing in your final message and stop.
 - Research external APIs, libraries, and services with official sources before writing a backlog. The payload usually includes a brief path with the agreed scope.
 - Write artifacts in English. Do not detect or switch languages.
@@ -570,7 +570,7 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `commitTypes`: string array. Allowed Conventional Commit types.
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
-- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths.
+- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the provided OpenCode agents, because their permissions allow those paths.
 - `stateDir`: string. Local state directory. Use `tickets/.autopilot` when tickets are local, otherwise `.autopilot`. Keep `tickets/.autopilot` when using the provided OpenCode agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `.autopilot.json`.
@@ -3363,7 +3363,7 @@ The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `
 ## PHASE 0: Evidence and Scope (MANDATORY)
 1. Read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
 2. The evidence file may reference compiler warnings, test output, and recent runtime logs. Use it as evidence; do not create any diagnostic report.
-3. You may only write inside the output directory under `tickets/identified/`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
+3. You may only write inside the payload `outputDir`. Source, tests, UX, CI, ADRs, and configuration are read-only for you.
 
 ## PHASE 1: Strict Verification
 Obtain exact line numbers, actual function or class names, and the directly affected files from the current code. Never invent paths or lines. If a datapoint cannot be verified, say so instead of guessing.
