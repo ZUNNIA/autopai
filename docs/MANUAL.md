@@ -1,0 +1,725 @@
+# AutopAI Manual
+
+This manual explains how AutopAI works, who does what, and how to operate it day by day. The README covers installation and the quick start. The `spec/` folder holds the design decisions this manual describes from a user perspective.
+
+## Table of contents
+
+1. [What AutopAI is](#1-what-autopai-is)
+2. [Core concepts](#2-core-concepts)
+3. [The agents](#3-the-agents)
+4. [The lifecycle](#4-the-lifecycle)
+5. [Tickets](#5-tickets)
+6. [Configuration](#6-configuration)
+7. [CLI reference](#7-cli-reference)
+8. [State, logs, and artifacts](#8-state-logs-and-artifacts)
+9. [Safety and permissions](#9-safety-and-permissions)
+10. [Customization](#10-customization)
+11. [Extending AutopAI](#11-extending-autopai)
+12. [Walkthroughs](#12-walkthroughs)
+13. [Troubleshooting and FAQ](#13-troubleshooting-and-faq)
+14. [Design decisions and where to read more](#14-design-decisions-and-where-to-read-more)
+15. [Glossary](#15-glossary)
+
+## 1. What AutopAI is
+
+AutopAI is an external orchestrator. It runs as a Node CLI inside a target repository and coordinates agentic coding tools through a development lifecycle: a feature request becomes a backlog, the backlog becomes tickets, the tickets become pull requests, and the pull requests merge only after CI passes.
+
+The division of responsibility is the key idea:
+
+- The **orchestrator** owns state, Git writes, pull requests, CI waits, and merges. It is deterministic code, not a conversation.
+- The **coding tool** owns implementation. Each phase or ticket runs in a fresh session with a core-owned prompt.
+- The **executor** (an agent inside the coding tool) makes commits. It never pushes and never merges.
+- **CI** is the merge authority. The orchestrator fails closed when a required check is missing or failing.
+
+Because state lives in local files, a run survives crashes, machine restarts, and tool restarts. You can stop after any phase and continue later.
+
+```mermaid
+flowchart LR
+    subgraph Core["AutopAI orchestrator (Node CLI)"]
+        Phases[Phases and gates]
+        State[(Local state, logs, artifacts)]
+    end
+    Runner[Runner module]
+    Tool[Coding tool sessions]
+    GitHub[GitHub via gh CLI]
+    Repo[(Target repository)]
+
+    Core --> Runner
+    Runner --> Tool
+    Tool --> Repo
+    Core --> GitHub
+    Core <--> State
+    Core --> Repo
+```
+
+## 2. Core concepts
+
+**Orchestrator.** The `autopai` CLI. It resolves the repository, loads `autopai.json`, takes a lock, runs a phase, and releases the lock. It verifies facts (commits, diffs, gates, checks) and never trusts an agent summary.
+
+**Phase.** One step of the lifecycle: `adopt`, `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`. Each phase can be run alone, chained with `run --from --to`, or resumed after a failure.
+
+**Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. No long-running conversation carries a run.
+
+**Runner.** The adapter between the orchestrator and the coding tool CLI. The bundled runner is `opencode`. Adding a tool means adding one runner module, never touching the core.
+
+**Platform.** The agent, permission, and command files for a specific coding tool. The bundled platform lives under `platforms/opencode/` and is installed into the tool's global configuration.
+
+**Agent.** A named role inside the coding tool with a prompt and a permission model. AutopAI defines four: `autopai` (executor), `planner`, `auditor`, and `setup`. See [section 3](#3-the-agents).
+
+**Ticket.** A local Markdown work item. Tickets are never committed. The orchestrator reads ready-for-dev and ready-for-refactor tickets, turns each one into a branch and a pull request, and moves the file to the done directory after the merge.
+
+**Local artifacts.** Tickets, briefs, findings, UX proposals, and audit evidence. They stay on disk under the configured ticket directories and are excluded from Git.
+
+**Gates.** The checks a branch must pass before anything reaches the remote. Local gates run restore, build, test, and coverage. CI gates wait for the configured check names after the pull request exists.
+
+**State.** `state.json` under the state directory. It stores the run mode, phase, feature, branch, SHAs, pull request number, merge commit, scopes, attempts, sessions, and blockers. Writes are atomic and a lock file prevents concurrent runs.
+
+**Policy.** The rules that keep Git artifacts independent from local work items: branch naming, commit format, no scopes, no ticket or ADR references, no default merge message. The orchestrator enforces policy before every push and before every merge.
+
+## 3. The agents
+
+AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below.
+
+| Role | Default agent | Writes | Read-only over | Invoked by |
+| --- | --- | --- | --- | --- |
+| executor | `autopai` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
+| planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve` |
+| auditor | `auditor` | `tickets/identified/**`, `tickets/ux/**` | Source, tests, UX | `identify` |
+| setup | `setup` | `autopai.json`, `.gitignore` | Everything else | `/autopai-init` and manual commands |
+
+An important clarification: `build` is a built-in agent of OpenCode, not part of AutopAI. It has no role in a run. Every AutopAI session names its agent explicitly, and the agent name comes from the configuration.
+
+The prompts that drive each session are owned by the core and live in `src/prompts/` (`autopai-finish.md`, `autopai-dev.md`, `feature-brief.md`, `backlog.md`, `ready-for-dev.md`, `identified.md`, `ready-for-refactor.md`, `release.md`). The platform files under `platforms/opencode/agents/` only define permissions and standing rules. A port to another tool recreates the roles, not the prompts.
+
+### 3.1 Executor (`autopai`)
+
+**Mission.** Execute exactly one work item per session and commit the result.
+
+**Work item modes.** The prompt payload tells the executor what kind of work it is:
+
+- `finish`: finish an adopted branch. Fix the policy violations and gate failures listed in the payload, then leave the branch green. The payload can also include `prTitlePath`; the executor writes the proposed pull request title as one line in that file.
+- `title`: the branch is already green; only propose the pull request title.
+- `policy-fix`: the orchestrator found Git artifact violations right before a push and asks for a focused fix.
+- `dev`: implement one ready-for-dev ticket.
+- `refactor`: implement one ready-for-refactor ticket with the same discipline.
+
+**Permissions (bundled platform).** The executor may edit any file except protected paths, run any command except `git push`, `git merge`, `git rebase`, `git reset --hard`, `gh`, and destructive delete commands. It cannot ask questions, run tasks, or touch files outside the repository.
+
+**Commits.** The executor stages only the files it changed and commits with `<type>: <subject>`, no scope parentheses, and no ticket, ADR, or issue references.
+
+**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume.
+
+### 3.2 Planner (`planner`)
+
+**Mission.** Produce local planning artifacts. Nothing else.
+
+**Phases.** `prepare` runs the planner twice: once for the feature brief (only when `brief.md` does not exist yet) and once for the technical backlog. `approve` runs the planner to turn the approved backlog into ready-for-dev tickets with front matter.
+
+**Permissions.** The planner writes only inside the configured backlog, ready-for-dev, ready-for-refactor, and done directories. Source, tests, CI, ADRs, and configuration are read-only.
+
+**Research duty.** Before writing a backlog, the planner reads official documentation for every external API, library, or service the feature may need. Every task and subtask in the backlog must link official docs or explicitly state that it is internal logic only.
+
+### 3.3 Auditor (`auditor`)
+
+**Mission.** Document technical debt. Never fix it.
+
+**Phases.** `identify` resolves one or more scopes (`branch:<name>`, `pr:<number>`, `dir:<path>`), collects local evidence, and runs the auditor once per scope. The auditor writes one Markdown file per debt under `tickets/identified/<scope>/`.
+
+**Permissions.** The auditor writes only Markdown under the identified and UX directories. Everything else is read-only. If it cannot verify a file path or line number, it omits the finding instead of guessing.
+
+**Golden rule: zero solutions.** An Identified ticket documents what is wrong, where, and the risk. It never proposes a refactor. A separate human or planning step decides what becomes a ready-for-refactor ticket.
+
+**No diagnostic reports.** The evidence file (compiler warnings, test output, runtime log excerpts) is input to the auditor. The tickets are the only deliverable.
+
+### 3.4 Setup (`setup`)
+
+**Mission.** Maintain the repository configuration and run orchestrator commands on request.
+
+**Initialization.** `/autopai-init` runs the setup agent. It inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, then writes `autopai.json` with the real commands, branches, and check names. It never guesses a language or framework, and it validates the result with `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
+
+**Permissions.** The setup agent edits only `autopai.json` and `.gitignore`. It can run `autopai`, `git`, and `gh` commands, but it never edits source.
+
+**Manual commands.** The platform commands (`/autopai-adopt`, `/autopai-run`, `/autopai-identify`, `/autopai-resume`, `/autopai-status`, and the workflow wrappers `/backlog`, `/ready-for-dev`, `/identified`, `/ready-for-refactor`, `/release`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments. The CLI is always the same entry point.
+
+## 4. The lifecycle
+
+```mermaid
+flowchart LR
+    A[adopt] --> M1[merged]
+    P[prepare] --> R{backlog review}
+    R -->|approve| D[dev loop]
+    D --> DC[dev-complete]
+    I[identify] --> ID[Identified tickets]
+    ID -->|human triage| RF[refactor loop]
+    RF --> RC[refactor-complete]
+    DC --> REL[release]
+    RC --> REL
+    REL --> TAG[tagged]
+```
+
+Phases can be run alone, in any supported range, or resumed. The phase order used by `run --from --to` is: `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`, `adopt`. Note that a chain from `prepare` to `release` therefore includes `identify` between `dev` and `refactor`.
+
+### 4.1 adopt
+
+**Purpose.** Take a branch that already has commits and drive it to a green merge without changing its scope.
+
+**Flow.**
+
+1. Resolve the branch (`--branch` or the current branch) and the base branch (`--base` or `baseBranch`).
+2. Refuse to proceed when the working tree has pending tracked changes, when the base branch does not exist on the remote, or when the branch has no commits over the base.
+3. Compute the diff, the commit list, and the changed files for `origin/<base>...<branch>`.
+4. Refuse adoption when the branch modifies protected paths.
+5. Scan policy: branch name, commit subjects and bodies, added code lines, and the current content of changed code files. The repository-wide file scan also reports ticket or ADR references that predate the branch, because adoption must leave the touched files compliant.
+6. Run the local gates (restore, build, test, coverage).
+7. Run the executor: mode `finish` when there are violations or gate failures, mode `title` when the branch is already green. In both cases the executor can propose the pull request title in `<stateDir>/pr-title.txt`.
+8. Re-scan policy, re-run the gates, resolve the final title (`--title` override, then the executor title when valid, then a derived title), and continue with push, pull request, CI wait, fix loop, and merge.
+
+**Dry run.** `--dry-run` stops after the scan and prints the derived title, commits, changed files, and violations. No executor, no gates, no push.
+
+**Failure modes.** Protected path changes, remaining policy violations, gate failures, and CI failures after `maxAttempts` attempts all stop the run with an error.
+
+### 4.2 prepare
+
+**Purpose.** Turn an idea into a reviewable brief and backlog.
+
+**Flow.**
+
+1. Require `--feature <slug>`.
+2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` was provided, run the planner to write the brief.
+3. Run the planner to write `backlog.md` next to the brief.
+4. Stop at `awaiting_approval`.
+
+Nothing is implemented yet. This is the human checkpoint: read the brief, edit the backlog if needed, and decide whether to continue.
+
+### 4.3 approve
+
+**Purpose.** Convert the approved backlog into tickets and run the development loop.
+
+**Flow.**
+
+1. Require an existing backlog for the feature.
+2. Run the planner to write ready-for-dev tickets with front matter under `tickets/ready-for-dev/<feature>/`.
+3. Immediately run the `dev` loop (see below). `approve` is the entry point that combines ticket generation and execution.
+
+If you want to review the generated tickets before any branch is created, run `approve` and stop it before the loop, or generate the tickets manually and run `dev` later.
+
+### 4.4 dev
+
+**Purpose.** Implement every ready-for-dev ticket, one branch and one pull request per ticket.
+
+**Flow per ticket.**
+
+1. Order the tickets by `depends_on` and priority.
+2. Create a branch from the base branch. The name is `<type>/<slug>`; a numeric suffix is added on collision.
+3. Run the executor with mode `dev` and the ticket payload.
+4. Verify that at least one commit exists, scan policy, and run the local gates.
+5. Push, open or reuse the pull request, wait for CI, run the fix loop on failure, and merge when the required checks pass.
+6. Move the ticket file to `tickets/done/<feature>/` and record the scope in the state.
+
+**Completion.** The phase ends at `dev-complete` when every ticket merged.
+
+### 4.5 identify
+
+**Purpose.** Audit one or more scopes and produce local Identified tickets.
+
+**Flow.**
+
+1. Resolve each `--scope`:
+   - `branch:<name>` uses `origin/<base>...<branch>`, fetches first, and writes a patch file plus a changed-file list.
+   - `pr:<number>` uses the pull request diff and file list from `gh`.
+   - `dir:<path>` walks the directory for code files (no patch).
+2. Run the local gates and collect runtime logs configured in `runtimeLogs` (the five most recent files per pattern).
+3. Write `evidence.json` with the gate result, coverage, and log copies.
+4. Run the auditor once per scope. Each run writes one file per debt under `tickets/identified/<scope>/`.
+5. Verify that no tracked file changed. A dirty working tree fails the phase.
+
+**Dry run.** `--dry-run` resolves the scopes and reports the file counts without collecting evidence or running the auditor.
+
+**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Triage is a human decision: to execute a finding, promote it into a ready-for-refactor ticket.
+
+### 4.6 refactor
+
+**Purpose.** Execute ready-for-refactor tickets with the same gates as `dev`.
+
+**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/<feature>/` and every branch is forced to the `refactor` type. Tickets move to `tickets/done/<feature>/` after the merge.
+
+### 4.7 release
+
+**Purpose.** Prepare, merge, and tag a release.
+
+**Flow.**
+
+1. Require `--version` in `MAJOR.MINOR.PATCH` format.
+2. Create `chore/release-v<version>` from the base branch.
+3. Run the executor in release mode: update the version and the changelog.
+4. Run the local gates, resolve the title, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the fix loop, and merge.
+5. Tag `v<version>` on the merge commit and push the tag.
+
+### 4.8 run and resume
+
+**run.** `autopai run --from <phase> --to <phase>` executes the phases in the fixed order above, inclusive. The default range is `prepare` to `refactor`.
+
+**resume.** `autopai resume` reloads `state.json` and re-runs the stored mode with the stored branch, base, and feature. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one. Automatic resume supports the modes `adopt`, `prepare`, `dev`, `refactor`, and `identify`. Modes `approve` and `release` are not auto-resumable; re-run them with their original command.
+
+## 5. Tickets
+
+All ticket directories are configurable through `ticketDirs` and default to:
+
+| Directory | Purpose |
+| --- | --- |
+| `tickets/backlog/<feature>/` | `brief.md` and `backlog.md` |
+| `tickets/ready-for-dev/<feature>/` | tickets waiting for the dev loop |
+| `tickets/identified/<scope>/` | audit findings |
+| `tickets/ready-for-refactor/<feature>/` | tickets waiting for the refactor loop |
+| `tickets/ux/` | UX proposals written by the UX review command |
+| `tickets/done/<feature>/` | tickets whose pull request merged |
+
+Tickets are local artifacts. Add `/tickets/` (or the configured state directory) to `.gitignore` during initialization.
+
+### 5.1 Front matter
+
+Every ready-for-dev and ready-for-refactor ticket starts with:
+
+```yaml
+---
+id: short-unique-id
+feature: feature-slug
+type: feat|fix|refactor|perf|test|docs|chore
+priority: urgent|important|minor
+depends_on: []
+---
+```
+
+The orchestrator reads this front matter, not the ticket identifiers, so Git artifacts stay free of ticket references. `id` is required; `type` defaults to `feat`; `priority` defaults to `important`; unknown priorities fall back to `important`. `depends_on` accepts an inline list `[a, b]` or a YAML block list.
+
+### 5.2 Ordering and branch naming
+
+Tickets run in dependency order. The order is a topological sort of `depends_on`, with ties broken by priority (`urgent`, then `important`, then `minor`) and then by file name. An unknown dependency or a dependency cycle stops the phase with an error before any branch is created.
+
+The branch name comes from the ticket type and the file name without its numeric prefix, for example `feat/settings-panel`. When the branch already exists locally, `-2`, `-3`, and so on are appended. The refactor loop always uses the `refactor` type.
+
+### 5.3 Reviewing and editing
+
+- Review `backlog.md` before running `approve`. Edit it freely; the planner reads it at that moment.
+- Review generated ready-for-dev tickets before running `dev` if the loop has not started.
+- Edit `depends_on`, `priority`, or `type` front matter to change execution order or branch type.
+- Promote an Identified ticket manually by copying it into `tickets/ready-for-refactor/<feature>/` with the required front matter. The auditor never promotes its own findings.
+
+## 6. Configuration
+
+`autopai.json` lives at the root of the target repository. It is generated by `/autopai-init` and must never contain secrets, tokens, or personal absolute paths. String values support `${NAME}` expansion from the process environment.
+
+### 6.1 Field reference
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `runner` | string | required | Session runner name. The bundled runner is `opencode`. |
+| `runnerOptions` | object | `{}` | Runner settings. The OpenCode runner reads `env` for extra environment variables. |
+| `protectedPaths` | string array | `.github/**`, `AGENTS.md`, `autopai.json` | Repository-relative globs the executor must never modify. |
+| `baseBranch` | string | `main` | Integration branch for feature pull requests. |
+| `releaseBranch` | string | `main` | Production branch for release pull requests. |
+| `requiredChecks` | string array | `[]` | CI check names that must pass before merge, exactly as `gh pr checks` reports them. |
+| `ignoredChecks` | string array | `[]` | Checks that may fail or stay pending without blocking the merge. |
+| `restoreCommand` | string array or null | `null` | Dependency restore command, as an argument array. |
+| `buildCommand` | string array or null | `null` | Build command, as an argument array. |
+| `testCommand` | string array or null | `null` | Test command, as an argument array. |
+| `coverageThreshold` | number or null | `null` | Minimum line coverage between 0 and 1. Use the same value as CI. |
+| `maxAttempts` | integer | `3` | CI fix attempts before the run stops. |
+| `maxMinutes` | integer | `240` | Wall-clock budget. Reserved: accepted, not enforced yet. |
+| `commandTimeoutMinutes` | integer | `30` | Timeout per local command. |
+| `sessionTimeoutMinutes` | integer | `90` | Timeout per AI session. |
+| `checkPollSeconds` | integer | `30` | CI polling interval. |
+| `checkTimeoutMinutes` | integer | `30` | CI wait budget per check cycle. |
+| `autoMerge` | boolean | `true` | Reserved: the implementation always merges after the required checks pass. |
+| `approvalRequired` | boolean | `true` | Reserved: `prepare` always stops at `awaiting_approval`. |
+| `prTitle` | string or null | `null` | Null lets the executor decide the title. |
+| `runtimeLogs` | string array | `[]` | Local runtime log globs used as audit evidence. |
+| `commitTypes` | string array | `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore` | Allowed commit and pull request types. |
+| `agents` | object | see below | Agent name per role. |
+| `models` | object | all null | Optional model override per role. |
+| `ticketDirs` | object | see [section 5](#5-tickets) | Ticket directory paths. |
+| `stateDir` | string | `tickets/.autopai` when `tickets/` exists, else `.autopai` | Local state directory. |
+
+Default `agents` object:
+
+```json
+{
+  "agents": {
+    "executor": "autopai",
+    "planner": "planner",
+    "auditor": "auditor",
+    "setup": "setup"
+  }
+}
+```
+
+### 6.2 Example
+
+```json
+{
+  "runner": "opencode",
+  "baseBranch": "develop",
+  "releaseBranch": "main",
+  "requiredChecks": ["Build and test"],
+  "ignoredChecks": [],
+  "restoreCommand": ["npm", "ci"],
+  "buildCommand": ["npm", "run", "build"],
+  "testCommand": ["npm", "test", "--", "--coverage"],
+  "coverageThreshold": 0.7,
+  "maxAttempts": 3,
+  "ticketDirs": {
+    "backlog": "tickets/backlog",
+    "readyForDev": "tickets/ready-for-dev",
+    "identified": "tickets/identified",
+    "readyForRefactor": "tickets/ready-for-refactor",
+    "ux": "tickets/ux",
+    "done": "tickets/done"
+  },
+  "stateDir": "tickets/.autopai"
+}
+```
+
+### 6.3 Validation
+
+`autopai status --repo .` loads the configuration and fails with a specific message when:
+
+- `autopai.json` is missing.
+- `runner` is missing or empty.
+- `baseBranch` or `releaseBranch` is missing.
+- A command is present but is not an array of strings.
+- `maxAttempts` is not greater than zero.
+
+Commands are argument arrays, never shell strings, so no shell quoting or injection applies.
+
+## 7. CLI reference
+
+```
+autopai help
+autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
+autopai identify --repo <path> --scope branch:<name> [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
+autopai prepare --repo <path> --feature <slug> [--description <text>]
+autopai approve --repo <path> --feature <slug>
+autopai dev --repo <path> --feature <slug>
+autopai refactor --repo <path> --feature <slug>
+autopai release --repo <path> --version <x.y.z>
+autopai run --repo <path> --from <phase> --to <phase> [phase options]
+autopai status --repo <path>
+autopai resume --repo <path>
+autopai abort --repo <path>
+```
+
+**Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope` can be repeated.
+
+**Output.** Successful commands print a JSON result to standard output, except `status` and `abort`, which print short human-readable text. Errors go to standard error prefixed with `autopai: ` and the process exits with code 1.
+
+**Locking.** Commands that run a phase take `run.lock` under the state directory. A second concurrent run fails with the active pid. `status` and `help` never lock.
+
+**status output.**
+
+```json
+{
+  "runId": "20261018010532-12345",
+  "mode": "dev",
+  "phase": "dev",
+  "feature": "settings-panel",
+  "branch": null,
+  "prNumber": null,
+  "mergeCommit": null,
+  "scopes": 0,
+  "completedPhases": []
+}
+```
+
+When no state exists, `status` prints `No AutopAI state found for this repository.`
+
+## 8. State, logs, and artifacts
+
+Everything runtime-related lives under the state directory. Nothing here is committed.
+
+```
+tickets/.autopai/
+├── state.json              current run state
+├── run.lock                present only while a run is active
+├── pr-title.txt            executor-proposed pull request title
+├── needs-human/            blocker JSON files written by the executor
+├── artifacts/<runId>/
+│   ├── branch.patch
+│   ├── commits.txt
+│   ├── changed-files.txt
+│   ├── policy-latest.json
+│   ├── policy-final.json
+│   ├── checks-latest.json
+│   ├── ci-failure-<n>.log
+│   ├── gate-<name>.log, initial-*.log, final-*.log, fix-<n>-*.log
+│   ├── executor-*.log, planner-*.log, auditor-*.log, refactor-*.log, release-*.log
+│   └── runtime-logs/
+└── logs/<runId>.jsonl      event log for the run
+```
+
+**state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`.
+
+**Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit.
+
+**Blockers.** When the executor cannot continue, it writes a JSON file under `needs-human/` with the reason, the files involved, and what a human must decide. Resolve the issue, delete or keep the blocker file for your records, and resume.
+
+**abort.** Marks `state.json` as `aborted` and releases the lock without touching the repository or the remote.
+
+## 9. Safety and permissions
+
+### 9.1 Executor restrictions
+
+The executor can edit source and tests and can commit. It cannot push, fetch new branches, merge, rebase, force-push, run `gh`, or delete files destructively. It cannot edit tickets, ADRs, `.github/**`, `AGENTS.md`, `opencode.json*`, or `autopai.json`. The orchestrator re-verifies the diff before every push regardless of what the agent reported.
+
+### 9.2 Protected paths
+
+`protectedPaths` is a list of repository-relative globs. Adoption refuses a branch that modifies them. Every push re-checks the changed files against the list. The bundled platform also denies those paths at the tool level, so violations normally never reach the diff.
+
+### 9.3 Policy verification
+
+Before any push and before any merge, the orchestrator validates:
+
+- **Branch name.** `<type>/<kebab-case-slug>` with allowed types. No numeric segments that look like ticket identifiers, no `ticket` or `#` references, no ADR references.
+- **Commit subjects and bodies.** `<type>: <subject>`, no scope parentheses, no ticket paths, no `TICKET-123`, no `ADR-000`, no `#123` issue references, no GitHub default merge subject.
+- **Added code lines.** No ticket paths, no ADR references. Issue-style `#123` is only checked in commit and pull request text because color literals such as `#0AFFFFFF` are valid in styles.
+- **Repository files.** Changed code files are scanned again in full, so references that predate the branch are caught when the branch touches the file.
+- **Pull request title and body.** Same subject rules, no references of any kind.
+
+When violations appear during a push, the orchestrator asks the executor for a focused `policy-fix` session and re-verifies. If violations remain, the run stops.
+
+### 9.4 Local gates
+
+Local gates run before every push, in order: `restoreCommand`, `buildCommand`, `testCommand`, then coverage. Coverage is read from Cobertura reports found under `TestResults/**/coverage.cobertura.xml`, summed across reports, and compared with `coverageThreshold` when set. A missing report fails the gate when a threshold is configured. Each command runs with `commandTimeoutMinutes` and its output is saved under the run artifacts.
+
+### 9.5 CI gates
+
+After the pull request exists, the orchestrator polls `gh pr checks` every `checkPollSeconds` up to `checkTimeoutMinutes`:
+
+- A failed, cancelled, timed-out, or action-required check on a non-ignored check fails immediately.
+- Required checks must appear within 120 seconds and must finish in `SUCCESS`.
+- When no required checks are configured, every non-ignored check must finish in `SUCCESS`, `SKIPPED`, or `NEUTRAL`.
+- `ignoredChecks` are excluded from all of the above.
+
+The reported checks are stored as `checks-latest.json` artifacts on every poll.
+
+### 9.6 Fix loop
+
+On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. When the attempt budget is exhausted, the run stops with an error.
+
+### 9.7 Merge rules
+
+- A merge happens only after every required check passes.
+- A conflicting pull request stops the run. A pull request that is `BEHIND` gets its branch updated and the checks are awaited again.
+- The merge commit subject is the pull request title, and the body states the branch, the base, and the CI result, including coverage. The generated body never references tickets, ADRs, or issues.
+- After the merge, the orchestrator verifies the pull request state is `MERGED` and deletes the remote branch.
+
+## 10. Customization
+
+**Models per role.** Set `models.executor`, `models.planner`, `models.auditor`, or `models.setup` to a model string accepted by the runner. The OpenCode runner passes it with `--model`. Null means the tool default.
+
+**Agent names per role.** Set `agents.executor` and the rest when you define your own agent files. The orchestrator passes the configured name to the runner.
+
+**Runner environment.** `runnerOptions.env` adds environment variables to every session. The OpenCode runner always sets `OPENCODE_DISABLE_AUTOUPDATE=1`.
+
+**Timeouts and attempts.** `commandTimeoutMinutes`, `sessionTimeoutMinutes`, `checkPollSeconds`, `checkTimeoutMinutes`, and `maxAttempts` tune the run without touching code.
+
+**Coverage.** `coverageThreshold` expects a Cobertura report from the test command. Keep the value identical to the CI threshold so local gates and CI agree.
+
+**Ticket and state paths.** `ticketDirs` and `stateDir` are configurable, but the bundled platform agents hard-code permission rules for the default paths (`tickets/**`, `tickets/.autopai/**`). If you change them, update the agent permission rules under `platforms/opencode/agents/` accordingly. The executor needs write access to `<stateDir>/pr-title.txt` and `<stateDir>/needs-human/**` in particular.
+
+## 11. Extending AutopAI
+
+### 11.1 Adding a coding tool runner
+
+1. Create `src/runners/<name>.js` exporting `runSession({ config, agent, promptText, title, logFile, role })`.
+2. Register the module in the runner map at `src/runners/index.js`.
+3. Set `"runner": "<name>"` in every repository that uses it.
+
+Keep the prompt text passed in by the orchestrator. The runner only maps the call to the tool CLI and handles timeout, logging, and environment.
+
+### 11.2 Adding a platform
+
+1. Recreate the four roles with the tool's agent, skill, or system-prompt mechanism.
+2. Recreate the protected-path and Git-write restrictions with the tool permission model. When the tool has none, rely on the orchestrator diff verification.
+3. Confirm the tool accepts a prompt supplied at session start. It must not require prompts registered inside the tool.
+4. Provide command wrappers if the tool supports them, mirroring `platforms/opencode/commands/`.
+5. Run the verification checklist in `BOOTSTRAP_PROMPT.md` before trusting the port.
+
+`spec/PLATFORMS.md` is the authoritative guide for both cases.
+
+### 11.3 Adding a phase
+
+A phase is a function in `src/phases/` that receives `{ config, stateStore, options, log }`, writes state, and returns a JSON result. Register it in the command dispatch in `src/cli.js` and in the `PHASES` order array. Keep prompts in `src/prompts/` and keep Git writes in the orchestrator, never in a prompt.
+
+## 12. Walkthroughs
+
+The examples use a generic Node repository with `npm ci`, `npm test`, CI check `build`, base branch `develop`, and release branch `main`.
+
+### 12.1 Walkthrough: adopt an existing branch
+
+An existing feature branch `feat/order-history` has four commits and no push yet.
+
+1. Make sure the working tree is clean and `gh auth status` succeeds.
+2. Preview the adoption:
+
+```
+autopai adopt --repo . --branch feat/order-history --dry-run
+```
+
+Read the output: derived title, commit list, changed files, and any policy violations. In this example, the scan finds an `ADR-012` reference in one of the changed source files.
+
+3. Run the adoption for real:
+
+```
+autopai adopt --repo . --branch feat/order-history
+```
+
+The orchestrator scans policy, runs the gates, runs the executor in `finish` mode (it removes the ADR reference and fixes anything else the payload lists), re-scans, re-runs the gates, and proposes the title `feat: order history`. It then pushes the branch, opens the pull request, waits for the `build` check, and merges with the pull request title as the merge subject.
+
+4. Inspect the result. The output contains the pull request number, the merge commit, the commits, the changed files, and the coverage.
+
+If the branch already passes everything, the executor only proposes the title.
+
+### 12.2 Walkthrough: a full feature cycle
+
+The feature is a settings panel for a web application.
+
+1. Prepare:
+
+```
+autopai run --repo . --from prepare --to prepare --feature settings-panel --description "Add a settings panel with theme and language options"
+```
+
+The planner writes `tickets/backlog/settings-panel/brief.md` and `backlog.md`. The phase stops at `awaiting_approval`.
+
+2. Review the brief and the backlog. Fix any wrong assumption, reorder tasks, or clarify external API links. This is the cheapest moment to change direction.
+
+3. Approve and develop:
+
+```
+autopai run --repo . --from approve --to dev --feature settings-panel
+```
+
+The planner generates ready-for-dev tickets with front matter. The dev loop then takes each ticket, creates its branch, runs the executor, verifies policy and gates, opens the pull request, waits for CI, merges, and moves the ticket to `tickets/done/settings-panel/`. Every merged pull request updates the state with its number and merge commit.
+
+4. Check progress at any time:
+
+```
+autopai status --repo .
+```
+
+If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fix attempts before stopping. If the run stops, fix the reported blocker and continue with `autopai resume --repo .`.
+
+### 12.3 Walkthrough: identify, refactor, release
+
+1. Audit the merged work:
+
+```
+autopai identify --repo . --scope branch:feat/order-history --scope pr:412
+```
+
+The auditor writes one Identified ticket per debt under `tickets/identified/feat-order-history/` and `tickets/identified/pr-412/`. Nothing is committed.
+
+2. Triage. Read the findings and decide which ones deserve work. Copy the chosen ones into `tickets/ready-for-refactor/settings-panel/` with front matter (`id`, `feature`, `type: refactor`, `priority`, `depends_on`).
+
+3. Refactor:
+
+```
+autopai run --repo . --from refactor --to refactor --feature settings-panel
+```
+
+Each refactor ticket becomes a `refactor/<slug>` branch through the same gates and merge rules.
+
+4. Release:
+
+```
+autopai run --repo . --from release --to release --version 1.4.0
+```
+
+The executor updates the version and changelog on `chore/release-v1.4.0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
+
+## 13. Troubleshooting and FAQ
+
+**`Missing autopai.json at <path>. Run /autopai-init first.`** The target repository has no configuration. Run `/autopai-init` in the coding tool, or write `autopai.json` manually and validate with `autopai status --repo .`.
+
+**`Another AutopAI run is active with pid <n>.`** A lock from a live process exists. If the process is gone, the lock is stale and any next run replaces it. If it is alive, wait or run `autopai abort --repo .` to mark the run aborted and release the lock.
+
+**`Unknown runner` or runner errors during a session.** The `runner` value does not match a module under `src/runners/`. Use `opencode` or add the runner first.
+
+**`Cannot switch from <a> to <b>: the working tree has pending tracked changes.`** Adoption needs a clean tree. Commit or stash tracked changes. `autopai.json`, `tickets/`, and `.autopai/` are allowed as untracked files.
+
+**`The branch changes protected paths and cannot be adopted automatically.`** The branch modifies a path listed in `protectedPaths`. Review the change manually. If the path is legitimately part of the feature, adjust `protectedPaths` in `autopai.json` first; remember that the bundled executor cannot edit that file.
+
+**`Policy violations remain after the executor run.`** The executor could not remove a violation. The message lists file and line. Fix it manually, amend the commit if needed, and resume or re-run adopt.
+
+**`Coverage X% is below the configured minimum Y%.`** The Cobertura report under `TestResults/` is below `coverageThreshold`. Add tests or align the threshold with CI.
+
+**`Required checks were not reported: <names>.`** Within 120 seconds of the first poll, `gh pr checks` did not report every name in `requiredChecks`. Confirm the exact names with `gh pr checks <number>` and copy them verbatim.
+
+**`CI did not pass after <n> attempts.`** The fix budget is exhausted. Read the `ci-failure-<n>.log` artifacts, fix locally, push, and resume.
+
+**`Executor failed with exit code <n>.`** Read the corresponding `executor-*.log` artifact. Common causes are missing build tools, a command timeout, or a blocker written under `needs-human/`.
+
+**`Cannot resume mode release automatically.`** Only `adopt`, `prepare`, `dev`, `refactor`, and `identify` resume automatically. Re-run `release` with its original `--version`.
+
+**The run stopped but `status` shows an old phase.** `status` shows the last saved state. Failed runs keep the phase they were in. The error output is the source of truth for why it stopped.
+
+**Where do I see what the agents did?** Every session writes a log under `<stateDir>/artifacts/<runId>/`, and the event stream is in `<stateDir>/logs/<runId>.jsonl`.
+
+## 14. Design decisions and where to read more
+
+The `spec/` folder records the decisions this manual operates. Read them in this order:
+
+- `spec/ARCHITECTURE.md`: the division of responsibility, design rules, phase list, state model, gates, protected paths, and the policy verification summary.
+- `spec/POLICIES.md`: the Git artifact policy, local artifact policy, per-role permissions, quality rules, and security rules.
+- `spec/CONFIG_SCHEMA.md`: the configuration schema and the generation rules the setup agent follows.
+- `spec/PLATFORMS.md`: the runner interface, the bundled platform, and the porting checklist.
+- `AGENTS.md`: the repository-wide engineering rules, including the Git and CI/CD rules every agent follows.
+
+Decisions worth highlighting:
+
+- **Git-host dependency.** GitHub is a hard dependency today because pull requests, checks, and merges go through `gh`. The coding tool is replaceable through runners; the Git host would need its own adapter layer.
+- **English-only artifacts.** Prompts and generated artifacts are always English. There is no language detection.
+- **Issue-reference check scope.** `#123` references are checked in commit and pull request text only, because color literals such as `#0AFFFFFF` are valid in styles.
+- **Fail closed.** A missing required check stops the run instead of guessing that a check was renamed.
+
+## 15. Glossary
+
+**Adopt.** Phase that finishes an existing branch through push, pull request, CI, and merge.
+
+**Agent.** A named role in the coding tool with a prompt and permissions. AutopAI defines `autopai`, `planner`, `auditor`, and `setup`.
+
+**Artifacts.** Per-run files under `<stateDir>/artifacts/<runId>/`: patches, commit lists, gate logs, check snapshots, and session logs.
+
+**Blocker.** A JSON file under `<stateDir>/needs-human/` written by the executor when a human decision is required. The run stops until you resolve it.
+
+**Brief.** `brief.md` under the backlog directory. The agreed scope written before the backlog.
+
+**Cobertura.** The XML coverage format the orchestrator reads from `TestResults/**/coverage.cobertura.xml`.
+
+**Executor.** The role that implements work items and commits. Default agent name: `autopai`.
+
+**Gate.** A local check (restore, build, test, coverage) that runs before any push.
+
+**Identified ticket.** A local audit finding under `tickets/identified/`. Documentation only, no solutions.
+
+**Local artifact.** Anything that must never be committed: tickets, briefs, findings, proposals, and evidence.
+
+**Lock.** `<stateDir>/run.lock`. Prevents two concurrent runs.
+
+**Phase.** One lifecycle step: `adopt`, `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`.
+
+**Platform.** Agent, permission, and command files for one coding tool, under `platforms/<tool>/`.
+
+**Policy.** The Git artifact and quality rules enforced by the orchestrator before every push and merge.
+
+**Protected path.** A repository-relative glob the executor must never modify.
+
+**Runner.** The module that maps `runSession` to a coding tool CLI.
+
+**Scope.** An audit target: `branch:<name>`, `pr:<number>`, or `dir:<path>`.
+
+**Session.** One non-interactive coding tool invocation with a core-owned prompt.
+
+**State directory.** `<stateDir>`, default `tickets/.autopai`. Holds `state.json`, the lock, artifacts, logs, and blockers.
+
+**Ticket.** A local Markdown work item with front matter. Ready-for-dev and ready-for-refactor tickets drive the loops.

@@ -67,9 +67,9 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `commandTimeoutMinutes`: integer. Timeout per local command, default 30.
 - `sessionTimeoutMinutes`: integer. Timeout per AI session, default 90.
 - `checkPollSeconds`: integer. CI polling interval, default 30.
-- `checkTimeoutMinutes`: integer. CI wait budget, default 45.
-- `autoMerge`: boolean. Merge after required checks pass.
-- `approvalRequired`: boolean. Stop after the backlog for human review.
+- `checkTimeoutMinutes`: integer. CI wait budget, default 30.
+- `autoMerge`: boolean. Merge after required checks pass. Reserved: accepted, not enforced yet.
+- `approvalRequired`: boolean. Stop after the backlog for human review. Reserved: accepted, not enforced yet.
 - `prTitle`: string or null. Null lets the executor decide the title.
 - `runtimeLogs`: string array. Local runtime log globs for audit evidence. Use environment variables such as `${LOCALAPPDATA}` when needed.
 - `commitTypes`: string array. Allowed Conventional Commit types.

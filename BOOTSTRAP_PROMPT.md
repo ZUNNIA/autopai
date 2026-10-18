@@ -61,6 +61,10 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `assets/autopai.svg`
 
+### Documentation
+
+- `docs/MANUAL.md`
+
 ### Specifications
 
 - `spec/ARCHITECTURE.md`

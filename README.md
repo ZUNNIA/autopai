@@ -110,6 +110,14 @@ autopai resume --repo .
 
 Every command supports `--dry-run` where it makes sense, and a run can start or stop at any phase.
 
+## Documentation
+
+- `docs/MANUAL.md`: the user manual. Agents, lifecycle, tickets, configuration, CLI reference, state, safety, customization, walkthroughs, and FAQ.
+- `spec/ARCHITECTURE.md`: design rules, phases, state, gates, and policy verification.
+- `spec/POLICIES.md`: Git artifact rules, local artifact rules, and per-role permissions.
+- `spec/CONFIG_SCHEMA.md`: the `autopai.json` schema and generation rules.
+- `spec/PLATFORMS.md`: the runner interface and the guide for porting to another coding tool.
+
 ## Install with an AI agent
 
 `BOOTSTRAP_PROMPT.md` contains a bootstrap prompt for an AI agent. It references the repository files instead of duplicating them, so the same prompt works for installing this repository and for porting the system to another coding tool. Point your agent at that file, or at the repository, and let it follow `README.md`.

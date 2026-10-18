@@ -16,13 +16,13 @@ The configuration file lives at the root of each target repository. It is genera
 | `testCommand` | string array or null | Test command. It must produce the coverage report expected by `coverageThreshold`. |
 | `coverageThreshold` | number or null | Minimum line coverage between 0 and 1. Use the same value as CI. |
 | `maxAttempts` | integer | CI fix attempts. Default 3. |
-| `maxMinutes` | integer | Wall-clock budget. Default 240. |
+| `maxMinutes` | integer | Wall-clock budget. Default 240. Reserved: accepted, not enforced yet. |
 | `commandTimeoutMinutes` | integer | Timeout per local command. Default 30. |
 | `sessionTimeoutMinutes` | integer | Timeout per AI session. Default 90. |
 | `checkPollSeconds` | integer | CI polling interval. Default 30. |
-| `checkTimeoutMinutes` | integer | CI wait budget. Default 45. |
-| `autoMerge` | boolean | Merge after required checks pass. |
-| `approvalRequired` | boolean | Stop after the backlog for human review. |
+| `checkTimeoutMinutes` | integer | CI wait budget. Default 30. |
+| `autoMerge` | boolean | Merge after required checks pass. Reserved: the implementation always merges after the required checks pass. |
+| `approvalRequired` | boolean | Stop after the backlog for human review. Reserved: prepare always stops at awaiting_approval. |
 | `prTitle` | string or null | Null lets the executor decide the title. |
 | `runtimeLogs` | string array | Local runtime log globs for audit evidence. Use environment variables for machine-specific paths. |
 | `commitTypes` | string array | Allowed Conventional Commit types. |
