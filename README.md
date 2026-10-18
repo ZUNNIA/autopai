@@ -1,8 +1,47 @@
-# AutopAI
+<p align="center">
+  <img src="assets/autopai.svg" width="128" alt="AutopAI">
+</p>
 
-Portable, CI-gated development orchestrator for agentic coding tools. It coordinates work through resumable phases, keeps state in local files, and owns every Git write: branches, commit validation, pushes, pull requests, CI waits, and merges.
+<h1 align="center">AutopAI</h1>
 
-The orchestrator is language, repository, and coding-tool agnostic. Every build, test, and check comes from a `autopai.json` that the AI generates inside each target repository. Task prompts live in the core and sessions run through a runner selected in the configuration, so the same orchestrator can drive the bundled platform today and another tool tomorrow.
+<p align="center">
+  Turns a feature idea into merged pull requests while you stay out of the loop.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg" alt="Node 20 or newer">
+  <img src="https://img.shields.io/badge/status-active-success.svg" alt="Active">
+</p>
+
+## About
+
+AutopAI drives agentic coding tools through the whole development cycle. It plans a feature, breaks it into tickets, implements them one by one, audits the result, refactors what it finds, and prepares the release. Each phase runs in a fresh session, the state lives in local files, and the orchestrator owns every Git write, so a run survives a crash and resumes where it stopped.
+
+It is language, repository, and coding-tool agnostic. The build, test, and check commands come from an `autopai.json` generated inside each target repository, the task prompts live in the core, and the coding tool is a replaceable runner.
+
+## Highlights
+
+- Resumable phases: adopt, prepare, approve, dev, identify, refactor, and release.
+- Starts at any phase. Hand it an existing branch or stop after a backlog review.
+- CI-gated merges. It merges only after the required checks pass.
+- Local artifacts. Tickets, briefs, and findings never touch Git.
+- Any coding tool. One runner module per tool; the core does not change.
+- Any language. No ecosystem detection; the AI inspects the repository.
+
+## How it works
+
+| Phase | What it does |
+| --- | --- |
+| `adopt` | Finishes an existing branch through push, pull request, CI, and merge. |
+| `prepare` | Writes the feature brief and the backlog, then stops for review. |
+| `approve` | Generates ready-for-dev tickets and starts the development loop. |
+| `dev` | Implements one ticket per branch through CI and merge. |
+| `identify` | Audits scopes and writes local findings. |
+| `refactor` | Executes refactor tickets with the same gates. |
+| `release` | Updates version and changelog, opens the release pull request, merges, and tags. |
+
+`autopai run --from <phase> --to <phase>` chains any range of phases.
 
 ## Requirements
 
@@ -10,99 +49,20 @@ The orchestrator is language, repository, and coding-tool agnostic. Every build,
 - Git and GitHub CLI (`gh`) authenticated.
 - The CLI of at least one supported coding tool. The bundled platform targets OpenCode; adding another tool is documented in `spec/PLATFORMS.md`.
 
-## Repository layout
+## Install
+
+1. Clone the repository, install dependencies, and link the command:
 
 ```text
-src/                         Node orchestrator
-src/prompts/                 Core-owned task prompts, independent from any tool
-src/runners/                 Session runners, one module per coding tool
-test/                        Unit tests
-spec/                        Architecture, policies, config schema, platform guide
-platforms/opencode/agents/   Bundled platform agent definitions
-platforms/opencode/commands/ Bundled platform command wrappers
-AGENTS.md                    Global rules for the coding tool
-BOOTSTRAP_PROMPT.md          Bootstrap prompt that guides an AI agent to install or port the system
-scripts/build-bootstrap.mjs  Regenerates BOOTSTRAP_PROMPT.md from the sources
-```
-
-## Setup
-
-1. Clone this repository anywhere on the machine.
-2. Install dependencies:
-
-```text
-npm ci
-```
-
-3. Make the orchestrator available as a global command:
-
-```text
-npm link
-```
-
-The `autopai` command now points at this clone. Run `npm link` again after moving the clone.
-
-4. Install the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`. Copy or link:
-
-- `platforms/opencode/agents/*` into `~/.config/opencode/agents/`.
-- `platforms/opencode/commands/*` into `~/.config/opencode/commands/`.
-- `AGENTS.md` into `~/.config/opencode/AGENTS.md`, or merge it with the existing file.
-
-## Install with an AI agent
-
-This section is written so a human or an AI agent can install the kit without guessing.
-
-Verify the prerequisites:
-
-```powershell
-node --version
-git --version
-gh auth status
-```
-
-```bash
-node --version
-git --version
-gh auth status
-```
-
-For the bundled platform, also verify its CLI:
-
-```powershell
-opencode --version
-```
-
-```bash
-opencode --version
-```
-
-Clone the repository:
-
-```powershell
-gh repo clone ZUNNIA/autopai "$env:USERPROFILE\autopai"
-```
-
-```bash
-gh repo clone ZUNNIA/autopai ~/autopai
-```
-
-Install dependencies and link the command:
-
-```powershell
-Set-Location "$env:USERPROFILE\autopai"
+gh repo clone ZUNNIA/autopai
+cd autopai
 npm ci
 npm link
 ```
 
-```bash
-cd ~/autopai
-npm ci
-npm link
-```
+`npm link` creates the `autopai` command. Run it again after moving the clone.
 
-`npm link` creates the `autopai` command. On Windows the shim lives in `%APPDATA%\npm`, which must be on `PATH`.
-
-Install the bundled platform files:
+2. Install the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`.
 
 ```powershell
 Copy-Item .\platforms\opencode\agents\*.md "$env:USERPROFILE\.config\opencode\agents\" -Force
@@ -117,32 +77,29 @@ cp platforms/opencode/commands/*.md ~/.config/opencode/commands/
 cp AGENTS.md ~/.config/opencode/AGENTS.md
 ```
 
-If `~/.config/opencode/AGENTS.md` already exists, merge the AutopAI section instead of overwriting the whole file. When you use another coding tool, install its platform files in the location that tool reads instead.
+If `~/.config/opencode/AGENTS.md` already exists, merge the AutopAI section instead of overwriting the whole file.
 
-Verify the installation:
+3. Verify the installation:
 
 ```text
 autopai help
 ```
 
-Then open a target repository and run `/autopai-init`. If you are an AI agent, `BOOTSTRAP_PROMPT.md` contains a bootstrap prompt you can be given directly. It references the repository files instead of duplicating them, so it works for installing this repository and for porting the system to another coding tool.
+## Usage
 
-## Usage in a target repository
+Open a target repository in the coding tool and run `/autopai-init`. The setup agent inspects the repository and writes `autopai.json`. No language or framework is assumed. Then run the phase you need:
 
-1. Open the target repository in the coding tool.
-2. Run `/autopai-init`. The setup agent inspects the repository and writes `autopai.json`. No language or framework is assumed.
-3. Review `autopai.json`.
-4. Run the phase you need:
+```text
+/autopai-adopt --branch <name>
+/autopai-run --from prepare --to prepare --feature <slug> --description "<idea>"
+/autopai-run --from approve --to dev --feature <slug>
+/autopai-identify --scope branch:<name> --scope pr:<number>
+/autopai-run --from refactor --to refactor --feature <slug>
+/autopai-run --from release --to release --version <x.y.z>
+/autopai-status
+```
 
-- `/autopai-adopt --branch <name>` finishes an existing branch through push, pull request, CI, and merge.
-- `/autopai-run --from prepare --to prepare --feature <slug> --description "<idea>"` generates a brief and a backlog, then stops for review.
-- `/autopai-run --from approve --to dev --feature <slug>` generates tickets and runs the development loop.
-- `/autopai-identify --scope branch:<name> --scope pr:<number>` audits scopes and writes local findings.
-- `/autopai-run --from refactor --to refactor --feature <slug>` executes refactor tickets.
-- `/autopai-run --from release --to release --version <x.y.z>` prepares and merges a release.
-- `/autopai-status` shows the current run.
-
-CLI equivalents:
+The same phases are available from the CLI:
 
 ```text
 autopai adopt --repo . --branch <name>
@@ -151,7 +108,11 @@ autopai status --repo .
 autopai resume --repo .
 ```
 
-Every command supports `--dry-run` where it makes sense. A run can start at any phase and stop at any phase.
+Every command supports `--dry-run` where it makes sense, and a run can start or stop at any phase.
+
+## Install with an AI agent
+
+`BOOTSTRAP_PROMPT.md` contains a bootstrap prompt for an AI agent. It references the repository files instead of duplicating them, so the same prompt works for installing this repository and for porting the system to another coding tool. Point your agent at that file, or at the repository, and let it follow `README.md`.
 
 ## Policies
 
@@ -172,16 +133,14 @@ Every command supports `--dry-run` where it makes sense. A run can start at any 
 
 ## Migrating to another tool
 
-Installing this repository is not the same as using it with another coding tool. The kit ships one bundled platform. To run the orchestrator with another tool, follow the porting steps below.
-
-Read `BOOTSTRAP_PROMPT.md` and `spec/PLATFORMS.md`. The orchestrator is the portable piece. To support a new tool:
+Installing this repository is not the same as using it with another coding tool. The kit ships one bundled platform. To run the orchestrator with another tool:
 
 1. Add `src/runners/<tool>.js` exporting `runSession`.
 2. Register it in `src/runners/index.js`.
 3. Set `runner` in the target repository `autopai.json`.
 4. Recreate the agent roles and permissions under `platforms/<tool>/`.
 
-The core prompts, phases, state, policy, and merge logic do not change.
+The core prompts, phases, state, policy, and merge logic do not change. Read `spec/PLATFORMS.md` and `BOOTSTRAP_PROMPT.md` for the details.
 
 ## Troubleshooting
 
@@ -196,7 +155,3 @@ npm test
 npm run build-bootstrap
 npm run check-bootstrap
 ```
-
-## License
-
-MIT. See `LICENSE`.

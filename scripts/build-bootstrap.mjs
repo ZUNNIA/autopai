@@ -81,6 +81,7 @@ async function main() {
 async function buildPrompt() {
   const groups = [
     ['Repository files', await sorted('AGENTS.md')],
+    ['Assets', await sorted('assets')],
     ['Specifications', await sorted('spec')],
     ['Platform files', await sorted('platforms')],
     ['Core', await sorted('src/cli.js')],

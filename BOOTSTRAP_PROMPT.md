@@ -57,6 +57,10 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `AGENTS.md`
 
+### Assets
+
+- `assets/autopai.svg`
+
 ### Specifications
 
 - `spec/ARCHITECTURE.md`
