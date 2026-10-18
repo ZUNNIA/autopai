@@ -107,6 +107,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     restoreCommand: config.restoreCommand,
     buildCommand: config.buildCommand,
     testCommand: config.testCommand,
+    smokeCommand: config.smokeCommand,
     stateDir: config.stateDir,
     prTitlePath: titleFile,
     instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or AutopAI configuration.'

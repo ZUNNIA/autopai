@@ -136,3 +136,45 @@ export function branchNameFor(ticket, existingBranches = []) {
   while (existingBranches.includes(`${base}-${index}`)) index += 1
   return `${base}-${index}`
 }
+
+/**
+ * Collects the Manual Verification sections of the done tickets into a single
+ * checklist so the human runs only the checks that automated gates cannot
+ * cover. Returns the written path, or null when no ticket needs manual work.
+ */
+export async function collectManualVerification({ doneDir, outputFile }) {
+  const files = await walkFiles(doneDir, file => file.endsWith('.md'))
+  const sections = []
+  for (const file of files) {
+    const text = await fs.readFile(file, 'utf8')
+    const section = extractManualVerification(text)
+    if (!section) continue
+    sections.push({ file, section })
+  }
+  if (sections.length === 0) return null
+
+  const parts = [
+    `# Manual verification: ${path.basename(outputFile, '.md')}`,
+    '',
+    'Pending manual checks collected from the done tickets. Review every item before auditing this feature.',
+    ''
+  ]
+  for (const { file, section } of sections) {
+    parts.push(`## ${path.basename(file)}`, '', section, '')
+  }
+  await ensureDir(path.dirname(outputFile))
+  await fs.writeFile(outputFile, `${parts.join('\n').trimEnd()}\n`, 'utf8')
+  return outputFile
+}
+
+function extractManualVerification(text) {
+  const match = String(text).match(/^#{1,6}\s*(?:\d+\.\s*)?Manual Verification\b[^\n]*$/im)
+  if (!match) return null
+  const rest = text.slice(match.index + match[0].length)
+  const next = rest.match(/^#{1,6}\s+\S/m)
+  const body = (next ? rest.slice(0, next.index) : rest).trim()
+  if (!body) return null
+  const plain = body.replace(/^[-*]\s*/gm, '').trim()
+  if (/^(none|n\/a)\.?$/i.test(plain)) return null
+  return body
+}

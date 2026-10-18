@@ -11,11 +11,12 @@ Use the bash tool with a timeout of at least 3600000 ms:
 
 Examples:
 
-- `--from prepare --to prepare --feature <slug> --description "<idea>"`
-- `--from approve --to dev --feature <slug>`
+- `--from prepare --to prepare --description "<idea>"`
+- `--from approve --to dev`
+- `--from identify --to promote`
 - `--from identify --to identify --scope branch:<name>`
-- `--from refactor --to refactor --feature <slug>`
+- `--from refactor --to refactor`
 - `--from release --to release --version 1.2.3`
 - `--from adopt --to adopt --branch <name>`
 
-Report the CLI output verbatim. If the command fails, report the exact error and stop.
+The feature and scope arguments are optional: they resolve from the previous run state or the latest ticket directory. Report the CLI output verbatim. If the command fails, report the exact error and stop.

@@ -7,11 +7,12 @@ import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, resolveTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
-import { branchNameFor, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
+import { branchNameFor, collectManualVerification, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
+import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { ensureDir } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
-  const feature = requireFeature(options)
+  const feature = resolvePrepareFeature(options)
   const backlogDir = path.join(config.repoPath, config.ticketDirs.backlog, feature)
   const briefPath = path.join(backlogDir, 'brief.md')
   await ensureDir(backlogDir)
@@ -57,7 +58,8 @@ export async function runPrepare({ config, stateStore, options, log }) {
 }
 
 export async function runApprove({ config, stateStore, options, log }) {
-  const feature = requireFeature(options)
+  const previous = await stateStore.load()
+  const feature = await resolveFeature({ config, options, state: previous, dirs: [config.ticketDirs.backlog] })
   const backlogDir = path.join(config.repoPath, config.ticketDirs.backlog, feature)
   if (!await exists(backlogDir)) throw new Error(`No backlog found for feature ${feature}. Run prepare first.`)
 
@@ -78,17 +80,18 @@ export async function runApprove({ config, stateStore, options, log }) {
   if (generated.code !== 0) throw new Error('The planner could not generate ready-for-dev tickets.')
 
   await log?.(`Tickets generated at ${readyDir}.`)
-  return runDev({ config, stateStore, options, log })
+  return runDev({ config, stateStore, options: { ...options, feature }, log })
 }
 
 export async function runDev({ config, stateStore, options, log }) {
-  const feature = requireFeature(options)
+  const loaded = await stateStore.load()
+  const feature = await resolveFeature({ config, options, state: loaded, dirs: [config.ticketDirs.readyForDev] })
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
   const doneDir = path.join(config.repoPath, config.ticketDirs.done, feature)
   const tickets = orderTickets(await listTickets(readyDir))
   if (tickets.length === 0) throw new Error(`No ready-for-dev tickets found in ${readyDir}.`)
 
-  const state = (await stateStore.load()) ?? await stateStore.create('dev', { feature })
+  const state = loaded ?? await stateStore.create('dev', { feature })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
   state.mode = 'dev'
@@ -115,6 +118,7 @@ export async function runDev({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      smokeCommand: config.smokeCommand,
       stateDir: config.stateDir,
       instructions: 'Implement only this ticket. Do not push or merge. Commit with type: subject, no scope, no ticket or ADR references.'
     }
@@ -165,17 +169,23 @@ export async function runDev({ config, stateStore, options, log }) {
 
   state.phase = 'dev-complete'
   await stateStore.save(state)
-  return { feature, tickets: results }
+  const qaFile = await collectManualVerification({
+    doneDir,
+    outputFile: path.join(config.repoPath, config.ticketDirs.qa, `${feature}.md`)
+  })
+  if (qaFile) await log?.(`Manual verification checklist at ${qaFile}.`)
+  return { feature, tickets: results, manualVerification: qaFile }
 }
 
 export async function runRefactor({ config, stateStore, options, log }) {
-  const feature = requireFeature(options)
+  const loaded = await stateStore.load()
+  const feature = await resolveFeature({ config, options, state: loaded, dirs: [config.ticketDirs.readyForRefactor] })
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
   const doneDir = path.join(config.repoPath, config.ticketDirs.done, feature)
   const tickets = orderTickets(await listTickets(readyDir))
   if (tickets.length === 0) throw new Error(`No ready-for-refactor tickets found in ${readyDir}.`)
 
-  const state = (await stateStore.load()) ?? await stateStore.create('refactor', { feature })
+  const state = loaded ?? await stateStore.create('refactor', { feature })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
   state.mode = 'refactor'
@@ -200,8 +210,9 @@ export async function runRefactor({ config, stateStore, options, log }) {
       restoreCommand: config.restoreCommand,
       buildCommand: config.buildCommand,
       testCommand: config.testCommand,
+      smokeCommand: config.smokeCommand,
       stateDir: config.stateDir,
-      instructions: 'Refactor only the files in the ticket scope. Keep tests green. Do not push or merge.'
+      instructions: 'Refactor only the files in the ticket scope. Preserve the user-visible behavior. Keep tests green. Do not push or merge.'
     }
 
     const execution = await runSession({
@@ -244,6 +255,42 @@ export async function runRefactor({ config, stateStore, options, log }) {
   state.phase = 'refactor-complete'
   await stateStore.save(state)
   return { feature, tickets: results }
+}
+
+/**
+ * Turns the Identified findings of the last audit into ready-for-refactor
+ * tickets. The planner owns the promotion; the auditor stays read-only.
+ */
+export async function runPromote({ config, stateStore, options, log }) {
+  const state = (await stateStore.load()) ?? await stateStore.create('promote', {})
+  const feature = String(options.feature ?? state.feature ?? 'tech-debt').trim() || 'tech-debt'
+  const findings = await resolveFindings({ config, state })
+  if (findings.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
+
+  const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
+  await ensureDir(outputDir)
+  const artifacts = new Artifacts(config, state.runId)
+  await artifacts.init()
+
+  const execution = await runSession({
+    config,
+    prompt: 'ready-for-refactor',
+    agent: config.agents.planner,
+    payload: { feature, findings, outputDir },
+    title: `AutopAI promote ${feature}`,
+    logFile: artifacts.path('planner-ready-for-refactor.log'),
+    role: 'planner'
+  })
+  if (execution.code !== 0) throw new Error('The planner could not generate ready-for-refactor tickets.')
+
+  const tickets = await listMarkdown(outputDir)
+  state.mode = 'promote'
+  state.phase = 'promoted'
+  state.feature = feature
+  state.completedPhases = [...new Set([...state.completedPhases, 'promote'])]
+  await stateStore.save(state)
+  await log?.(`Ready-for-refactor tickets at ${outputDir}.`)
+  return { feature, outputDir, findings: findings.length, tickets: tickets.length }
 }
 
 export async function runRelease({ config, stateStore, options, log }) {
@@ -309,10 +356,21 @@ export async function runRelease({ config, stateStore, options, log }) {
   return { version, tag, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit }
 }
 
-function requireFeature(options) {
-  const feature = String(options.feature ?? '').trim()
-  if (!feature) throw new Error('The --feature option is required.')
-  return feature
+function resolvePrepareFeature(options) {
+  const explicit = String(options.feature ?? '').trim()
+  if (explicit) return explicit
+  const derived = featureFromDescription(options.description)
+  if (derived) return derived
+  throw new Error('The --feature option is required when no --description is provided.')
+}
+
+async function resolveFindings({ config, state }) {
+  const fromState = (state.scopes ?? [])
+    .flatMap(scope => scope.tickets ?? [])
+    .filter(file => String(file).endsWith('.md'))
+  const unique = [...new Set(fromState)]
+  if (unique.length > 0) return unique
+  return listMarkdown(path.join(config.repoPath, config.ticketDirs.identified))
 }
 
 async function listMarkdown(dir) {

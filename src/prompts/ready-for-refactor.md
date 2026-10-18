@@ -4,7 +4,14 @@ The orchestrator invoked you with this JSON payload:
 
 {{PAYLOAD}}
 
-Read the Identified tickets and the scope patch or file list the payload provides, and write tickets under the payload `outputDir`. Stay inside the provided scope. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
+The payload provides `feature`, `findings` (the Identified documents of the last audit), and `outputDir`.
+
+Read the Identified documents and the scope patch or file list they reference, and write tickets under the payload `outputDir`. Stay inside the provided scope. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
+
+Constraints:
+
+- Every ticket must preserve the user-visible behavior: treat the UX as frozen unless the Identified document describes a UX defect.
+- One ticket per debt. Split a finding into several tickets only when it names independent work items with their own acceptance criteria.
 
 ## PHASE 1: Context and Code Analysis (MANDATORY)
 Before writing the plan, understand the original problem and the current code.

@@ -63,7 +63,7 @@ flowchart LR
 
 **Orchestrator.** The `autopai` CLI. It resolves the repository, loads `autopai.json`, takes a lock, runs a phase, and releases the lock. It verifies facts (commits, diffs, gates, checks) and never trusts an agent summary.
 
-**Phase.** One step of the lifecycle: `adopt`, `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`. Each phase can be run alone, chained with `run --from --to`, or resumed after a failure.
+**Phase.** One step of the lifecycle: `adopt`, `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`. Each phase can be run alone, chained with `run --from --to`, or resumed after a failure.
 
 **Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. No long-running conversation carries a run.
 
@@ -90,7 +90,7 @@ AutopAI runs four roles. The role names are stable; the agent names are configur
 | Role | Default agent | Writes | Read-only over | Invoked by |
 | --- | --- | --- | --- | --- |
 | executor | `autopai` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
-| planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve` |
+| planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve`, `promote` |
 | auditor | `auditor` | `tickets/identified/**`, `tickets/ux/**` | Source, tests, UX | `identify` |
 | setup | `setup` | `autopai.json`, `.gitignore` | Everything else | `/autopai-init` and manual commands |
 
@@ -120,7 +120,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Mission.** Produce local planning artifacts. Nothing else.
 
-**Phases.** `prepare` runs the planner twice: once for the feature brief (only when `brief.md` does not exist yet) and once for the technical backlog. `approve` runs the planner to turn the approved backlog into ready-for-dev tickets with front matter.
+**Phases.** `prepare` runs the planner twice: once for the feature brief (only when `brief.md` does not exist yet) and once for the technical backlog. `approve` runs the planner to turn the approved backlog into ready-for-dev tickets with front matter. `promote` runs the planner to turn the Identified findings of the last audit into ready-for-refactor tickets.
 
 **Permissions.** The planner writes only inside the configured backlog, ready-for-dev, ready-for-refactor, and done directories. Source, tests, CI, ADRs, and configuration are read-only.
 
@@ -158,17 +158,18 @@ flowchart TD
     Review -->|approve| Dev["dev<br/>one pull request per ticket"]
     Dev --> Refactor["refactor<br/>one pull request per ticket"]
     Refactor --> Release["release<br/>merge and tag"]
-    Identify["identify<br/>local findings"] -.->|triage| Refactor
+    Identify["identify<br/>local findings"] -.->|promote| Promote["promote<br/>refactor tickets"]
+    Promote -.-> Refactor
 
     classDef step fill:#ffffff,stroke:#8c959f,color:#24292f
     classDef gate fill:#fff8c5,stroke:#d4a72c,color:#7d4e00
     classDef done fill:#dafbe1,stroke:#4ac26b,color:#116329
-    class Prepare,Dev,Refactor,Release,Identify,Adopt step
+    class Prepare,Dev,Refactor,Release,Identify,Adopt,Promote step
     class Review gate
     class Merged done
 ```
 
-Phases can be run alone, in any supported range, or resumed. The phase order used by `run --from --to` is: `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`, `adopt`. Note that a chain from `prepare` to `release` therefore includes `identify` between `dev` and `refactor`.
+Phases can be run alone, in any supported range, or resumed. The phase order used by `run --from --to` is: `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`, `adopt`. Note that a chain from `prepare` to `release` therefore includes `identify` and `promote` between `dev` and `refactor`.
 
 ### 4.1 adopt
 
@@ -235,7 +236,7 @@ If you want to review the generated tickets before any branch is created, run `a
 
 **Flow.**
 
-1. Resolve each `--scope`:
+1. Resolve each `--scope`. Without `--scope`, the scopes come from the previous run state (the pull requests of the last `dev`, `refactor`, `adopt`, or `identify` run) or from the current branch when it has commits over `origin/<base>`. The resolved feature is carried into the new state:
    - `branch:<name>` uses `origin/<base>...<branch>`, fetches first, and writes a patch file plus a changed-file list.
    - `pr:<number>` uses the pull request diff and file list from `gh`.
    - `dir:<path>` walks the directory for code files (no patch).
@@ -246,15 +247,28 @@ If you want to review the generated tickets before any branch is created, run `a
 
 **Dry run.** `--dry-run` resolves the scopes and reports the file counts without collecting evidence or running the auditor.
 
-**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Triage is a human decision: to execute a finding, promote it into a ready-for-refactor ticket.
+**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Promotion is automatic: the `promote` phase turns every finding into a ready-for-refactor ticket, and the refactor loop executes them.
 
-### 4.6 refactor
+### 4.6 promote
+
+**Purpose.** Turn the Identified findings of the last audit into ready-for-refactor tickets.
+
+**Flow.**
+
+1. Resolve the `feature` (explicit, or the feature of the last run, or `tech-debt`).
+2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`.
+3. Run the planner with the `ready-for-refactor` prompt. It writes one ticket per finding under `tickets/ready-for-refactor/<feature>/` with front matter.
+4. Refuse to continue when no Identified ticket exists.
+
+Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect.
+
+### 4.7 refactor
 
 **Purpose.** Execute ready-for-refactor tickets with the same gates as `dev`.
 
 **Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/<feature>/` and every branch is forced to the `refactor` type. Tickets move to `tickets/done/<feature>/` after the merge.
 
-### 4.7 release
+### 4.8 release
 
 **Purpose.** Prepare, merge, and tag a release.
 
@@ -266,11 +280,11 @@ If you want to review the generated tickets before any branch is created, run `a
 4. Run the local gates, resolve the title, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the fix loop, and merge.
 5. Tag `v<version>` on the merge commit and push the tag.
 
-### 4.8 run and resume
+### 4.9 run and resume
 
 **run.** `autopai run --from <phase> --to <phase>` executes the phases in the fixed order above, inclusive. The default range is `prepare` to `refactor`.
 
-**resume.** `autopai resume` reloads `state.json` and re-runs the stored mode with the stored branch, base, and feature. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one. Automatic resume supports the modes `adopt`, `prepare`, `dev`, `refactor`, and `identify`. Modes `approve` and `release` are not auto-resumable; re-run them with their original command.
+**resume.** `autopai resume` reloads `state.json` and re-runs the stored mode with the stored branch, base, and feature. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one. Automatic resume supports the modes `adopt`, `prepare`, `dev`, `refactor`, `identify`, and `promote`. Modes `approve` and `release` are not auto-resumable; re-run them with their original command.
 
 ## 5. Tickets
 
@@ -283,6 +297,7 @@ All ticket directories are configurable through `ticketDirs` and default to:
 | `tickets/identified/<scope>/` | audit findings |
 | `tickets/ready-for-refactor/<feature>/` | tickets waiting for the refactor loop |
 | `tickets/ux/` | UX proposals written by the UX review command |
+| `tickets/qa/` | manual verification checklist collected after the dev loop |
 | `tickets/done/<feature>/` | tickets whose pull request merged |
 
 Tickets are local artifacts. Add `/tickets/` (or the configured state directory) to `.gitignore` during initialization.
@@ -314,7 +329,7 @@ The branch name comes from the ticket type and the file name without its numeric
 - Review `backlog.md` before running `approve`. Edit it freely; the planner reads it at that moment.
 - Review generated ready-for-dev tickets before running `dev` if the loop has not started.
 - Edit `depends_on`, `priority`, or `type` front matter to change execution order or branch type.
-- Promote an Identified ticket manually by copying it into `tickets/ready-for-refactor/<feature>/` with the required front matter. The auditor never promotes its own findings.
+- Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/<feature>/` with the required front matter.
 
 ## 6. Configuration
 
@@ -334,6 +349,7 @@ The branch name comes from the ticket type and the file name without its numeric
 | `restoreCommand` | string array or null | `null` | Dependency restore command, as an argument array. |
 | `buildCommand` | string array or null | `null` | Build command, as an argument array. |
 | `testCommand` | string array or null | `null` | Test command, as an argument array. |
+| `smokeCommand` | string array or null | `null` | Optional smoke command that runs after the test command in the local gates. |
 | `coverageThreshold` | number or null | `null` | Minimum line coverage between 0 and 1. Use the same value as CI. |
 | `maxAttempts` | integer | `3` | CI fix attempts before the run stops. |
 | `maxMinutes` | integer | `240` | Wall-clock budget. Reserved: accepted, not enforced yet. |
@@ -407,11 +423,12 @@ Commands are argument arrays, never shell strings, so no shell quoting or inject
 ```
 autopai help
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-autopai identify --repo <path> --scope branch:<name> [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
-autopai prepare --repo <path> --feature <slug> [--description <text>]
-autopai approve --repo <path> --feature <slug>
-autopai dev --repo <path> --feature <slug>
-autopai refactor --repo <path> --feature <slug>
+autopai identify --repo <path> [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
+autopai promote --repo <path> [--feature <slug>]
+autopai prepare --repo <path> [--feature <slug>] [--description <text>]
+autopai approve --repo <path> [--feature <slug>]
+autopai dev --repo <path> [--feature <slug>]
+autopai refactor --repo <path> [--feature <slug>]
 autopai release --repo <path> --version <x.y.z>
 autopai run --repo <path> --from <phase> --to <phase> [phase options]
 autopai status --repo <path>
@@ -420,6 +437,8 @@ autopai abort --repo <path>
 ```
 
 **Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope` can be repeated.
+
+**Defaults.** `--feature` resolves from the previous run state or the latest ticket directory, and `--scope` defaults to the scopes of the last run. Explicit flags always win, and the resolver fails with a clear error instead of guessing when no candidate exists.
 
 **Output.** Successful commands print a JSON result to standard output, except `status` and `abort`, which print short human-readable text. Errors go to standard error prefixed with `autopai: ` and the process exits with code 1.
 
@@ -499,7 +518,7 @@ When violations appear during a push, the orchestrator asks the executor for a f
 
 ### 9.4 Local gates
 
-Local gates run before every push, in order: `restoreCommand`, `buildCommand`, `testCommand`, then coverage. Coverage is read from Cobertura reports found under `TestResults/**/coverage.cobertura.xml`, summed across reports, and compared with `coverageThreshold` when set. A missing report fails the gate when a threshold is configured. Each command runs with `commandTimeoutMinutes` and its output is saved under the run artifacts.
+Local gates run before every push, in order: `restoreCommand`, `buildCommand`, `testCommand`, `smokeCommand` when configured, then coverage. Coverage is read from Cobertura reports found under `TestResults/**/coverage.cobertura.xml`, summed across reports, and compared with `coverageThreshold` when set. A missing report fails the gate when a threshold is configured. Each command runs with `commandTimeoutMinutes` and its output is saved under the run artifacts.
 
 ### 9.5 CI gates
 
@@ -521,7 +540,7 @@ On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, 
 - A merge happens only after every required check passes.
 - A conflicting pull request stops the run. A pull request that is `BEHIND` gets its branch updated and the checks are awaited again.
 - The merge commit subject is the pull request title, and the body states the branch, the base, and the CI result, including coverage. The generated body never references tickets, ADRs, or issues.
-- After the merge, the orchestrator verifies the pull request state is `MERGED` and deletes the remote branch.
+- After the merge, the orchestrator verifies the pull request state is `MERGED` and deletes the remote branch. It also prunes remote refs, fast-forwards the local base branch, returns to it, and deletes the merged local branch. Local divergences are reported and never overwritten.
 
 ## 10. Customization
 
@@ -630,7 +649,7 @@ autopai identify --repo . --scope branch:feat/order-history --scope pr:412
 
 The auditor writes one Identified ticket per debt under `tickets/identified/feat-order-history/` and `tickets/identified/pr-412/`. Nothing is committed.
 
-2. Triage. Read the findings and decide which ones deserve work. Copy the chosen ones into `tickets/ready-for-refactor/settings-panel/` with front matter (`id`, `feature`, `type: refactor`, `priority`, `depends_on`).
+2. Promote. `/autopai-identify` already chained `promote`, so every finding became a ready-for-refactor ticket under `tickets/ready-for-refactor/settings-panel/`. To run it alone, use `autopai promote --repo . --feature settings-panel`. The auditor never promotes its own findings; the planner does.
 
 3. Refactor:
 
@@ -663,6 +682,12 @@ The executor updates the version and changelog on `chore/release-v1.4.0`, the or
 **`Policy violations remain after the executor run.`** The executor could not remove a violation. The message lists file and line. Fix it manually, amend the commit if needed, and resume or re-run adopt.
 
 **`Coverage X% is below the configured minimum Y%.`** The Cobertura report under `TestResults/` is below `coverageThreshold`. Add tests or align the threshold with CI.
+
+**`No audit scope could be resolved.`** `identify` found no explicit `--scope`, no state from a previous run, and the current branch has no commits over the base. Pass `--scope branch:<name>` or `--scope pr:<number>`.
+
+**`No Identified tickets were found.`** `promote` ran without findings. Run `identify` first, or generate the Identified tickets manually under `tickets/identified/`.
+
+**`Could not resolve --feature: no ticket directory was found.`** The previous state and the ticket directories offered no candidate. Pass `--feature <slug>` explicitly or create the backlog first.
 
 **`Required checks were not reported: <names>.`** Within 120 seconds of the first poll, `gh pr checks` did not report every name in `requiredChecks`. Confirm the exact names with `gh pr checks <number>` and copy them verbatim.
 
@@ -722,6 +747,8 @@ Decisions worth highlighting:
 **Platform.** Agent, permission, and command files for one coding tool, under `platforms/<tool>/`.
 
 **Policy.** The Git artifact and quality rules enforced by the orchestrator before every push and merge.
+
+**Promote.** Phase that turns the Identified findings of the last audit into ready-for-refactor tickets through the planner.
 
 **Protected path.** A repository-relative glob the executor must never modify.
 

@@ -7,6 +7,7 @@ const DEFAULT_TICKET_DIRS = {
   identified: 'tickets/identified',
   readyForRefactor: 'tickets/ready-for-refactor',
   ux: 'tickets/ux',
+  qa: 'tickets/qa',
   done: 'tickets/done'
 }
 
@@ -26,6 +27,7 @@ const DEFAULTS = {
   restoreCommand: null,
   buildCommand: null,
   testCommand: null,
+  smokeCommand: null,
   coverageThreshold: null,
   maxAttempts: 3,
   maxMinutes: 240,
@@ -89,6 +91,7 @@ export async function loadConfig(repoPath) {
   validateCommand(config.restoreCommand, 'restoreCommand')
   validateCommand(config.buildCommand, 'buildCommand')
   validateCommand(config.testCommand, 'testCommand')
+  validateCommand(config.smokeCommand, 'smokeCommand')
   assert(config.maxAttempts > 0, 'maxAttempts must be greater than zero')
 
   return config

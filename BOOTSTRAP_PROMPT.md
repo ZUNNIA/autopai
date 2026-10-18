@@ -79,17 +79,15 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `platforms/opencode/agents/planner.md`
 - `platforms/opencode/agents/setup.md`
 - `platforms/opencode/commands/autopai-adopt.md`
+- `platforms/opencode/commands/autopai-dev.md`
 - `platforms/opencode/commands/autopai-identify.md`
 - `platforms/opencode/commands/autopai-init.md`
+- `platforms/opencode/commands/autopai-plan.md`
+- `platforms/opencode/commands/autopai-refactor.md`
+- `platforms/opencode/commands/autopai-release.md`
 - `platforms/opencode/commands/autopai-resume.md`
 - `platforms/opencode/commands/autopai-run.md`
 - `platforms/opencode/commands/autopai-status.md`
-- `platforms/opencode/commands/backlog.md`
-- `platforms/opencode/commands/cicd.md`
-- `platforms/opencode/commands/identified.md`
-- `platforms/opencode/commands/ready-for-dev.md`
-- `platforms/opencode/commands/ready-for-refactor.md`
-- `platforms/opencode/commands/release.md`
 - `platforms/opencode/commands/ux-review.md`
 
 ### Core
@@ -101,6 +99,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/artifacts.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
+- `src/lib/defaults.js`
 - `src/lib/forbidden.js`
 - `src/lib/gates.js`
 - `src/lib/git.js`
@@ -141,6 +140,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `test/config.test.js`
 - `test/coverage.test.js`
+- `test/defaults.test.js`
 - `test/forbidden.test.js`
 - `test/policy.test.js`
 - `test/prompts.test.js`

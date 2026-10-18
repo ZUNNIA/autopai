@@ -69,6 +69,11 @@ export async function diffNames(repo, range) {
   return result.stdout.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
 }
 
+export async function countCommitsOver(repo, base, branch) {
+  const result = await git(repo, ['rev-list', '--count', `origin/${base}..${branch}`], { allowFailure: true })
+  return result.code === 0 ? Number(result.stdout.trim()) : 0
+}
+
 export async function logCommits(repo, range) {
   const result = await git(repo, ['log', '--format=%H%x1f%s%x1f%b%x1e', range])
   return result.stdout
@@ -83,6 +88,25 @@ export async function logCommits(repo, range) {
 
 export async function switchBranch(repo, branch) {
   await git(repo, ['switch', branch])
+}
+
+export async function switchBranchSafe(repo, branch) {
+  const result = await git(repo, ['switch', branch], { allowFailure: true })
+  return result.code === 0
+}
+
+/**
+ * Fast-forwards a local branch from origin with a refspec. The fetch refuses
+ * non-fast-forward updates, so local commits are never overwritten.
+ */
+export async function syncLocalBranch(repo, branch) {
+  const result = await git(repo, ['fetch', 'origin', `${branch}:${branch}`], { allowFailure: true })
+  return result.code === 0
+}
+
+export async function deleteLocalBranch(repo, branch) {
+  const result = await git(repo, ['branch', '-d', branch], { allowFailure: true })
+  return result.code === 0
 }
 
 export async function createBranchFrom(repo, branch, base) {

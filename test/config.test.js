@@ -40,3 +40,26 @@ test('fails when the runner is missing', async () => {
   }), 'utf8')
   await assert.rejects(() => loadConfig(repo), /runner is required/)
 })
+
+test('validates the smoke command and defaults the qa directory', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-smoke-'))
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    smokeCommand: ['npm', 'run', 'smoke']
+  }), 'utf8')
+
+  const config = await loadConfig(repo)
+  assert.deepEqual(config.smokeCommand, ['npm', 'run', 'smoke'])
+  assert.equal(config.ticketDirs.qa, 'tickets/qa')
+
+  const invalid = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-smoke-invalid-'))
+  await fs.writeFile(path.join(invalid, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    smokeCommand: 'npm run smoke'
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(invalid), /smokeCommand/)
+})

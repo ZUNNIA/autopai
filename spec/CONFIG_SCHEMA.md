@@ -14,6 +14,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `restoreCommand` | string array or null | Dependency restore command. |
 | `buildCommand` | string array or null | Build command. |
 | `testCommand` | string array or null | Test command. It must produce the coverage report expected by `coverageThreshold`. |
+| `smokeCommand` | string array or null | Optional smoke command. It runs after the test command as part of the local gates. |
 | `coverageThreshold` | number or null | Minimum line coverage between 0 and 1. Use the same value as CI. |
 | `maxAttempts` | integer | CI fix attempts. Default 3. |
 | `maxMinutes` | integer | Wall-clock budget. Default 240. Reserved: accepted, not enforced yet. |
@@ -28,7 +29,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `setup`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `setup`. |
-| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done`. Keep the defaults when using the bundled platform agents, because their permissions allow those paths. |
+| `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, `qa`, and `done`. Keep the defaults when using the bundled platform agents, because their permissions allow those paths. |
 | `stateDir` | string | Local state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:

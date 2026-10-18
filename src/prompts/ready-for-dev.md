@@ -69,3 +69,6 @@ Important details for implementation:
 * **Design decisions:** Why this approach was chosen over another.
 * **Error handling:** How and where errors should be caught and thrown.
 * **Architecture Impact:** If this implementation introduces a new framework, database, or core pattern, stop and ask for an architecture decision record before proceeding.
+
+## 6. Manual Verification
+Exact manual steps a human must run for behavior that automated tests and the smoke command cannot cover. Include preconditions, steps, and expected results. Write "None" when the ticket is fully covered by automated tests.
