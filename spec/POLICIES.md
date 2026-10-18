@@ -22,10 +22,13 @@
 - **auditor**: may write only under the configured identified and UX directories. Read-only over source and UX.
 - **setup**: may edit only `autopai.json` and `.gitignore`.
 - The orchestrator pushes, opens pull requests, and merges after the required checks pass.
+- Promotion is a planner duty: the `promote` phase turns Identified findings into ready-for-refactor tickets. The auditor never promotes its own findings.
 
 ## Quality
 
 - Tests may be changed, added, or removed. The CI build, test suite, and coverage threshold are the only quality gates.
+- Refactors preserve the user-visible behavior unless the finding documents a UX defect.
+- After the dev loop, the orchestrator collects the Manual Verification sections of the done tickets into `tickets/qa/<feature>.md` so the human runs only what automation cannot cover.
 - Protected paths cannot be edited by the executor: tickets, ADRs, CI workflows, `autopai.json`, repository `AGENTS.md`, and coding tool configuration.
 - New compiler warnings fail the build when the repository treats warnings as errors.
 

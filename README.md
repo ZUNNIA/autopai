@@ -22,9 +22,11 @@ It is language, repository, and coding-tool agnostic. The build, test, and check
 
 ## Highlights
 
-- Resumable phases: adopt, prepare, approve, dev, identify, refactor, and release.
+- Resumable phases: adopt, prepare, approve, dev, identify, promote, refactor, and release.
+- Zero-argument phases: `--feature` and `--scope` resolve from the previous run state or the latest ticket directory.
 - Starts at any phase. Hand it an existing branch or stop after a backlog review.
 - CI-gated merges. It merges only after the required checks pass.
+- Clean loops. After every merge it deletes the remote branch, fast-forwards the local base branch, and deletes the merged local branch.
 - Local artifacts. Tickets, briefs, and findings never touch Git.
 - Any coding tool. One runner module per tool; the core does not change.
 - Any language. No ecosystem detection; the AI inspects the repository.
@@ -38,6 +40,7 @@ It is language, repository, and coding-tool agnostic. The build, test, and check
 | `approve` | Generates ready-for-dev tickets and starts the development loop. |
 | `dev` | Implements one ticket per branch through CI and merge. |
 | `identify` | Audits scopes and writes local findings. |
+| `promote` | Turns the findings into ready-for-refactor tickets. |
 | `refactor` | Executes refactor tickets with the same gates. |
 | `release` | Updates version and changelog, opens the release pull request, merges, and tags. |
 
@@ -90,20 +93,22 @@ autopai help
 Open a target repository in the coding tool and run `/autopai-init`. The setup agent inspects the repository and writes `autopai.json`. No language or framework is assumed. Then run the phase you need:
 
 ```text
+/autopai-plan "<idea>"
+/autopai-dev
+/autopai-identify
+/autopai-refactor
+/autopai-release <x.y.z>
 /autopai-adopt --branch <name>
-/autopai-run --from prepare --to prepare --feature <slug> --description "<idea>"
-/autopai-run --from approve --to dev --feature <slug>
-/autopai-identify --scope branch:<name> --scope pr:<number>
-/autopai-run --from refactor --to refactor --feature <slug>
-/autopai-run --from release --to release --version <x.y.z>
 /autopai-status
 ```
 
-The same phases are available from the CLI:
+The arguments are optional. `--feature` resolves from the previous run state or the latest ticket directory, and `identify` audits the pull requests of the last run when no `--scope` is given. The same phases are available from the CLI:
 
 ```text
-autopai adopt --repo . --branch <name>
-autopai identify --repo . --scope branch:<name> --scope pr:<number>
+autopai prepare --repo . --description "<idea>"
+autopai run --repo . --from approve --to dev
+autopai identify --repo .
+autopai promote --repo .
 autopai status --repo .
 autopai resume --repo .
 ```

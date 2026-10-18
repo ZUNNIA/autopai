@@ -9,10 +9,12 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
 - One session per phase or per ticket. No long-running conversation carries the run.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop after a backlog, identify debt, refactor, or release.
+- Phase arguments are optional: `--feature` and `--scope` resolve from the previous run state or the latest ticket directory. The resolver fails instead of guessing when no candidate exists.
 - State lives outside any conversation, in local files, and survives crashes.
 - The CI result is the merge authority. The orchestrator fails closed when a required check is missing.
 - Tickets, briefs, findings, and evidence are local artifacts. Git artifacts never reference them.
 - Executors commit. The orchestrator pushes, opens pull requests, and merges.
+- After a merge the orchestrator deletes the remote branch, fast-forwards the local base branch, and deletes the merged local branch. Local divergences are never overwritten.
 - The orchestrator verifies facts: commits, diffs, protected paths, commit format, build, tests, coverage, and CI checks. It never trusts the agent's summary.
 
 ## Phases
@@ -21,8 +23,9 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - `prepare`: generates a brief and a backlog, then stops for human approval.
 - `approve`: generates ready-for-dev tickets and starts the development loop.
 - `dev`: implements one ticket per branch through push, pull request, CI, and merge.
-- `identify`: audits one or more branch or pull request scopes and writes local findings.
-- `refactor`: executes ready-for-refactor tickets with the same gates.
+- `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run.
+- `promote`: the planner turns the Identified findings of the last audit into ready-for-refactor tickets. The auditor never promotes its own findings.
+- `refactor`: executes ready-for-refactor tickets with the same gates. Refactors preserve the user-visible behavior unless the finding documents a UX defect.
 - `release`: updates version and changelog, opens a release pull request, merges, and tags.
 
 `run --from <phase> --to <phase>` chains any range of phases.
@@ -35,7 +38,7 @@ Reconciliation on resume checks the real branch, commits, pull request, and chec
 
 ## Gates
 
-Local gates run restore, build, test, and the configured coverage threshold before any push. CI gates require the configured check names after the pull request exists. On failure, the orchestrator sends the failed logs to the executor, which fixes and commits. After the configured attempts, the run stops with a blocker.
+Local gates run restore, build, test, the optional smoke command, and the configured coverage threshold before any push. CI gates require the configured check names after the pull request exists. On failure, the orchestrator sends the failed logs to the executor, which fixes and commits. After the configured attempts, the run stops with a blocker.
 
 ## Protected paths
 
