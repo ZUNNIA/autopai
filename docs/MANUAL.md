@@ -34,22 +34,29 @@ The division of responsibility is the key idea:
 Because state lives in local files, a run survives crashes, machine restarts, and tool restarts. You can stop after any phase and continue later.
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear"}}}%%
 flowchart LR
-    subgraph Core["AutopAI orchestrator (Node CLI)"]
-        Phases[Phases and gates]
-        State[(Local state, logs, artifacts)]
-    end
-    Runner[Runner module]
-    Tool[Coding tool sessions]
-    GitHub[GitHub via gh CLI]
-    Repo[(Target repository)]
+    CLI["autopai CLI<br/>phases and gates"]
+    State[("state.json<br/>logs and artifacts")]
+    Runner["Runner"]
+    Session["Coding tool session"]
+    GitHub["GitHub CLI"]
+    Repo[("Target repository")]
 
-    Core --> Runner
-    Runner --> Tool
-    Tool --> Repo
-    Core --> GitHub
-    Core <--> State
-    Core --> Repo
+    CLI --> Runner
+    Runner --> Session
+    Session --> Repo
+    CLI --> GitHub
+    CLI --> Repo
+    CLI -.-> State
+
+    classDef cli fill:#ddf4ff,stroke:#54aeff,color:#0a3069
+    classDef store fill:#f6f8fa,stroke:#8c959f,color:#24292f
+    classDef plain fill:#ffffff,stroke:#8c959f,color:#24292f
+    class CLI cli
+    class State,Repo store
+    class Runner,Session,GitHub plain
+    linkStyle default stroke:#8c959f
 ```
 
 ## 2. Core concepts
@@ -144,17 +151,21 @@ The prompts that drive each session are owned by the core and live in `src/promp
 ## 4. The lifecycle
 
 ```mermaid
-flowchart LR
-    A[adopt] --> M1[merged]
-    P[prepare] --> R{backlog review}
-    R -->|approve| D[dev loop]
-    D --> DC[dev-complete]
-    I[identify] --> ID[Identified tickets]
-    ID -->|human triage| RF[refactor loop]
-    RF --> RC[refactor-complete]
-    DC --> REL[release]
-    RC --> REL
-    REL --> TAG[tagged]
+%%{init: {"flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    Adopt["adopt<br/>existing branch"] --> Merged["merged"]
+    Prepare["prepare<br/>brief and backlog"] --> Review{"human review"}
+    Review -->|approve| Dev["dev<br/>one pull request per ticket"]
+    Dev --> Refactor["refactor<br/>one pull request per ticket"]
+    Refactor --> Release["release<br/>merge and tag"]
+    Identify["identify<br/>local findings"] -.->|triage| Refactor
+
+    classDef step fill:#ffffff,stroke:#8c959f,color:#24292f
+    classDef gate fill:#fff8c5,stroke:#d4a72c,color:#7d4e00
+    classDef done fill:#dafbe1,stroke:#4ac26b,color:#116329
+    class Prepare,Dev,Refactor,Release,Identify,Adopt step
+    class Review gate
+    class Merged done
 ```
 
 Phases can be run alone, in any supported range, or resumed. The phase order used by `run --from --to` is: `prepare`, `approve`, `dev`, `identify`, `refactor`, `release`, `adopt`. Note that a chain from `prepare` to `release` therefore includes `identify` between `dev` and `refactor`.
