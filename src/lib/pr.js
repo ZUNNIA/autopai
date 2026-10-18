@@ -204,7 +204,29 @@ export async function pushOpenWaitMerge({
   }
 
   await git.deleteRemoteBranch(config.repoPath, branch)
+  await cleanupAfterMerge({ config, branch, baseBranch, log })
   return { prNumber: pr.number, mergeCommit: merged.mergeCommit?.oid ?? null, title, checks: checks.checks }
+}
+
+/**
+ * Leaves the repository clean after a merge: prunes remote refs, fast-forwards
+ * the local base branch, returns to it, and deletes the merged local branch.
+ * Local divergences are reported and never overwritten.
+ */
+async function cleanupAfterMerge({ config, branch, baseBranch, log }) {
+  await git.fetch(config.repoPath)
+  if (!await git.syncLocalBranch(config.repoPath, baseBranch)) {
+    await log?.(`Local ${baseBranch} could not be fast-forwarded; local cleanup was skipped.`)
+    return
+  }
+  const current = await git.currentBranch(config.repoPath)
+  if (current === branch && !await git.switchBranchSafe(config.repoPath, baseBranch)) {
+    await log?.(`Could not switch to ${baseBranch}; the merged local branch was kept.`)
+    return
+  }
+  if (await git.branchExists(config.repoPath, branch) && !await git.deleteLocalBranch(config.repoPath, branch)) {
+    await log?.(`Local branch ${branch} was kept because it is not fully merged.`)
+  }
 }
 
 /**

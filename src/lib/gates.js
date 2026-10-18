@@ -2,14 +2,15 @@ import { runCommand } from './runner.js'
 import { readCoverage, formatCoverage } from './coverage.js'
 
 /**
- * Runs restore, build, test, and coverage locally. The GitHub workflow remains
- * the final authority; these gates catch failures before a push.
+ * Runs restore, build, test, smoke, and coverage locally. The GitHub workflow
+ * remains the final authority; these gates catch failures before a push.
  */
 export async function runGates({ config, artifacts, prefix = 'gate' }) {
   const steps = [
     ['restore', config.restoreCommand],
     ['build', config.buildCommand],
-    ['test', config.testCommand]
+    ['test', config.testCommand],
+    ['smoke', config.smokeCommand]
   ].filter(([, command]) => Array.isArray(command) && command.length > 0)
 
   const results = []

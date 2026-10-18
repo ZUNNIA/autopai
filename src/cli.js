@@ -5,9 +5,9 @@ import { loadConfig } from './lib/config.js'
 import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
-import { runApprove, runDev, runPrepare, runRefactor, runRelease } from './phases/pipeline.js'
+import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
 
-const PHASES = ['prepare', 'approve', 'dev', 'identify', 'refactor', 'release', 'adopt']
+const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
 async function main() {
   const { command, options } = parseCliArgs(process.argv.slice(2))
@@ -29,6 +29,7 @@ async function main() {
     let result
     if (command === 'adopt') result = await runAdopt(ctx)
     else if (command === 'identify') result = await runIdentify(ctx)
+    else if (command === 'promote') result = await runPromote(ctx)
     else if (command === 'prepare') result = await runPrepare(ctx)
     else if (command === 'approve') result = await runApprove(ctx)
     else if (command === 'dev') result = await runDev(ctx)
@@ -52,13 +53,14 @@ async function runSequence({ config, stateStore, options, log }) {
 
   const results = []
   for (const phase of PHASES.slice(start, end + 1)) {
-    if (!['prepare', 'approve', 'dev', 'identify', 'refactor', 'release', 'adopt'].includes(phase)) continue
+    if (!['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt'].includes(phase)) continue
     log(`Running phase ${phase}.`)
     const ctx = { config, stateStore, options, log }
     if (phase === 'prepare') results.push(await runPrepare(ctx))
     if (phase === 'approve') results.push(await runApprove(ctx))
     if (phase === 'dev') results.push(await runDev(ctx))
     if (phase === 'identify') results.push(await runIdentify(ctx))
+    if (phase === 'promote') results.push(await runPromote(ctx))
     if (phase === 'refactor') results.push(await runRefactor(ctx))
     if (phase === 'release') results.push(await runRelease(ctx))
     if (phase === 'adopt') results.push(await runAdopt(ctx))
@@ -79,6 +81,7 @@ async function resumeRun({ config, stateStore, options, log }) {
     else if (state.mode === 'dev') result = await runDev(ctx)
     else if (state.mode === 'refactor') result = await runRefactor(ctx)
     else if (state.mode === 'identify') result = await runIdentify(ctx)
+    else if (state.mode === 'promote') result = await runPromote(ctx)
     else throw new Error(`Cannot resume mode ${state.mode} automatically.`)
     printResult(result)
     return result
@@ -127,16 +130,21 @@ function printHelp() {
 
 Usage:
   autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-  autopai identify --repo <path> --scope branch:<name> [--scope pr:<number>] [--scope dir:<path>]
-  autopai prepare --repo <path> --feature <slug> [--description <text>]
-  autopai approve --repo <path> --feature <slug>
-  autopai dev --repo <path> --feature <slug>
-  autopai refactor --repo <path> --feature <slug>
+  autopai identify --repo <path> [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
+  autopai promote --repo <path> [--feature <slug>]
+  autopai prepare --repo <path> [--feature <slug>] [--description <text>]
+  autopai approve --repo <path> [--feature <slug>]
+  autopai dev --repo <path> [--feature <slug>]
+  autopai refactor --repo <path> [--feature <slug>]
   autopai release --repo <path> --version <x.y.z>
-  autopai run --repo <path> --from <phase> --to <phase> [--feature <slug>]
+  autopai run --repo <path> --from <phase> --to <phase> [phase options]
   autopai status --repo <path>
   autopai resume --repo <path>
   autopai abort --repo <path>
+
+Phase arguments are optional: the feature resolves from the previous run state
+or the latest ticket directory, and identify audits the scopes recorded by the
+last run when no --scope is given.
 `)
 }
 

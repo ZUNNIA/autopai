@@ -5,18 +5,24 @@ import * as github from '../lib/github.js'
 import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
+import { scopesFromState } from '../lib/defaults.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
 /**
  * Resolves one or more audit scopes (branch, pull request, or directory),
  * gathers local evidence, and runs the read-only auditor. No diagnostic report
- * is produced: the auditor writes only Identified tickets.
+ * is produced: the auditor writes only Identified tickets. Without --scope the
+ * scopes come from the previous run state or the current branch.
  */
 export async function runIdentify({ config, stateStore, options, log }) {
-  const scopes = normalizeScopes(options.scope)
-  if (scopes.length === 0) throw new Error('At least one --scope is required, for example --scope branch:feat/ux-improvements.')
+  const previous = await stateStore.load()
+  const scopes = await resolveScopes({ config, options, previous })
+  if (scopes.length === 0) {
+    throw new Error('No audit scope could be resolved. Pass --scope branch:<name> or --scope pr:<number>.')
+  }
 
-  const state = await stateStore.create('identify', {})
+  const feature = String(options.feature ?? previous?.feature ?? '').trim() || null
+  const state = await stateStore.create('identify', { feature })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
@@ -103,6 +109,21 @@ function normalizeScopes(value) {
   if (!value) return []
   const list = Array.isArray(value) ? value : [value]
   return list.map(item => String(item).trim()).filter(Boolean)
+}
+
+async function resolveScopes({ config, options, previous }) {
+  const explicit = normalizeScopes(options.scope)
+  if (explicit.length > 0) return explicit
+
+  const fromState = scopesFromState(previous)
+  if (fromState.length > 0) return fromState
+  if (previous?.branch) return [`branch:${previous.branch}`]
+
+  const branch = await git.currentBranch(config.repoPath)
+  if (branch && branch !== config.baseBranch && await git.countCommitsOver(config.repoPath, config.baseBranch, branch) > 0) {
+    return [`branch:${branch}`]
+  }
+  return []
 }
 
 async function resolveScope({ config, artifacts, scope }) {
