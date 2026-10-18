@@ -66,7 +66,7 @@ async function main() {
   const prompt = await buildPrompt()
   if (check) {
     const existing = await fs.readFile(outputFile, 'utf8').catch(() => '')
-    if (existing !== prompt) {
+    if (normalizeLineEndings(existing) !== normalizeLineEndings(prompt)) {
       process.stderr.write('BOOTSTRAP_PROMPT.md is out of date. Run: npm run build-bootstrap\n')
       process.exitCode = 1
       return
@@ -108,6 +108,10 @@ async function sorted(target) {
     .map(entry => path.relative(root, path.join(entry.parentPath ?? entry.path, entry.name)).replace(/\\/g, '/'))
     .filter(file => !file.endsWith('.map'))
     .sort()
+}
+
+function normalizeLineEndings(value) {
+  return String(value).replace(/\r\n/g, '\n')
 }
 
 main().catch(error => {
