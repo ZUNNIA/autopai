@@ -47,7 +47,7 @@ Use the bash tool with a timeout of at least 3600000 ms:
 
 `autopai <command> --repo . $ARGUMENTS`
 
-Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
+Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
 
 ## autopai.json schema
 
@@ -61,6 +61,7 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `restoreCommand`: string array or null. Example shape: `["dotnet", "restore", "Solution.sln"]`.
 - `buildCommand`: string array or null.
 - `testCommand`: string array or null. It must produce the coverage report expected by `coverageThreshold`.
+- `smokeCommand`: string array or null. Optional smoke command that runs after the test command.
 - `coverageThreshold`: number between 0 and 1, or null. Use the same threshold as CI.
 - `maxAttempts`: integer. CI fix attempts, default 3.
 - `maxMinutes`: integer. Wall-clock budget, default 240.
@@ -75,7 +76,7 @@ Commands: `adopt`, `identify`, `prepare`, `approve`, `dev`, `refactor`, `release
 - `commitTypes`: string array. Allowed Conventional Commit types.
 - `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names.
 - `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
-- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, and `done` paths. Keep the defaults when using the bundled platform agents, because their permissions allow those paths.
+- `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, `qa`, and `done` paths. Keep the defaults when using the bundled platform agents, because their permissions allow those paths.
 - `stateDir`: string. Local state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. Keep `tickets/.autopai` when using the bundled platform agents, because their permissions allow the `needs-human` folder there.
 
 Never put secrets, tokens, or personal absolute paths in `autopai.json`.
