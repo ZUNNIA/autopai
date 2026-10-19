@@ -39,8 +39,7 @@ test('builds OpenCode arguments with agent, model and the prompt file', () => {
     'autopai',
     '--model',
     'provider/model',
-    '--file',
-    'C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md',
+    '--file=C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md',
     'Read the attached AutopAI instruction document at C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md and follow it exactly.'
   ])
 })
