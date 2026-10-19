@@ -146,7 +146,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Permissions.** The setup agent edits only `autopai.json` and `.gitignore`. It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
-**Manual commands.** The platform commands (`/autopai-adopt`, `/autopai-run`, `/autopai-identify`, `/autopai-resume`, `/autopai-status`, and the workflow wrappers `/backlog`, `/ready-for-dev`, `/identified`, `/ready-for-refactor`, `/release`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments. The CLI is always the same entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the setup agent translates into flags. The CLI is always the same entry point.
 
 ## 4. The lifecycle
 
@@ -236,7 +236,7 @@ If you want to review the generated tickets before any branch is created, run `a
 
 **Flow.**
 
-1. Resolve each `--scope`. Without `--scope`, the scopes come from the previous run state (the pull requests of the last `dev`, `refactor`, `adopt`, or `identify` run) or from the current branch when it has commits over `origin/<base>`. The resolved feature is carried into the new state:
+1. Resolve each `--scope`, or `--last <n>` for the last n pull requests merged into the base branch. Without either, the scopes come from the previous run state (the pull requests of the last `dev`, `refactor`, `adopt`, or `identify` run) or from the current branch when it has commits over `origin/<base>`. The resolved feature is carried into the new state:
    - `branch:<name>` uses `origin/<base>...<branch>`, fetches first, and writes a patch file plus a changed-file list.
    - `pr:<number>` uses the pull request diff and file list from `gh`.
    - `dir:<path>` walks the directory for code files (no patch).
@@ -424,7 +424,7 @@ Commands are argument arrays, never shell strings, so no shell quoting or inject
 ```
 autopai help
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-autopai identify --repo <path> [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
+autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
 autopai promote --repo <path> [--feature <slug>]
 autopai prepare --repo <path> [--feature <slug>] [--description <text>]
 autopai approve --repo <path> [--feature <slug>]
