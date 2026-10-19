@@ -240,10 +240,11 @@ If you want to review the generated tickets before any branch is created, run `a
    - `branch:<name>` uses `origin/<base>...<branch>`, fetches first, and writes a patch file plus a changed-file list.
    - `pr:<number>` uses the pull request diff and file list from `gh`.
    - `dir:<path>` walks the directory for code files (no patch).
-2. Run the local gates and collect runtime logs configured in `runtimeLogs` (the five most recent files per pattern).
-3. Write `evidence.json` with the gate result, coverage, and log copies.
-4. Run the auditor once per scope. Each run writes one file per debt under `tickets/identified/<scope>/`.
-5. Verify that no tracked file changed. A dirty working tree fails the phase.
+2. Refuse to continue when the working tree already has uncommitted tracked changes.
+3. Run the local gates and collect runtime logs configured in `runtimeLogs` (the five most recent files per pattern).
+4. Write `evidence.json` with the gate result, coverage, and log copies.
+5. Run the auditor once per scope. Each run writes one file per debt under `tickets/identified/<scope>/`.
+6. Verify that no tracked file changed during the run. Untracked files never block the phase.
 
 **Dry run.** `--dry-run` resolves the scopes and reports the file counts without collecting evidence or running the auditor.
 
@@ -686,6 +687,8 @@ The executor updates the version and changelog on `chore/release-v1.4.0`, the or
 **`No audit scope could be resolved.`** `identify` found no explicit `--scope`, no state from a previous run, and the current branch has no commits over the base. Pass `--scope branch:<name>` or `--scope pr:<number>`.
 
 **`No Identified tickets were found.`** `promote` ran without findings. Run `identify` first, or generate the Identified tickets manually under `tickets/identified/`.
+
+**`The working tree has uncommitted tracked changes.`** `identify` only audits a clean tracked tree. Commit or stash the changes before retrying. Untracked files such as an uncommitted `autopai.json` never block the phase.
 
 **`Could not resolve --feature: no ticket directory was found.`** The previous state and the ticket directories offered no candidate. Pass `--feature <slug>` explicitly or create the backlog first.
 

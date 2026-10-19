@@ -13,8 +13,13 @@ export async function currentBranch(repo) {
   return result.stdout.trim()
 }
 
-export async function statusPorcelain(repo) {
-  const result = await git(repo, ['status', '--porcelain'])
+/**
+ * Returns the porcelain status of tracked files only. Untracked files such as
+ * an uncommitted autopai.json never block a phase, because the orchestrator
+ * only guards against modifications of the tracked tree.
+ */
+export async function statusTrackedPorcelain(repo) {
+  const result = await git(repo, ['status', '--porcelain', '--untracked-files=no'])
   return result.stdout.trim()
 }
 

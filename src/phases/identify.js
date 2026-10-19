@@ -41,6 +41,11 @@ export async function runIdentify({ config, stateStore, options, log }) {
     }
   }
 
+  const uncommitted = await git.statusTrackedPorcelain(config.repoPath)
+  if (uncommitted !== '') {
+    throw new Error(`The working tree has uncommitted tracked changes. Commit or stash them before identifying:\n${uncommitted}`)
+  }
+
   const gates = await runGates({ config, artifacts, prefix: 'evidence' })
   await log?.(`Evidence gates: ${gates.ok ? 'passed' : gates.reason}`)
 
@@ -81,7 +86,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
     await log?.(`Scope ${resolved.name}: ${resolved.tickets.length} Identified tickets.`)
   }
 
-  const dirty = await git.statusPorcelain(config.repoPath)
+  const dirty = await git.statusTrackedPorcelain(config.repoPath)
   if (dirty !== '') {
     throw new Error(`The auditor modified tracked files. Review the working tree:\n${dirty}`)
   }
