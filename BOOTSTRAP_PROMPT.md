@@ -99,6 +99,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `src/lib/artifacts.js`
 - `src/lib/blockers.js`
+- `src/lib/chunks.js`
+- `src/lib/codefiles.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
 - `src/lib/defaults.js`
@@ -141,6 +143,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Tests
 
 - `test/blockers.test.js`
+- `test/chunks.test.js`
+- `test/codefiles.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`
