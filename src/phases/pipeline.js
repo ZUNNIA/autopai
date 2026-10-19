@@ -7,6 +7,7 @@ import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, resolveTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
+import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { branchNameFor, collectManualVerification, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { ensureDir } from '../lib/util.js'
@@ -132,6 +133,12 @@ export async function runDev({ config, stateStore, options, log }) {
       logFile: artifacts.path(`executor-${ticket.slug}.log`),
       role: 'executor'
     })
+    const blockers = await listBlockers(config)
+    if (blockers.length > 0) {
+      state.blockers = blockers.map(blocker => blocker.file)
+      await stateStore.save(state)
+      throw new Error(blockerMessage(blockers))
+    }
     if (execution.code !== 0) throw new Error(`Executor failed for ticket ${ticket.id}.`)
 
     const range = `origin/${config.baseBranch}...${branch}`
@@ -154,6 +161,7 @@ export async function runDev({ config, stateStore, options, log }) {
       title,
       prBody,
       state,
+      stateStore,
       executorPrompt: 'autopai-dev',
       executorPayload: payload,
       coverage: gates.coverage,
@@ -224,6 +232,12 @@ export async function runRefactor({ config, stateStore, options, log }) {
       logFile: artifacts.path(`refactor-${ticket.slug}.log`),
       role: 'executor'
     })
+    const blockers = await listBlockers(config)
+    if (blockers.length > 0) {
+      state.blockers = blockers.map(blocker => blocker.file)
+      await stateStore.save(state)
+      throw new Error(blockerMessage(blockers))
+    }
     if (execution.code !== 0) throw new Error(`Executor failed for refactor ticket ${ticket.id}.`)
 
     const range = `origin/${config.baseBranch}...${branch}`
@@ -240,6 +254,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
       title,
       prBody: generatePrBody({ commits, coverage: gates.coverage }),
       state,
+      stateStore,
       executorPrompt: 'autopai-dev',
       executorPayload: payload,
       coverage: gates.coverage,
@@ -340,6 +355,7 @@ export async function runRelease({ config, stateStore, options, log }) {
     title,
     prBody: generatePrBody({ commits, coverage: gates.coverage }),
     state,
+    stateStore,
     executorPrompt: 'release',
     executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch, stateDir: config.stateDir },
     coverage: gates.coverage,

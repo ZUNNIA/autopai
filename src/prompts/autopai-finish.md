@@ -14,6 +14,6 @@ Tasks:
 - Commit with `<type>: <subject>`, no scope, no ticket, ADR, or issue references. If nothing changed, do not commit.
 - When `prTitlePath` is present, write exactly one line to that path with the proposed PR title for the whole branch. It must follow `<type>: <subject>` and contain no scope, ticket, ADR, or issue reference.
 - Never push, merge, rebase, or run `gh`.
-- If you cannot finish, write a blocker JSON under the `needs-human` folder inside the payload `stateDir` and stop.
+- If you cannot finish, write a blocker JSON under the `needs-human` folder inside the payload `stateDir` with `reason`, `files`, `decision`, and `suggestedAction`, then stop. Never create or edit an ADR yourself.
 
 End with a short summary: what changed, the commit subject if any, and the PR title you wrote.

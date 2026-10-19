@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
 import { runSession } from '../lib/session.js'
+import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { scanBranch, scanRepositoryFiles, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { deriveTitle, generatePrBody, resolveTitle } from '../lib/title.js'
@@ -122,6 +123,12 @@ export async function runAdopt({ config, stateStore, options, log }) {
     logFile: artifacts.path('executor-finish.log'),
     role: 'executor'
   })
+  const blockers = await listBlockers(config)
+  if (blockers.length > 0) {
+    state.blockers = blockers.map(blocker => blocker.file)
+    await stateStore.save(state)
+    throw new Error(blockerMessage(blockers))
+  }
   if (execution.code !== 0) {
     throw new Error(`Executor failed with exit code ${execution.code}. See ${artifacts.path('executor-finish.log')}.`)
   }
@@ -163,6 +170,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     title,
     prBody,
     state,
+    stateStore,
     executorPrompt: 'autopai-finish',
     executorPayload: payload,
     coverage: gates.coverage,
