@@ -20,11 +20,10 @@ test('rejects unknown runners', async () => {
   assert.deepEqual(availableRunners(), ['opencode'])
 })
 
-test('builds OpenCode arguments with agent, model and the prompt file', () => {
+test('builds OpenCode arguments with agent and model, without the prompt', () => {
   const args = buildArgs({
     config: { repoPath: 'C:/repo', models: { executor: 'provider/model' } },
     agent: 'autopai',
-    promptFile: 'C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md',
     title: 'task',
     role: 'executor'
   })
@@ -38,9 +37,7 @@ test('builds OpenCode arguments with agent, model and the prompt file', () => {
     '--agent',
     'autopai',
     '--model',
-    'provider/model',
-    '--file=C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md',
-    'Read the attached AutopAI instruction document at C:/repo/tickets/.autopai/artifacts/run/executor.prompt.md and follow it exactly.'
+    'provider/model'
   ])
 })
 
