@@ -49,6 +49,11 @@ export async function prListByHead(repo, head) {
   return parseJson(result.stdout, [])
 }
 
+export async function prListMerged(repo, base, limit) {
+  const result = await gh(repo, ['pr', 'list', '--base', base, '--state', 'merged', '--limit', String(limit), '--json', 'number,mergedAt'])
+  return parseJson(result.stdout, [])
+}
+
 export async function prMerge(repo, number, { title, body }) {
   await gh(repo, ['pr', 'merge', String(number), '--merge', '--subject', title, '--body', body])
 }

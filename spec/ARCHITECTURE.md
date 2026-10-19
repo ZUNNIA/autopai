@@ -23,7 +23,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - `prepare`: generates a brief and a backlog, then stops for human approval.
 - `approve`: generates ready-for-dev tickets and starts the development loop.
 - `dev`: implements one ticket per branch through push, pull request, CI, and merge.
-- `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run.
+- `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run; `--last <n>` audits the last n pull requests merged into the base branch.
 - `promote`: the planner turns the Identified findings of the last audit into ready-for-refactor tickets. The auditor never promotes its own findings.
 - `refactor`: executes ready-for-refactor tickets with the same gates. Refactors preserve the user-visible behavior unless the finding documents a UX defect.
 - `release`: updates version and changelog, opens a release pull request, merges, and tags.

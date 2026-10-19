@@ -5,7 +5,7 @@ import * as github from '../lib/github.js'
 import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
-import { scopesFromState } from '../lib/defaults.js'
+import { scopesFromState, lastMergedScopes } from '../lib/defaults.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
 /**
@@ -119,6 +119,15 @@ function normalizeScopes(value) {
 async function resolveScopes({ config, options, previous }) {
   const explicit = normalizeScopes(options.scope)
   if (explicit.length > 0) return explicit
+
+  if (options.last !== undefined) {
+    const count = options.last === true ? 1 : Number(options.last)
+    if (!Number.isInteger(count) || count < 1) throw new Error(`Invalid --last value: ${options.last}. Use a positive integer.`)
+    const prs = await github.prListMerged(config.repoPath, config.baseBranch, Math.max(count, 100))
+    const scopes = lastMergedScopes(prs, count)
+    if (scopes.length === 0) throw new Error(`No merged pull requests were found on ${config.baseBranch}.`)
+    return scopes
+  }
 
   const fromState = scopesFromState(previous)
   if (fromState.length > 0) return fromState
