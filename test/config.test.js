@@ -63,3 +63,23 @@ test('validates the smoke command and defaults the qa directory', async () => {
   }), 'utf8')
   await assert.rejects(() => loadConfig(invalid), /smokeCommand/)
 })
+
+test('defaults the audit chunk size and rejects invalid values', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-chunks-'))
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main'
+  }), 'utf8')
+  const config = await loadConfig(repo)
+  assert.equal(config.auditChunkFiles, 40)
+
+  const invalid = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-chunks-invalid-'))
+  await fs.writeFile(path.join(invalid, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    auditChunkFiles: 0
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(invalid), /auditChunkFiles/)
+})

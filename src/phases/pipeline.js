@@ -10,7 +10,7 @@ import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { branchNameFor, collectManualVerification, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
-import { ensureDir } from '../lib/util.js'
+import { ensureDir, slugify } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
   const feature = resolvePrepareFeature(options)
@@ -279,24 +279,29 @@ export async function runRefactor({ config, stateStore, options, log }) {
 export async function runPromote({ config, stateStore, options, log }) {
   const state = (await stateStore.load()) ?? await stateStore.create('promote', {})
   const feature = String(options.feature ?? state.feature ?? 'tech-debt').trim() || 'tech-debt'
-  const findings = await resolveFindings({ config, state })
-  if (findings.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
+  const groups = await resolveFindingGroups({ config, state })
+  if (groups.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
 
   const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
   await ensureDir(outputDir)
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
-  const execution = await runSession({
-    config,
-    prompt: 'ready-for-refactor',
-    agent: config.agents.planner,
-    payload: { feature, findings, outputDir },
-    title: `AutopAI promote ${feature}`,
-    logFile: artifacts.path('planner-ready-for-refactor.log'),
-    role: 'planner'
-  })
-  if (execution.code !== 0) throw new Error('The planner could not generate ready-for-refactor tickets.')
+  const sessions = []
+  for (const group of groups) {
+    const execution = await runSession({
+      config,
+      prompt: 'ready-for-refactor',
+      agent: config.agents.planner,
+      payload: { feature, findings: group.findings, outputDir, chunk: group.name },
+      title: `AutopAI promote ${feature} ${group.name}`,
+      logFile: artifacts.path(`planner-ready-for-refactor-${slugify(group.name)}.log`),
+      role: 'planner'
+    })
+    if (execution.code !== 0) throw new Error(`The planner could not generate ready-for-refactor tickets for ${group.name}.`)
+    sessions.push({ chunk: group.name, findings: group.findings.length })
+    await log?.(`Promoted ${group.findings.length} findings from ${group.name}.`)
+  }
 
   const tickets = await listMarkdown(outputDir)
   state.mode = 'promote'
@@ -305,7 +310,7 @@ export async function runPromote({ config, stateStore, options, log }) {
   state.completedPhases = [...new Set([...state.completedPhases, 'promote'])]
   await stateStore.save(state)
   await log?.(`Ready-for-refactor tickets at ${outputDir}.`)
-  return { feature, outputDir, findings: findings.length, tickets: tickets.length }
+  return { feature, outputDir, chunks: sessions, tickets: tickets.length }
 }
 
 export async function runRelease({ config, stateStore, options, log }) {
@@ -380,13 +385,23 @@ function resolvePrepareFeature(options) {
   throw new Error('The --feature option is required when no --description is provided.')
 }
 
-async function resolveFindings({ config, state }) {
-  const fromState = (state.scopes ?? [])
-    .flatMap(scope => scope.tickets ?? [])
-    .filter(file => String(file).endsWith('.md'))
-  const unique = [...new Set(fromState)]
-  if (unique.length > 0) return unique
-  return listMarkdown(path.join(config.repoPath, config.ticketDirs.identified))
+async function resolveFindingGroups({ config, state }) {
+  const groups = (state.scopes ?? [])
+    .map(scope => ({
+      name: String(scope.name),
+      findings: (scope.tickets ?? []).filter(file => String(file).endsWith('.md'))
+    }))
+    .filter(group => group.findings.length > 0)
+  if (groups.length > 0) return groups
+
+  const files = await listMarkdown(path.join(config.repoPath, config.ticketDirs.identified))
+  const byScope = new Map()
+  for (const file of files) {
+    const name = path.basename(path.dirname(file)) || 'identified'
+    if (!byScope.has(name)) byScope.set(name, [])
+    byScope.get(name).push(file)
+  }
+  return [...byScope.entries()].map(([name, findings]) => ({ name, findings }))
 }
 
 async function listMarkdown(dir) {

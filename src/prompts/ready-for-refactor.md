@@ -4,7 +4,7 @@ The orchestrator invoked you with this JSON payload:
 
 {{PAYLOAD}}
 
-The payload provides `feature`, `findings` (the Identified documents of the last audit), and `outputDir`.
+The payload provides `feature`, `findings` (the Identified documents of this audit chunk), `outputDir`, and `chunk` (the chunk name).
 
 Read the Identified documents and the scope patch or file list they reference, and write tickets under the payload `outputDir`. Stay inside the provided scope. Tickets are local artifacts; never edit source, tests, UX, CI, ADRs, or configuration.
 
@@ -22,7 +22,7 @@ Before writing the plan, understand the original problem and the current code.
 
 ## PHASE 2: Plan Generation and Saving
 For each main task, or complex subtask, in the Identified documents, generate an independent technical ticket.
-**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-refactor/[feature]/[number-of-ticket]-[ticket-name].md`.
+**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-refactor/[feature]/[number-of-ticket]-[ticket-name].md`. When the payload provides `chunk`, prefix every file name with `<chunk>-` so tickets from different chunks never collide.
 
 ## Front Matter (MANDATORY)
 Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
