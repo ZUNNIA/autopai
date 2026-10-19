@@ -103,7 +103,7 @@ Open a target repository in the coding tool and run `/autopai-init`. The setup a
 /autopai-status
 ```
 
-The arguments are optional. `--feature` resolves from the previous run state or the latest ticket directory, and `identify` audits the pull requests of the last run when no `--scope` is given. The commands also accept natural language (`/autopai-identify audit the last 2 merged branches`): the setup agent translates the request into flags and confirms ambiguous interpretations. The same phases are available from the CLI:
+The arguments are optional. `--feature` resolves from the previous run state or the latest ticket directory, and `identify` audits the pull requests of the last run when no `--scope` is given. The commands also accept natural language (`/autopai-identify audit the last 2 merged branches`): the setup agent translates the request into flags and confirms ambiguous interpretations. Directory audits are chunked: ignored paths are skipped and large trees split into bounded auditor sessions (`--scope dir:.` audits the whole project). The same phases are available from the CLI:
 
 ```text
 autopai prepare --repo . --description "<idea>"

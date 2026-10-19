@@ -239,7 +239,7 @@ If you want to review the generated tickets before any branch is created, run `a
 1. Resolve each `--scope`, or `--last <n>` for the last n pull requests merged into the base branch. Without either, the scopes come from the previous run state (the pull requests of the last `dev`, `refactor`, `adopt`, or `identify` run) or from the current branch when it has commits over `origin/<base>`. The resolved feature is carried into the new state:
    - `branch:<name>` uses `origin/<base>...<branch>`, fetches first, and writes a patch file plus a changed-file list.
    - `pr:<number>` uses the pull request diff and file list from `gh`.
-   - `dir:<path>` walks the directory for code files (no patch).
+   - `dir:<path>` lists the code files under the directory with Git as the source of truth: tracked and untracked files, every ignore rule honored. Large trees split into bounded chunks (`auditChunkFiles`, default 40) and each chunk runs its own auditor session (no patch).
 2. Refuse to continue when the working tree already has uncommitted tracked changes.
 3. Run the local gates and collect runtime logs configured in `runtimeLogs` (the five most recent files per pattern).
 4. Write `evidence.json` with the gate result, coverage, and log copies.
@@ -258,7 +258,7 @@ If you want to review the generated tickets before any branch is created, run `a
 
 1. Resolve the `feature` (explicit, or the feature of the last run, or `tech-debt`).
 2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`.
-3. Run the planner with the `ready-for-refactor` prompt. It writes one ticket per finding under `tickets/ready-for-refactor/<feature>/` with front matter.
+3. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets under `tickets/ready-for-refactor/<feature>/` with front matter, prefixed with the chunk name so chunks never collide.
 4. Refuse to continue when no Identified ticket exists.
 
 Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect.
@@ -352,6 +352,7 @@ The branch name comes from the ticket type and the file name without its numeric
 | `testCommand` | string array or null | `null` | Test command, as an argument array. |
 | `smokeCommand` | string array or null | `null` | Optional smoke command that runs after the test command in the local gates. |
 | `coverageThreshold` | number or null | `null` | Minimum line coverage between 0 and 1. Use the same value as CI. |
+| `auditChunkFiles` | integer | `40` | Maximum code files per directory audit chunk. |
 | `maxAttempts` | integer | `3` | CI fix attempts before the run stops. |
 | `maxMinutes` | integer | `240` | Wall-clock budget. Reserved: accepted, not enforced yet. |
 | `commandTimeoutMinutes` | integer | `30` | Timeout per local command. |

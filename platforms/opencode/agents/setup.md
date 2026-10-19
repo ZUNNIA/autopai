@@ -37,7 +37,7 @@ Commands may arrive in natural language and in any language. Translate the
 request into the exact CLI flags before running:
 
 - "the last N branches/PRs merged" → `--last N` on identify.
-- A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`.
+- A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
 - A release version → `--version <x.y.z>`.
 - Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
@@ -84,6 +84,7 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `testCommand`: string array or null. It must produce the coverage report expected by `coverageThreshold`.
 - `smokeCommand`: string array or null. Optional smoke command that runs after the test command.
 - `coverageThreshold`: number between 0 and 1, or null. Use the same threshold as CI.
+- `auditChunkFiles`: integer. Maximum code files per directory audit chunk, default 40.
 - `maxAttempts`: integer. CI fix attempts, default 3.
 - `maxMinutes`: integer. Wall-clock budget, default 240.
 - `commandTimeoutMinutes`: integer. Timeout per local command, default 30.

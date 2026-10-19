@@ -10,10 +10,11 @@ The user request: $ARGUMENTS
 Compose the CLI arguments from the request (see the interpreting rules):
 
 - "the last N branches/PRs merged" → `--last N`.
-- A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a directory → `--scope dir:<path>`.
+- A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`.
+- A folder → `--scope dir:<path>`; the whole project → `--scope dir:.`.
 - Nothing → no scope arguments: the orchestrator audits the pull requests of the last run.
 
-Confirm the resolved scopes when the interpretation is not obvious.
+Directory audits are chunked automatically (ignored paths are skipped and large trees split into bounded sessions). Confirm the resolved scopes when the interpretation is not obvious.
 
 Use the bash tool with a timeout of at least 3600000 ms:
 
