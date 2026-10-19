@@ -5,17 +5,23 @@ import { ensureDir } from './util.js'
 
 /**
  * Runs a command without a shell, captures both streams, and optionally
- * appends the complete transcript to a log file.
+ * appends the complete transcript to a log file. When `stdin` is provided, the
+ * text is piped into the child and stdin is closed, so large inputs never
+ * travel through the command line.
  */
 export async function runCommand(command, args = [], options = {}) {
-  const { cwd, env, timeoutMs = 0, logFile } = options
+  const { cwd, env, timeoutMs = 0, logFile, stdin } = options
   return new Promise(resolve => {
     const child = crossSpawn(command, args, {
       cwd,
       env: { ...process.env, ...env },
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe']
     })
+    if (stdin !== undefined) {
+      child.stdin.on('error', () => {})
+      child.stdin.end(stdin)
+    }
 
     let stdout = ''
     let stderr = ''

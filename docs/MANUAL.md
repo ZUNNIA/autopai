@@ -483,7 +483,7 @@ tickets/.autopai/
 │   ├── ci-failure-<n>.log
 │   ├── gate-<name>.log, initial-*.log, final-*.log, fix-<n>-*.log
 │   ├── executor-*.log, planner-*.log, auditor-*.log, refactor-*.log, release-*.log
-│   ├── *.prompt.md         rendered prompt handed to each session as a file
+│   ├── *.prompt.md         copy of the rendered prompt sent to each session
 │   └── runtime-logs/
 └── logs/<runId>.jsonl      event log for the run
 ```

@@ -145,6 +145,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/git.test.js`
 - `test/policy.test.js`
 - `test/prompts.test.js`
+- `test/runner.test.js`
 - `test/runners.test.js`
 - `test/state.test.js`
 - `test/tickets.test.js`
