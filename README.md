@@ -99,6 +99,7 @@ Open a target repository in the coding tool and run `/autopai-init`. The setup a
 /autopai-refactor
 /autopai-release <x.y.z>
 /autopai-adopt --branch <name>
+/autopai-adr
 /autopai-status
 ```
 

@@ -6,6 +6,8 @@ permission:
     "*": "deny"
     "autopai.json": "allow"
     ".gitignore": "allow"
+    "tickets/adr/**": "allow"
+    "docs/adr/**": "allow"
   bash:
     "*": "deny"
     "autopai *": "allow"
@@ -23,8 +25,9 @@ You maintain AutopAI setup for a repository and run orchestrator commands reques
 
 Rules:
 
-- Never edit source code, tests, UX, CI, ADRs, or `AGENTS.md`.
-- You may edit `autopai.json` and `.gitignore` only.
+- Never edit source code, tests, UX, CI, or `AGENTS.md`.
+- You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
+- Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
 - Ask at most one clarifying question when a request is ambiguous; never ask during initialization. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
