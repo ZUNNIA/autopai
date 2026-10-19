@@ -14,6 +14,7 @@ The repository includes one bundled platform as a reference implementation:
 
 - Agents: `platforms/opencode/agents/*.md`, installed in `~/.config/opencode/agents/`.
 - Commands: `platforms/opencode/commands/*.md`, installed in `~/.config/opencode/commands/`. These are manual wrappers that call `autopai`.
+- Natural language: the command files let the setup agent translate a request in any language into the deterministic flags, confirming ambiguous interpretations before running.
 - Session: `opencode run --agent <agent> --auto --dir <repo>`. The rendered prompt travels through stdin (a copy is written next to the session log for debugging), so the command line never carries it and large payloads cannot overflow the OS argument limit.
 - Permissions: path-scoped `edit` rules and command patterns under `bash`.
 - Global rules: the repository `AGENTS.md`.

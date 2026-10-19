@@ -66,6 +66,17 @@ export function scopesFromState(state) {
   return [...new Set(scopes)]
 }
 
+/**
+ * Turns merged pull requests into audit scopes, most recent first. The Git host
+ * lists by creation date, so the caller fetches a wider window than it needs.
+ */
+export function lastMergedScopes(prs, count) {
+  const ordered = [...(prs ?? [])]
+    .filter(pr => pr && pr.number != null)
+    .sort((left, right) => String(right.mergedAt ?? '').localeCompare(String(left.mergedAt ?? '')))
+  return ordered.slice(0, count).map(pr => `pr:${pr.number}`)
+}
+
 async function featureDirExists(config, dirs, feature) {
   for (const dir of dirs) {
     try {

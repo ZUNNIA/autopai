@@ -12,7 +12,7 @@ permission:
     "git *": "allow"
     "gh *": "allow"
     "where *": "allow"
-  question: deny
+  question: allow
   task: deny
   webfetch: allow
   websearch: allow
@@ -25,8 +25,26 @@ Rules:
 
 - Never edit source code, tests, UX, CI, ADRs, or `AGENTS.md`.
 - You may edit `autopai.json` and `.gitignore` only.
-- Never ask questions. If a command fails, report the exact error and stop.
+- Ask at most one clarifying question when a request is ambiguous; never ask during initialization. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
+
+## Interpreting requests
+
+Commands may arrive in natural language and in any language. Translate the
+request into the exact CLI flags before running:
+
+- "the last N branches/PRs merged" → `--last N` on identify.
+- A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`.
+- A named feature, backlog, or refactor batch → `--feature <slug>`.
+- A release version → `--version <x.y.z>`.
+- Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
+
+Rules:
+
+- Explicit flags in the request run verbatim; never rewrite them.
+- When the interpretation is not obvious, show the resolved command and ask one confirmation question before running.
+- Never invent flags. `autopai help` lists the supported ones.
+- Quote `--description` values for the shell and keep them concise.
 
 ## Initializing a repository
 

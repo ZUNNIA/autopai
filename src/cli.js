@@ -130,7 +130,7 @@ function printHelp() {
 
 Usage:
   autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-  autopai identify --repo <path> [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
+  autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
   autopai promote --repo <path> [--feature <slug>]
   autopai prepare --repo <path> [--feature <slug>] [--description <text>]
   autopai approve --repo <path> [--feature <slug>]
