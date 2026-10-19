@@ -16,6 +16,7 @@ The configuration file lives at the root of each target repository. It is genera
 | `testCommand` | string array or null | Test command. It must produce the coverage report expected by `coverageThreshold`. |
 | `smokeCommand` | string array or null | Optional smoke command. It runs after the test command as part of the local gates. |
 | `coverageThreshold` | number or null | Minimum line coverage between 0 and 1. Use the same value as CI. |
+| `auditChunkFiles` | integer | Maximum code files per directory audit chunk. Default 40. |
 | `maxAttempts` | integer | CI fix attempts. Default 3. |
 | `maxMinutes` | integer | Wall-clock budget. Default 240. Reserved: accepted, not enforced yet. |
 | `commandTimeoutMinutes` | integer | Timeout per local command. Default 30. |

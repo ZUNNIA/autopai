@@ -6,6 +6,8 @@ import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { scopesFromState, lastMergedScopes } from '../lib/defaults.js'
+import { listCodeFiles } from '../lib/codefiles.js'
+import { chunkCodeFiles } from '../lib/chunks.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
 /**
@@ -29,8 +31,10 @@ export async function runIdentify({ config, stateStore, options, log }) {
   const resolvedScopes = []
   for (const scope of scopes) {
     const resolved = await resolveScope({ config, artifacts, scope })
-    resolvedScopes.push(resolved)
-    await log?.(`Scope ${resolved.name}: ${resolved.changedFiles.length} files.`)
+    for (const item of resolved) {
+      resolvedScopes.push(item)
+      await log?.(`Scope ${item.name}: ${item.changedFiles.length} files.`)
+    }
   }
 
   if (options.dryRun) {
@@ -152,13 +156,21 @@ async function resolveScope({ config, artifacts, scope }) {
     const patchPath = await artifacts.write(`scope-${number}.patch`, patch)
     const changedFiles = files.map(file => file.path)
     await artifacts.write(`scope-${number}.files`, changedFiles.join('\n'))
-    return { name: `pr-${number}`, kind, changedFiles, patchPath }
+    return [{ name: `pr-${number}`, kind, changedFiles, patchPath }]
   }
 
   if (kind === 'dir') {
     const target = path.resolve(config.repoPath, value)
-    const changedFiles = await walkFiles(target, file => /\.(cs|py|ts|tsx|js|jsx|rs|go|java|kt)$/i.test(file))
-    return { name: slugify(path.basename(target)), kind, changedFiles, patchPath: null }
+    const relativeDir = path.relative(config.repoPath, target).replace(/\\/g, '/') || '.'
+    if (relativeDir.startsWith('..')) throw new Error(`The directory must be inside the repository: ${value}`)
+    const files = await listCodeFiles(config.repoPath, relativeDir)
+    if (files.length === 0) throw new Error(`No code files were found under ${relativeDir} (ignored paths are excluded).`)
+    const resolved = []
+    for (const chunk of chunkCodeFiles(files, config.auditChunkFiles)) {
+      await artifacts.write(`scope-${chunk.name}.files`, chunk.files.join('\n'))
+      resolved.push({ name: chunk.name, kind: 'dir', changedFiles: chunk.files, patchPath: null })
+    }
+    return resolved
   }
 
   const branch = value
@@ -168,7 +180,7 @@ async function resolveScope({ config, artifacts, scope }) {
   const changedFiles = await git.diffNames(config.repoPath, `origin/${baseBranch}...${branch}`)
   const patchPath = await artifacts.write(`scope-${slugify(branch)}.patch`, patch)
   await artifacts.write(`scope-${slugify(branch)}.files`, changedFiles.join('\n'))
-  return { name: slugify(branch), kind: 'branch', changedFiles, patchPath }
+  return [{ name: slugify(branch), kind: 'branch', changedFiles, patchPath }]
 }
 
 async function collectRuntimeLogs(config, artifacts) {
