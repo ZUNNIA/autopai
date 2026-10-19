@@ -79,6 +79,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `platforms/opencode/agents/planner.md`
 - `platforms/opencode/agents/setup.md`
 - `platforms/opencode/commands/autopai-adopt.md`
+- `platforms/opencode/commands/autopai-adr.md`
 - `platforms/opencode/commands/autopai-dev.md`
 - `platforms/opencode/commands/autopai-identify.md`
 - `platforms/opencode/commands/autopai-init.md`
@@ -97,6 +98,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Core libraries
 
 - `src/lib/artifacts.js`
+- `src/lib/blockers.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
 - `src/lib/defaults.js`
@@ -138,6 +140,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 ### Tests
 
+- `test/blockers.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`

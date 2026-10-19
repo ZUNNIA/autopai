@@ -1,6 +1,7 @@
 import * as git from './git.js'
 import * as github from './github.js'
 import { runSession } from './session.js'
+import { listBlockers, blockerMessage } from './blockers.js'
 import { scanBranch, scanRepositoryFiles, formatViolations, validatePrBody } from './policy.js'
 import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
@@ -108,6 +109,7 @@ export async function pushOpenWaitMerge({
   title,
   prBody,
   state,
+  stateStore,
   executorPrompt,
   executorPayload,
   coverage,
@@ -165,6 +167,12 @@ export async function pushOpenWaitMerge({
       logFile: artifacts.path(`executor-fix-${attempt}.log`),
       role: 'executor'
     })
+    const blockers = await listBlockers(config)
+    if (blockers.length > 0) {
+      state.blockers = blockers.map(blocker => blocker.file)
+      await stateStore.save(state)
+      throw new Error(blockerMessage(blockers))
+    }
     if (execution.code !== 0) {
       throw new Error(`Executor failed while fixing CI (exit ${execution.code}). See ${artifacts.path(`executor-fix-${attempt}.log`)}.`)
     }

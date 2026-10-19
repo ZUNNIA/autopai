@@ -144,9 +144,9 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Initialization.** `/autopai-init` runs the setup agent. It inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, then writes `autopai.json` with the real commands, branches, and check names. It never guesses a language or framework, and it validates the result with `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
 
-**Permissions.** The setup agent edits only `autopai.json` and `.gitignore`. It can run `autopai`, `git`, and `gh` commands, but it never edits source.
+**Permissions.** The setup agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
-**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the setup agent translates into flags. The CLI is always the same entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the setup agent translates into flags. `/autopai-adr` is the exception: it does not call the CLI; the setup agent authors the architecture decision record directly. The CLI is always the same entry point.
 
 ## 4. The lifecycle
 
@@ -492,7 +492,7 @@ tickets/.autopai/
 
 **Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit.
 
-**Blockers.** When the executor cannot continue, it writes a JSON file under `needs-human/` with the reason, the files involved, and what a human must decide. Resolve the issue, delete or keep the blocker file for your records, and resume.
+**Blockers.** When the executor cannot continue, it writes a JSON file under `needs-human/` with the reason, the files involved, and what a human must decide. The orchestrator checks that folder after every executor session: when a blocker exists, the phase stops immediately with the blocker path and records it in the state, so partial work never reaches a pull request. Resolve the issue — architecture decisions go through `/autopai-adr` in the interactive coding tool — and run `autopai resume`.
 
 **abort.** Marks `state.json` as `aborted` and releases the lock without touching the repository or the remote.
 
@@ -669,6 +669,15 @@ autopai run --repo . --from release --to release --version 1.4.0
 
 The executor updates the version and changelog on `chore/release-v1.4.0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
 
+### 12.4 Walkthrough: blocked on an architecture decision
+
+A dev ticket needs a new pattern the repository has not decided yet.
+
+1. The executor reads the ticket and the repository ADRs, cannot find a decision, writes a blocker under `tickets/.autopai/needs-human/`, and stops.
+2. The orchestrator detects the blocker after the session, records it in the state, and stops the phase with the blocker path. Nothing was pushed.
+3. Read the blocker, then run `/autopai-adr` in the interactive coding tool with the context ("record the decision for the blocked ticket"). The setup agent analyzes the options, you confirm the chosen path, and it writes the ADR to the repository ADR directory.
+4. Run `autopai resume`. The executor now finds the ADR, implements the ticket, and the loop continues with push, pull request, CI, and merge.
+
 ## 13. Troubleshooting and FAQ
 
 **`Missing autopai.json at <path>. Run /autopai-init first.`** The target repository has no configuration. Run `/autopai-init` in the coding tool, or write `autopai.json` manually and validate with `autopai status --repo .`.
@@ -688,6 +697,8 @@ The executor updates the version and changelog on `chore/release-v1.4.0`, the or
 **`No audit scope could be resolved.`** `identify` found no explicit `--scope`, no state from a previous run, and the current branch has no commits over the base. Pass `--scope branch:<name>` or `--scope pr:<number>`.
 
 **`No Identified tickets were found.`** `promote` ran without findings. Run `identify` first, or generate the Identified tickets manually under `tickets/identified/`.
+
+**`The executor is blocked:`** The executor wrote one or more JSON files under `needs-human/` and the phase stopped before any push. Read them, resolve the decision (architecture decisions: run `/autopai-adr` in the interactive coding tool), and run `autopai resume`.
 
 **`The working tree has uncommitted tracked changes.`** `identify` only audits a clean tracked tree. Commit or stash the changes before retrying. Untracked files such as an uncommitted `autopai.json` never block the phase.
 
