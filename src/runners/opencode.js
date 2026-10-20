@@ -29,14 +29,58 @@ export function buildArgs({ config, agent, title, role }) {
   return args
 }
 
+/**
+ * Picks the session created by one run for cleanup: same title, same project
+ * directory, and created at or after the run started. Older sessions that
+ * reuse a title are never touched.
+ */
+export function pickSessionToDelete(sessions, { title, directory, since }) {
+  const target = normalizeDirectory(directory)
+  return (sessions ?? [])
+    .filter(session => session
+      && session.title === title
+      && normalizeDirectory(session.directory) === target
+      && Number(session.created ?? session.updated ?? 0) >= since)
+    .sort((left, right) => Number(right.updated ?? 0) - Number(left.updated ?? 0))[0] ?? null
+}
+
+async function deleteRunSession({ config, title, startedAt }) {
+  if (config.runnerOptions?.keepSessions === true) return
+
+  const listed = await runCommand('opencode', ['session', 'list', '--max-count', '25', '--format', 'json'], {
+    cwd: config.repoPath,
+    timeoutMs: 60000
+  })
+  if (listed.code !== 0) return
+
+  let sessions
+  try {
+    sessions = JSON.parse(listed.stdout)
+  } catch {
+    return
+  }
+
+  const session = pickSessionToDelete(sessions, { title, directory: config.repoPath, since: startedAt })
+  if (!session) return
+  await runCommand('opencode', ['session', 'delete', session.id], { cwd: config.repoPath, timeoutMs: 60000 })
+}
+
+function normalizeDirectory(directory) {
+  const normalized = String(directory ?? '').replace(/\\/g, '/').replace(/\/+$/, '')
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
 export async function runSession({ config, agent, promptText, title, logFile, role }) {
   await writePromptFile(logFile, promptText)
   const args = buildArgs({ config, agent, title, role })
-  return runCommand('opencode', args, {
+  const startedAt = Date.now()
+  const result = await runCommand('opencode', args, {
     cwd: config.repoPath,
     env: { ...(config.runnerOptions?.env ?? {}), OPENCODE_DISABLE_AUTOUPDATE: '1' },
     timeoutMs: config.sessionTimeoutMinutes * 60000,
     logFile,
     stdin: promptText
   })
+  await deleteRunSession({ config, title, startedAt })
+  return result
 }

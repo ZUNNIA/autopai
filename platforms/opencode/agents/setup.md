@@ -73,7 +73,7 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 ## autopai.json schema
 
 - `runner`: string. Required. Session runner name. The installation provides the bundled `opencode` runner; other runners are added under `src/runners/`.
-- `runnerOptions`: object. Optional runner settings, such as extra environment variables.
+- `runnerOptions`: object. Optional runner settings, such as extra environment variables. The opencode runner also accepts `keepSessions: true` to retain its tool sessions after each run.
 - `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `autopai.json`. Add the client configuration files of the tool in use when needed.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
