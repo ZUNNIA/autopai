@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { runCommand } from '../lib/runner.js'
 import { ensureDir } from '../lib/util.js'
 
@@ -30,18 +31,25 @@ export function buildArgs({ config, agent, title, role }) {
 }
 
 /**
+ * Appends a random per-run token to the session title, so cleanup can only ever
+ * match the session created by this exact run.
+ */
+export function uniqueSessionTitle(title) {
+  return `${title} [${randomUUID().slice(0, 8)}]`
+}
+
+/**
  * Picks the session created by one run for cleanup: same title, same project
- * directory, and created at or after the run started. Older sessions that
- * reuse a title are never touched.
+ * directory, and created at or after the run started. Only an unambiguous
+ * single match is returned; zero or several candidates delete nothing.
  */
 export function pickSessionToDelete(sessions, { title, directory, since }) {
   const target = normalizeDirectory(directory)
-  return (sessions ?? [])
-    .filter(session => session
-      && session.title === title
-      && normalizeDirectory(session.directory) === target
-      && Number(session.created ?? session.updated ?? 0) >= since)
-    .sort((left, right) => Number(right.updated ?? 0) - Number(left.updated ?? 0))[0] ?? null
+  const matches = (sessions ?? []).filter(session => session
+    && session.title === title
+    && normalizeDirectory(session.directory) === target
+    && Number(session.created ?? session.updated ?? 0) >= since)
+  return matches.length === 1 ? matches[0] : null
 }
 
 async function deleteRunSession({ config, title, startedAt }) {
@@ -72,7 +80,8 @@ function normalizeDirectory(directory) {
 
 export async function runSession({ config, agent, promptText, title, logFile, role }) {
   await writePromptFile(logFile, promptText)
-  const args = buildArgs({ config, agent, title, role })
+  const sessionTitle = uniqueSessionTitle(title)
+  const args = buildArgs({ config, agent, title: sessionTitle, role })
   const startedAt = Date.now()
   const result = await runCommand('opencode', args, {
     cwd: config.repoPath,
@@ -81,6 +90,6 @@ export async function runSession({ config, agent, promptText, title, logFile, ro
     logFile,
     stdin: promptText
   })
-  await deleteRunSession({ config, title, startedAt })
+  await deleteRunSession({ config, title: sessionTitle, startedAt })
   return result
 }

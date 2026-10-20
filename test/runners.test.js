@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { availableRunners, resolveRunner } from '../src/runners/index.js'
-import { buildArgs, writePromptFile, pickSessionToDelete } from '../src/runners/opencode.js'
+import { buildArgs, writePromptFile, pickSessionToDelete, uniqueSessionTitle } from '../src/runners/opencode.js'
 
 test('resolves a configured runner', async () => {
   const runner = await resolveRunner({ runner: 'opencode' })
@@ -48,15 +48,28 @@ test('writes the prompt next to the session log', async () => {
   assert.equal(await fs.readFile(file, 'utf8'), '# Prompt\n')
 })
 
-test('picks only the session created by this run for cleanup', () => {
+test('adds a unique per-run token to the session title', () => {
+  const first = uniqueSessionTitle('AutopAI dev t1')
+  const second = uniqueSessionTitle('AutopAI dev t1')
+  assert.ok(first.startsWith('AutopAI dev t1'))
+  assert.match(first, /^AutopAI dev t1 \[[0-9a-f]{8}\]$/)
+  assert.notEqual(first, second)
+})
+
+test('picks only an unambiguous session created by this run for cleanup', () => {
+  const title = 'AutopAI dev t1 [a1b2c3d4]'
   const sessions = [
-    { id: 'old', title: 'AutopAI dev t1', directory: 'C:\\repo', created: 100, updated: 100 },
-    { id: 'new', title: 'AutopAI dev t1', directory: 'C:\\repo', created: 200, updated: 200 },
-    { id: 'other', title: 'AutopAI dev t1', directory: 'C:\\other', created: 300, updated: 300 }
+    { id: 'run', title, directory: 'C:\\repo', created: 200, updated: 200 },
+    { id: 'other-dir', title, directory: 'C:\\other', created: 200, updated: 200 },
+    { id: 'old', title, directory: 'C:\\repo', created: 100, updated: 100 }
   ]
 
-  assert.equal(pickSessionToDelete(sessions, { title: 'AutopAI dev t1', directory: 'C:\\repo', since: 150 })?.id, 'new')
-  assert.equal(pickSessionToDelete(sessions, { title: 'AutopAI dev t2', directory: 'C:\\repo', since: 150 }), null)
-  assert.equal(pickSessionToDelete(sessions, { title: 'AutopAI dev t1', directory: 'C:\\repo', since: 250 }), null)
-  assert.equal(pickSessionToDelete([], { title: 'anything', directory: 'C:\\repo', since: 0 }), null)
+  assert.equal(pickSessionToDelete(sessions, { title, directory: 'C:\\repo', since: 150 })?.id, 'run')
+  assert.equal(pickSessionToDelete(sessions, { title: 'AutopAI dev t1 [ffffffff]', directory: 'C:\\repo', since: 150 }), null)
+  assert.equal(pickSessionToDelete(sessions, { title, directory: 'C:\\repo', since: 250 }), null)
+  assert.equal(pickSessionToDelete([
+    { id: 'a', title, directory: 'C:\\repo', created: 200, updated: 200 },
+    { id: 'b', title, directory: 'C:\\repo', created: 210, updated: 210 }
+  ], { title, directory: 'C:\\repo', since: 150 }), null)
+  assert.equal(pickSessionToDelete([], { title, directory: 'C:\\repo', since: 0 }), null)
 })

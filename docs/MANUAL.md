@@ -489,7 +489,7 @@ tickets/.autopai/
 └── logs/<runId>.jsonl      event log for the run
 ```
 
-**Tool sessions.** The OpenCode runner deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. Set `runnerOptions.keepSessions` to true to keep the sessions in the tool history.
+**Tool sessions.** The OpenCode runner deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. Set `runnerOptions.keepSessions` to true to keep the sessions in the tool history.
 
 **state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`.
 
