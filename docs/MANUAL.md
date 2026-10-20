@@ -341,7 +341,7 @@ The branch name comes from the ticket type and the file name without its numeric
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `runner` | string | required | Session runner name. The bundled runner is `opencode`. |
-| `runnerOptions` | object | `{}` | Runner settings. The OpenCode runner reads `env` for extra environment variables. |
+| `runnerOptions` | object | `{}` | Runner settings. The OpenCode runner reads `env` for extra environment variables and `keepSessions` to retain the tool sessions after each run. |
 | `protectedPaths` | string array | `.github/**`, `AGENTS.md`, `autopai.json` | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | `main` | Integration branch for feature pull requests. |
 | `releaseBranch` | string | `main` | Production branch for release pull requests. |
@@ -488,6 +488,8 @@ tickets/.autopai/
 │   └── runtime-logs/
 └── logs/<runId>.jsonl      event log for the run
 ```
+
+**Tool sessions.** The OpenCode runner deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. Set `runnerOptions.keepSessions` to true to keep the sessions in the tool history.
 
 **state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`.
 
