@@ -12,7 +12,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A version in the request → `--version <x.y.z>`.
 - No version → ask for it; you may read the repository version manifest to propose the next semantic version.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai run --repo . --from release --to release <composed arguments>`
 

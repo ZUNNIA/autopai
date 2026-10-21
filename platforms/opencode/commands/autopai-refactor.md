@@ -12,7 +12,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A named feature or refactor batch → `--feature <slug>`.
 - Nothing → no arguments: the orchestrator uses the last ready-for-refactor directory.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai run --repo . --from refactor --to refactor <composed arguments>`
 

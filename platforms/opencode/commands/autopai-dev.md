@@ -12,7 +12,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A named backlog or feature → `--feature <slug>`.
 - Nothing → no arguments: the orchestrator uses the last backlog.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai run --repo . --from approve --to dev <composed arguments>`
 

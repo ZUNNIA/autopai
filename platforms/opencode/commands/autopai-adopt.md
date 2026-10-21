@@ -12,7 +12,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A branch name → `--branch <name>`.
 - "my current branch" or nothing → no arguments: the orchestrator adopts the current branch.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai adopt --repo . <composed arguments>`
 
