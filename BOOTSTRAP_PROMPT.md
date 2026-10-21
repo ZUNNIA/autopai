@@ -112,6 +112,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/pr.js`
 - `src/lib/promotion.js`
 - `src/lib/prompts.js`
+- `src/lib/resume.js`
 - `src/lib/runner.js`
 - `src/lib/session.js`
 - `src/lib/state.js`
@@ -154,6 +155,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/policy.test.js`
 - `test/promotion.test.js`
 - `test/prompts.test.js`
+- `test/resume.test.js`
 - `test/runner.test.js`
 - `test/runners.test.js`
 - `test/state.test.js`
