@@ -6,6 +6,7 @@ import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
 import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
+import { nextPhase } from './lib/resume.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
@@ -70,13 +71,25 @@ async function runSequence({ config, stateStore, options, log }) {
 
 async function resumeRun({ config, stateStore, options, log }) {
   const state = await stateStore.load()
-  if (!state) throw new Error('No state found for this repository.')
-  log(`Resuming ${state.mode} at phase ${state.phase}.`)
+  const next = nextPhase(state)
+  if (next.action === 'none') {
+    process.stdout.write(`${next.reason}\n`)
+    return
+  }
+
+  log(`Continuing ${next.action === 'resume' ? state.mode : next.action} from ${state.mode}/${state.phase}.`)
   await stateStore.lock()
   try {
-    const ctx = { config, stateStore, options: { ...options, branch: state.branch, base: state.baseBranch, feature: state.feature }, log }
+    const ctx = {
+      config,
+      stateStore,
+      options: { ...options, resume: true, branch: state.branch, base: state.baseBranch, feature: next.feature ?? state.feature },
+      log
+    }
     let result
-    if (state.mode === 'adopt') result = await runAdopt(ctx)
+    if (next.action === 'promote') result = await runPromote(ctx)
+    else if (next.action === 'refactor') result = await runRefactor(ctx)
+    else if (state.mode === 'adopt') result = await runAdopt(ctx)
     else if (state.mode === 'prepare') result = await runPrepare(ctx)
     else if (state.mode === 'dev') result = await runDev(ctx)
     else if (state.mode === 'refactor') result = await runRefactor(ctx)
@@ -145,6 +158,9 @@ Usage:
 Phase arguments are optional: the feature resolves from the previous run state
 or the latest ticket directory, and identify audits the scopes recorded by the
 last run when no --scope is given.
+
+resume continues the stored run, skips completed work, and advances identify to
+promote or promote to refactor; human gates and releases stop it.
 `)
 }
 

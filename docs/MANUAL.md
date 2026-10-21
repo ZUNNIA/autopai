@@ -286,7 +286,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every f
 
 **run.** `autopai run --from <phase> --to <phase>` executes the phases in the fixed order above, inclusive. The default range is `prepare` to `refactor`.
 
-**resume.** `autopai resume` reloads `state.json` and re-runs the stored mode with the stored branch, base, and feature. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one. Automatic resume supports the modes `adopt`, `prepare`, `dev`, `refactor`, `identify`, and `promote`. Modes `approve` and `release` are not auto-resumable; re-run them with their original command.
+**resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes the interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. When the last phase completed, resume advances to the next local phase: `identify` to `promote`, and `promote` to `refactor`. It stops with a message at the human gates (backlog approval and manual QA after dev), at a completed refactor, adopt, or release, and for `approve` and `release`, which are not resumed automatically. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
 
 ## 5. Tickets
 
@@ -716,7 +716,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 **`Executor failed with exit code <n>.`** Read the corresponding `executor-*.log` artifact. Common causes are missing build tools, a command timeout, or a blocker written under `needs-human/`.
 
-**`Cannot resume mode release automatically.`** Only `adopt`, `prepare`, `dev`, `refactor`, and `identify` resume automatically. Re-run `release` with its original `--version`.
+**Resume prints a message instead of running.** That is a human gate or a mode that does not resume automatically: review the backlog and run `/autopai-dev` (prepare), run the manual QA in `tickets/qa/` and then `/autopai-identify` (dev complete), or re-run `release` with its version. Completed refactors and adopted merges also stop; start the next step explicitly.
 
 **The run stopped but `status` shows an old phase.** `status` shows the last saved state. Failed runs keep the phase they were in. The error output is the source of truth for why it stopped.
 
