@@ -1,6 +1,7 @@
 ---
 description: Read-only technical debt auditor that writes local Identified tickets
-mode: primary
+mode: all
+hidden: true
 permission:
   edit:
     "*": "deny"
