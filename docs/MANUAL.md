@@ -260,6 +260,7 @@ If you want to review the generated tickets before any branch is created, run `a
 2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`.
 3. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets under `tickets/ready-for-refactor/<feature>/` with front matter, prefixed with the chunk name so chunks never collide.
 4. Refuse to continue when no Identified ticket exists.
+5. Record every completed chunk in the state. An interrupted promotion resumes with `autopai resume`; `autopai promote --chunk <name>` processes one pending chunk without touching the rest.
 
 Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect.
 
@@ -426,7 +427,7 @@ Commands are argument arrays, never shell strings, so no shell quoting or inject
 autopai help
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
 autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
-autopai promote --repo <path> [--feature <slug>]
+autopai promote --repo <path> [--feature <slug>] [--chunk <name>]
 autopai prepare --repo <path> [--feature <slug>] [--description <text>]
 autopai approve --repo <path> [--feature <slug>]
 autopai dev --repo <path> [--feature <slug>]
@@ -702,6 +703,8 @@ A dev ticket needs a new pattern the repository has not decided yet.
 **`No Identified tickets were found.`** `promote` ran without findings. Run `identify` first, or generate the Identified tickets manually under `tickets/identified/`.
 
 **`The executor is blocked:`** The executor wrote one or more JSON files under `needs-human/` and the phase stopped before any push. Read them, resolve the decision (architecture decisions: run `/autopai-adr` in the interactive coding tool), and run `autopai resume`.
+
+**A promotion stopped mid-way.** The state records every completed chunk. Run `autopai resume`, or `autopai promote --repo . --feature <feature> --chunk <name>` for one pending chunk without redoing the rest.
 
 **`The working tree has uncommitted tracked changes.`** `identify` only audits a clean tracked tree. Commit or stash the changes before retrying. Untracked files such as an uncommitted `autopai.json` never block the phase.
 
