@@ -45,13 +45,13 @@ const DEFAULTS = {
     executor: 'executor',
     planner: 'planner',
     auditor: 'auditor',
-    setup: 'setup'
+    operator: 'autopai'
   },
   models: {
     executor: null,
     planner: null,
     auditor: null,
-    setup: null
+    operator: null
   }
 }
 

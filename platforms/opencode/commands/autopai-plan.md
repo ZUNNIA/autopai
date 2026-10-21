@@ -1,6 +1,6 @@
 ---
 description: Plan a feature from this conversation or a short description
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI in prepare mode.

@@ -1,6 +1,6 @@
 ---
 description: Adopt a branch and drive it to a green merge
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI in adopt mode.

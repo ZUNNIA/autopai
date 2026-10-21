@@ -20,7 +20,7 @@
 - **executor**: may edit source and tests, commit, run build and tests. It may not push, merge, rebase, force-push, or run `gh`.
 - **planner**: may write only under the configured backlog, ready-for-dev, and ready-for-refactor directories. Read-only over source.
 - **auditor**: may write only under the configured identified and UX directories. Read-only over source and UX.
-- **setup**: may edit only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`).
+- **operator** (agent `autopai`): may edit only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`).
 - The orchestrator pushes, opens pull requests, and merges after the required checks pass.
 - Promotion is a planner duty: the `promote` phase turns Identified findings into ready-for-refactor tickets. The auditor never promotes its own findings.
 

@@ -71,7 +71,7 @@ flowchart LR
 
 **Platform.** The agent, permission, and command files for a specific coding tool. The bundled platform lives under `platforms/opencode/` and is installed into the tool's global configuration.
 
-**Agent.** A named role inside the coding tool with a prompt and a permission model. AutopAI defines four: `executor`, `planner`, `auditor`, and `setup`. See [section 3](#3-the-agents).
+**Agent.** A named role inside the coding tool with a prompt and a permission model. AutopAI defines four: `executor`, `planner`, `auditor`, and `operator`. See [section 3](#3-the-agents).
 
 **Ticket.** A local Markdown work item. Tickets are never committed. The orchestrator reads ready-for-dev and ready-for-refactor tickets, turns each one into a branch and a pull request, and moves the file to the done directory after the merge.
 
@@ -85,14 +85,14 @@ flowchart LR
 
 ## 3. The agents
 
-AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below. The executor, planner, and auditor are installed as hidden agents (`mode: all` with `hidden`), so the orchestrator can invoke them by name while only `setup` is selectable in the tool UI.
+AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below. The executor, planner, and auditor are installed as hidden agents (`mode: all` with `hidden`), so the orchestrator can invoke them by name while only the operator agent (`autopai`) is selectable in the tool UI.
 
 | Role | Default agent | Writes | Read-only over | Invoked by |
 | --- | --- | --- | --- | --- |
 | executor | `executor` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
 | planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve`, `promote` |
 | auditor | `auditor` | `tickets/identified/**`, `tickets/ux/**` | Source, tests, UX | `identify` |
-| setup | `setup` | `autopai.json`, `.gitignore` | Everything else | `/autopai-init` and manual commands |
+| operator | `autopai` | `autopai.json`, `.gitignore`, ADRs | Everything else | `/autopai-init` and manual commands |
 
 An important clarification: `build` is a built-in agent of OpenCode, not part of AutopAI. It has no role in a run. Every AutopAI session names its agent explicitly, and the agent name comes from the configuration.
 
@@ -138,15 +138,15 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **No diagnostic reports.** The evidence file (compiler warnings, test output, runtime log excerpts) is input to the auditor. The tickets are the only deliverable.
 
-### 3.4 Setup (`setup`)
+### 3.4 Operator (`autopai`)
 
 **Mission.** Maintain the repository configuration and run orchestrator commands on request.
 
-**Initialization.** `/autopai-init` runs the setup agent. It inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, then writes `autopai.json` with the real commands, branches, and check names. It never guesses a language or framework, and it validates the result with `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
+**Initialization.** `/autopai-init` runs the operator agent (`autopai`). It inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, then writes `autopai.json` with the real commands, branches, and check names. It never guesses a language or framework, and it validates the result with `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
 
-**Permissions.** The setup agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
+**Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
-**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the setup agent. They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the setup agent translates into flags. `/autopai-adr` is the exception: it does not call the CLI; the setup agent authors the architecture decision record directly. The CLI is always the same entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. `/autopai-adr` is the exception: it does not call the CLI; the operator agent authors the architecture decision record directly. The CLI is always the same entry point.
 
 ## 4. The lifecycle
 
@@ -378,7 +378,7 @@ Default `agents` object:
     "executor": "executor",
     "planner": "planner",
     "auditor": "auditor",
-    "setup": "setup"
+    "operator": "autopai"
   }
 }
 ```
@@ -550,7 +550,7 @@ On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, 
 
 ## 10. Customization
 
-**Models per role.** Set `models.executor`, `models.planner`, `models.auditor`, or `models.setup` to a model string accepted by the runner. The OpenCode runner passes it with `--model`. Null means the tool default.
+**Models per role.** Set `models.executor`, `models.planner`, `models.auditor`, or `models.operator` to a model string accepted by the runner. The OpenCode runner passes it with `--model`. Null means the tool default.
 
 **Agent names per role.** Set `agents.executor` and the rest when you define your own agent files. The orchestrator passes the configured name to the runner.
 
@@ -679,7 +679,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 1. The executor reads the ticket and the repository ADRs, cannot find a decision, writes a blocker under `tickets/.autopai/needs-human/`, and stops.
 2. The orchestrator detects the blocker after the session, records it in the state, and stops the phase with the blocker path. Nothing was pushed.
-3. Read the blocker, then run `/autopai-adr` in the interactive coding tool with the context ("record the decision for the blocked ticket"). The setup agent analyzes the options, you confirm the chosen path, and it writes the ADR to the repository ADR directory.
+3. Read the blocker, then run `/autopai-adr` in the interactive coding tool with the context ("record the decision for the blocked ticket"). The operator agent analyzes the options, you confirm the chosen path, and it writes the ADR to the repository ADR directory.
 4. Run `autopai resume`. The executor now finds the ADR, implements the ticket, and the loop continues with push, pull request, CI, and merge.
 
 ## 13. Troubleshooting and FAQ
@@ -728,7 +728,7 @@ The `spec/` folder records the decisions this manual operates. Read them in this
 
 - `spec/ARCHITECTURE.md`: the division of responsibility, design rules, phase list, state model, gates, protected paths, and the policy verification summary.
 - `spec/POLICIES.md`: the Git artifact policy, local artifact policy, per-role permissions, quality rules, and security rules.
-- `spec/CONFIG_SCHEMA.md`: the configuration schema and the generation rules the setup agent follows.
+- `spec/CONFIG_SCHEMA.md`: the configuration schema and the generation rules the operator agent follows.
 - `spec/PLATFORMS.md`: the runner interface, the bundled platform, and the porting checklist.
 - `AGENTS.md`: the repository-wide engineering rules, including the Git and CI/CD rules every agent follows.
 
@@ -743,7 +743,7 @@ Decisions worth highlighting:
 
 **Adopt.** Phase that finishes an existing branch through push, pull request, CI, and merge.
 
-**Agent.** A named role in the coding tool with a prompt and permissions. AutopAI defines `executor`, `planner`, `auditor`, and `setup`.
+**Agent.** A named role in the coding tool with a prompt and permissions. AutopAI defines `executor`, `planner`, `auditor`, and `operator`.
 
 **Artifacts.** Per-run files under `<stateDir>/artifacts/<runId>/`: patches, commit lists, gate logs, check snapshots, and session logs.
 

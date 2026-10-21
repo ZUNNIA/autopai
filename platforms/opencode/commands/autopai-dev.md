@@ -1,6 +1,6 @@
 ---
 description: Generate ready-for-dev tickets and run the development loop
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI from approve to dev.
