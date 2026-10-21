@@ -40,6 +40,7 @@ request into the exact CLI flags before running:
 - A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
 - A release version → `--version <x.y.z>`.
+- "continue", "resume", "keep going", or a reference to the interrupted run → `autopai resume --repo .`. It resumes the interrupted phase and advances identify to promote or promote to refactor.
 - Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
 
 Rules:
