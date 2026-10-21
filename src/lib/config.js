@@ -42,7 +42,7 @@ const DEFAULTS = {
   runtimeLogs: [],
   commitTypes: ['feat', 'fix', 'refactor', 'perf', 'test', 'docs', 'chore'],
   agents: {
-    executor: 'autopai',
+    executor: 'executor',
     planner: 'planner',
     auditor: 'auditor',
     setup: 'setup'

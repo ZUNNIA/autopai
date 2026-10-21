@@ -71,7 +71,7 @@ flowchart LR
 
 **Platform.** The agent, permission, and command files for a specific coding tool. The bundled platform lives under `platforms/opencode/` and is installed into the tool's global configuration.
 
-**Agent.** A named role inside the coding tool with a prompt and a permission model. AutopAI defines four: `autopai` (executor), `planner`, `auditor`, and `setup`. See [section 3](#3-the-agents).
+**Agent.** A named role inside the coding tool with a prompt and a permission model. AutopAI defines four: `executor`, `planner`, `auditor`, and `setup`. See [section 3](#3-the-agents).
 
 **Ticket.** A local Markdown work item. Tickets are never committed. The orchestrator reads ready-for-dev and ready-for-refactor tickets, turns each one into a branch and a pull request, and moves the file to the done directory after the merge.
 
@@ -85,11 +85,11 @@ flowchart LR
 
 ## 3. The agents
 
-AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below.
+AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below. The executor, planner, and auditor are installed as hidden agents (`mode: all` with `hidden`), so the orchestrator can invoke them by name while only `setup` is selectable in the tool UI.
 
 | Role | Default agent | Writes | Read-only over | Invoked by |
 | --- | --- | --- | --- | --- |
-| executor | `autopai` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
+| executor | `executor` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
 | planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve`, `promote` |
 | auditor | `auditor` | `tickets/identified/**`, `tickets/ux/**` | Source, tests, UX | `identify` |
 | setup | `setup` | `autopai.json`, `.gitignore` | Everything else | `/autopai-init` and manual commands |
@@ -98,7 +98,7 @@ An important clarification: `build` is a built-in agent of OpenCode, not part of
 
 The prompts that drive each session are owned by the core and live in `src/prompts/` (`autopai-finish.md`, `autopai-dev.md`, `feature-brief.md`, `backlog.md`, `ready-for-dev.md`, `identified.md`, `ready-for-refactor.md`, `release.md`). The platform files under `platforms/opencode/agents/` only define permissions and standing rules. A port to another tool recreates the roles, not the prompts.
 
-### 3.1 Executor (`autopai`)
+### 3.1 Executor (`executor`)
 
 **Mission.** Execute exactly one work item per session and commit the result.
 
@@ -375,7 +375,7 @@ Default `agents` object:
 ```json
 {
   "agents": {
-    "executor": "autopai",
+    "executor": "executor",
     "planner": "planner",
     "auditor": "auditor",
     "setup": "setup"
@@ -743,7 +743,7 @@ Decisions worth highlighting:
 
 **Adopt.** Phase that finishes an existing branch through push, pull request, CI, and merge.
 
-**Agent.** A named role in the coding tool with a prompt and permissions. AutopAI defines `autopai`, `planner`, `auditor`, and `setup`.
+**Agent.** A named role in the coding tool with a prompt and permissions. AutopAI defines `executor`, `planner`, `auditor`, and `setup`.
 
 **Artifacts.** Per-run files under `<stateDir>/artifacts/<runId>/`: patches, commit lists, gate logs, check snapshots, and session logs.
 
@@ -753,7 +753,7 @@ Decisions worth highlighting:
 
 **Cobertura.** The XML coverage format the orchestrator reads from `TestResults/**/coverage.cobertura.xml`.
 
-**Executor.** The role that implements work items and commits. Default agent name: `autopai`.
+**Executor.** The role that implements work items and commits. Default agent name: `executor`.
 
 **Gate.** A local check (restore, build, test, coverage) that runs before any push.
 

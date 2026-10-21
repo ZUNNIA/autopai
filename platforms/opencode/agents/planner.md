@@ -1,6 +1,7 @@
 ---
 description: Generates local briefs, backlogs, and ready-for tickets without touching source
-mode: primary
+mode: all
+hidden: true
 permission:
   edit:
     "*": "deny"

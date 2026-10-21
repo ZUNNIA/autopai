@@ -1,6 +1,7 @@
 ---
 description: Executes one AutopAI work item without interactive prompts
-mode: primary
+mode: all
+hidden: true
 permission:
   edit:
     "*": "allow"
