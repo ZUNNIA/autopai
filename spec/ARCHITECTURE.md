@@ -34,7 +34,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 
 `tickets/.autopai/state.json` stores the run mode, phase, feature, branch, base branch, SHAs, pull request, merge commit, scopes, changed files, attempts, sessions, and blockers. Writes are atomic. A lock file prevents concurrent runs. Logs are JSONL and artifacts are per run.
 
-Reconciliation on resume checks the real branch, commits, pull request, and checks before continuing.
+Reconciliation on resume checks the real branch, commits, pull request, and checks before continuing. When the last phase completed, resume advances identify to promote or promote to refactor; human gates and releases stop it.
 
 ## Gates
 

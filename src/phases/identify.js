@@ -6,6 +6,7 @@ import { runSession } from '../lib/session.js'
 import { runGates } from '../lib/gates.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { scopesFromState, lastMergedScopes } from '../lib/defaults.js'
+import { pendingScopes } from '../lib/resume.js'
 import { listCodeFiles } from '../lib/codefiles.js'
 import { chunkCodeFiles } from '../lib/chunks.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
@@ -18,22 +19,44 @@ import { slugify, walkFiles, ensureDir } from '../lib/util.js'
  */
 export async function runIdentify({ config, stateStore, options, log }) {
   const previous = await stateStore.load()
-  const scopes = await resolveScopes({ config, options, previous })
-  if (scopes.length === 0) {
-    throw new Error('No audit scope could be resolved. Pass --scope branch:<name> or --scope pr:<number>.')
-  }
+  const resuming = options.resume === true
+    && previous?.mode === 'identify'
+    && (previous.scopes ?? []).length > 0
 
   const feature = String(options.feature ?? previous?.feature ?? '').trim() || null
-  const state = await stateStore.create('identify', { feature })
+  const state = resuming ? previous : await stateStore.create('identify', { feature })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
-  const resolvedScopes = []
-  for (const scope of scopes) {
-    const resolved = await resolveScope({ config, artifacts, scope })
-    for (const item of resolved) {
-      resolvedScopes.push(item)
-      await log?.(`Scope ${item.name}: ${item.changedFiles.length} files.`)
+  let resolvedScopes
+  if (resuming) {
+    resolvedScopes = []
+    for (const scope of state.scopes ?? []) {
+      const tickets = await walkFiles(
+        path.join(config.repoPath, config.ticketDirs.identified, scope.name),
+        file => file.endsWith('.md')
+      )
+      resolvedScopes.push({
+        name: scope.name,
+        kind: scope.kind,
+        changedFiles: scope.changedFiles ?? [],
+        patchPath: scope.patch ?? null,
+        tickets
+      })
+    }
+    await log?.(`Resuming identify with ${resolvedScopes.length} recorded scopes.`)
+  } else {
+    const scopes = await resolveScopes({ config, options, previous })
+    if (scopes.length === 0) {
+      throw new Error('No audit scope could be resolved. Pass --scope branch:<name> or --scope pr:<number>.')
+    }
+    resolvedScopes = []
+    for (const scope of scopes) {
+      const resolved = await resolveScope({ config, artifacts, scope })
+      for (const item of resolved) {
+        resolvedScopes.push(item)
+        await log?.(`Scope ${item.name}: ${item.changedFiles.length} files.`)
+      }
     }
   }
 
@@ -45,24 +68,44 @@ export async function runIdentify({ config, stateStore, options, log }) {
     }
   }
 
+  if (!resuming) {
+    state.phase = 'identifying'
+    state.scopes = resolvedScopes.map(scope => ({
+      name: scope.name,
+      kind: scope.kind,
+      changedFiles: scope.changedFiles,
+      patch: scope.patchPath,
+      tickets: []
+    }))
+    await stateStore.save(state)
+  }
+
   const uncommitted = await git.statusTrackedPorcelain(config.repoPath)
   if (uncommitted !== '') {
     throw new Error(`The working tree has uncommitted tracked changes. Commit or stash them before identifying:\n${uncommitted}`)
   }
 
-  const gates = await runGates({ config, artifacts, prefix: 'evidence' })
-  await log?.(`Evidence gates: ${gates.ok ? 'passed' : gates.reason}`)
+  let evidenceFile = artifacts.path('evidence.json')
+  if (!state.completedPhases.includes('identify:evidence')) {
+    const gates = await runGates({ config, artifacts, prefix: 'evidence' })
+    await log?.(`Evidence gates: ${gates.ok ? 'passed' : gates.reason}`)
 
-  const runtimeLogs = await collectRuntimeLogs(config, artifacts)
-  const evidence = {
-    generatedAt: new Date().toISOString(),
-    gates: { ok: gates.ok, reason: gates.reason ?? null, coverage: gates.coverage ? gates.coverage.rate : null },
-    runtimeLogs,
-    notes: 'Local evidence only. Do not create a diagnostic report.'
+    const runtimeLogs = await collectRuntimeLogs(config, artifacts)
+    const evidence = {
+      generatedAt: new Date().toISOString(),
+      gates: { ok: gates.ok, reason: gates.reason ?? null, coverage: gates.coverage ? gates.coverage.rate : null },
+      runtimeLogs,
+      notes: 'Local evidence only. Do not create a diagnostic report.'
+    }
+    evidenceFile = await artifacts.write('evidence.json', JSON.stringify(evidence, null, 2))
+    state.completedPhases = [...new Set([...state.completedPhases, 'identify:evidence'])]
+    await stateStore.save(state)
+  } else {
+    await log?.('Evidence gates already recorded; reusing the previous evidence.')
   }
-  const evidenceFile = await artifacts.write('evidence.json', JSON.stringify(evidence, null, 2))
 
-  for (const resolved of resolvedScopes) {
+  const pending = pendingScopes(resolvedScopes, state.completedPhases)
+  for (const resolved of pending) {
     const outputDir = path.join(config.repoPath, config.ticketDirs.identified, resolved.name)
     await ensureDir(outputDir)
     const payload = {
@@ -87,6 +130,8 @@ export async function runIdentify({ config, stateStore, options, log }) {
       throw new Error(`Auditor failed for scope ${resolved.name} with exit code ${execution.code}.`)
     }
     resolved.tickets = await walkFiles(outputDir, file => file.endsWith('.md'))
+    state.completedPhases = [...new Set([...state.completedPhases, `identify:${resolved.name}`])]
+    await stateStore.save(state)
     await log?.(`Scope ${resolved.name}: ${resolved.tickets.length} Identified tickets.`)
   }
 
@@ -102,13 +147,13 @@ export async function runIdentify({ config, stateStore, options, log }) {
     kind: scope.kind,
     changedFiles: scope.changedFiles,
     patch: scope.patchPath,
-    tickets: scope.tickets
+    tickets: scope.tickets ?? []
   }))
   await stateStore.save(state)
 
   return {
     runId: state.runId,
-    scopes: resolvedScopes.map(scope => ({ name: scope.name, tickets: scope.tickets.length, files: scope.changedFiles.length })),
+    scopes: resolvedScopes.map(scope => ({ name: scope.name, tickets: (scope.tickets ?? []).length, files: scope.changedFiles.length })),
     evidence: evidenceFile,
     localOnly: true
   }
