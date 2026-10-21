@@ -1,6 +1,6 @@
 ---
 description: Run a custom AutopAI phase range
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI with a custom phase range.

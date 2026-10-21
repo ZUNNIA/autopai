@@ -24,6 +24,8 @@ test('loads defaults and resolves the state directory', async () => {
   assert.equal(config.maxAttempts, 3)
   assert.equal(config.runner, 'opencode')
   assert.equal(config.agents.executor, 'executor')
+  assert.equal(config.agents.operator, 'autopai')
+  assert.equal(config.models.operator, null)
   assert.ok(config.protectedPaths.includes('.github/**'))
   assert.ok(config.protectedPaths.includes('autopai.json'))
 })

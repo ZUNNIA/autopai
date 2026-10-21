@@ -1,6 +1,6 @@
 ---
 description: Prepare, merge, and tag a release through AutopAI
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI in release mode.

@@ -75,9 +75,9 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Platform files
 
 - `platforms/opencode/agents/auditor.md`
+- `platforms/opencode/agents/autopai.md`
 - `platforms/opencode/agents/executor.md`
 - `platforms/opencode/agents/planner.md`
-- `platforms/opencode/agents/setup.md`
 - `platforms/opencode/commands/autopai-adopt.md`
 - `platforms/opencode/commands/autopai-adr.md`
 - `platforms/opencode/commands/autopai-dev.md`

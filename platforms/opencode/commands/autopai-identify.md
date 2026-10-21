@@ -1,6 +1,6 @@
 ---
 description: Audit recent work and generate ready-for-refactor tickets
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI in identify mode, then promote the findings into ready-for-refactor tickets.

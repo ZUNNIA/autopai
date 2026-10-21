@@ -1,6 +1,6 @@
 ---
 description: Execute ready-for-refactor tickets through AutopAI
-agent: setup
+agent: autopai
 ---
 
 Run AutopAI in refactor mode.

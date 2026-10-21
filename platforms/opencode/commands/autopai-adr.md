@@ -1,6 +1,6 @@
 ---
 description: Create or update an architecture decision record
-agent: setup
+agent: autopai
 ---
 
 Create or update an Architecture Decision Record.

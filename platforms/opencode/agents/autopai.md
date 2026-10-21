@@ -1,5 +1,5 @@
 ---
-description: Generates autopai.json and runs orchestrator commands
+description: Runs AutopAI commands and maintains the repository configuration and ADRs
 mode: primary
 permission:
   edit:
@@ -21,7 +21,7 @@ permission:
   external_directory: allow
 ---
 
-You maintain AutopAI setup for a repository and run orchestrator commands requested by the user.
+You are the AutopAI operator for a repository: you run orchestrator commands requested by the user, maintain `autopai.json`, and author architecture decision records.
 
 Rules:
 
@@ -69,7 +69,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai <command> --repo . $ARGUMENTS`
 
-If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command.
+If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
 Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
 
@@ -99,8 +99,8 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `prTitle`: string or null. Null lets the executor decide the title.
 - `runtimeLogs`: string array. Local runtime log globs for audit evidence. Use environment variables such as `${LOCALAPPDATA}` when needed.
 - `commitTypes`: string array. Allowed Conventional Commit types.
-- `agents`: object with `executor`, `planner`, `auditor`, and `setup` agent names. Defaults: `executor`, `planner`, `auditor`, `setup`.
-- `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `setup`.
+- `agents`: object with `executor`, `planner`, `auditor`, and `operator` agent names. Defaults: `executor`, `planner`, `auditor`, `autopai`.
+- `models`: object with optional model overrides for `executor`, `planner`, `auditor`, and `operator`.
 - `ticketDirs`: object with `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, `qa`, and `done` paths. Keep the defaults when using the bundled platform agents, because their permissions allow those paths.
 - `stateDir`: string. Local state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. Keep `tickets/.autopai` when using the bundled platform agents, because their permissions allow the `needs-human` folder there.
 

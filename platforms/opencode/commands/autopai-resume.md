@@ -1,6 +1,6 @@
 ---
 description: Resume the last AutopAI run
-agent: setup
+agent: autopai
 ---
 
 Run with the bash tool and a timeout of at least 14400000 ms:

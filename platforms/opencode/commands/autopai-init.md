@@ -1,6 +1,6 @@
 ---
 description: Generate autopai.json for this repository
-agent: setup
+agent: autopai
 ---
 
 Initialize AutopAI for this repository.

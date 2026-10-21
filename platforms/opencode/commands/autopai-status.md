@@ -1,6 +1,6 @@
 ---
 description: Show the current AutopAI run state
-agent: setup
+agent: autopai
 ---
 
 Run with the bash tool:
