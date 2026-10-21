@@ -3,7 +3,7 @@ description: Resume the last AutopAI run
 agent: setup
 ---
 
-Run with the bash tool and a timeout of at least 3600000 ms:
+Run with the bash tool and a timeout of at least 14400000 ms:
 
 `autopai resume --repo . $ARGUMENTS`
 

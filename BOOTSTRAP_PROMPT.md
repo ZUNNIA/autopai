@@ -110,6 +110,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/github.js`
 - `src/lib/policy.js`
 - `src/lib/pr.js`
+- `src/lib/promotion.js`
 - `src/lib/prompts.js`
 - `src/lib/runner.js`
 - `src/lib/session.js`
@@ -151,6 +152,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/forbidden.test.js`
 - `test/git.test.js`
 - `test/policy.test.js`
+- `test/promotion.test.js`
 - `test/prompts.test.js`
 - `test/runner.test.js`
 - `test/runners.test.js`

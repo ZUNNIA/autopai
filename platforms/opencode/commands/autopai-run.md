@@ -5,7 +5,7 @@ agent: setup
 
 Run AutopAI with a custom phase range.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai run --repo . $ARGUMENTS`
 

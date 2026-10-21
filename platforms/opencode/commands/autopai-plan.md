@@ -13,7 +13,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A reference to this conversation ("what we just discussed") → summarize the agreed feature (problem, scope, decisions) into a concise description.
 - Neither → ask for the idea.
 
-Use the bash tool with a timeout of at least 3600000 ms:
+Use the bash tool with a timeout of at least 14400000 ms:
 
 `autopai run --repo . --from prepare --to prepare <composed arguments>`
 

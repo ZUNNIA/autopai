@@ -10,6 +10,7 @@ import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { branchNameFor, collectManualVerification, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
+import { selectPromotionGroups } from '../lib/promotion.js'
 import { ensureDir, slugify } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
@@ -282,13 +283,19 @@ export async function runPromote({ config, stateStore, options, log }) {
   const groups = await resolveFindingGroups({ config, state })
   if (groups.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
 
+  const pending = selectPromotionGroups(groups, { chunk: options.chunk, completedPhases: state.completedPhases })
   const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
   await ensureDir(outputDir)
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
+  state.mode = 'promote'
+  state.phase = 'promoting'
+  state.feature = feature
+  await stateStore.save(state)
+
   const sessions = []
-  for (const group of groups) {
+  for (const group of pending) {
     const execution = await runSession({
       config,
       prompt: 'ready-for-refactor',
@@ -299,16 +306,17 @@ export async function runPromote({ config, stateStore, options, log }) {
       role: 'planner'
     })
     if (execution.code !== 0) throw new Error(`The planner could not generate ready-for-refactor tickets for ${group.name}.`)
+    state.completedPhases = [...new Set([...state.completedPhases, `promote:${group.name}`])]
+    await stateStore.save(state)
     sessions.push({ chunk: group.name, findings: group.findings.length })
     await log?.(`Promoted ${group.findings.length} findings from ${group.name}.`)
   }
 
   const tickets = await listMarkdown(outputDir)
-  state.mode = 'promote'
   state.phase = 'promoted'
-  state.feature = feature
   state.completedPhases = [...new Set([...state.completedPhases, 'promote'])]
   await stateStore.save(state)
+  if (pending.length === 0) await log?.('Every promotion chunk was already completed.')
   await log?.(`Ready-for-refactor tickets at ${outputDir}.`)
   return { feature, outputDir, chunks: sessions, tickets: tickets.length }
 }
