@@ -22,7 +22,7 @@ Before writing the plan, understand the original problem and the current code.
 
 ## PHASE 2: Plan Generation and Saving
 For each main task, or complex subtask, in the Identified documents, generate an independent technical ticket.
-**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-refactor/[feature]/[number-of-ticket]-[ticket-name].md`. When the payload provides `chunk`, prefix every file name with `<chunk>-` so tickets from different chunks never collide.
+**OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-refactor/[number-of-ticket]-[ticket-name].md`. When the payload provides `chunk`, prefix every file name with `<chunk>-` so tickets from different chunks never collide.
 
 ## Front Matter (MANDATORY)
 Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:

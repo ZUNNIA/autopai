@@ -8,7 +8,7 @@ import { generatePrBody, resolveTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
-import { branchNameFor, collectManualVerification, listTickets, moveTicket, orderTickets } from '../lib/tickets.js'
+import { branchNameFor, collectManualVerification, filterTicketsByFeature, listTickets, moveTicket, orderTickets, ticketDoneDir } from '../lib/tickets.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups } from '../lib/promotion.js'
 import { ensureDir, slugify } from '../lib/util.js'
@@ -188,17 +188,19 @@ export async function runDev({ config, stateStore, options, log }) {
 
 export async function runRefactor({ config, stateStore, options, log }) {
   const loaded = await stateStore.load()
-  const feature = await resolveFeature({ config, options, state: loaded, dirs: [config.ticketDirs.readyForRefactor] })
-  const readyDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
-  const doneDir = path.join(config.repoPath, config.ticketDirs.done, feature)
-  const tickets = orderTickets(await listTickets(readyDir))
-  if (tickets.length === 0) throw new Error(`No ready-for-refactor tickets found in ${readyDir}.`)
+  const requested = String(options.feature ?? '').trim() || null
+  const queueDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
+  const tickets = orderTickets(filterTicketsByFeature(await listTickets(queueDir), requested))
+  if (tickets.length === 0) {
+    const suffix = requested ? ` for feature ${requested}` : ''
+    throw new Error(`No ready-for-refactor tickets found in ${queueDir}${suffix}.`)
+  }
 
-  const state = loaded ?? await stateStore.create('refactor', { feature })
+  const state = loaded ?? await stateStore.create('refactor', { feature: requested })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
   state.mode = 'refactor'
-  state.feature = feature
+  state.feature = requested ?? state.feature ?? null
   state.phase = 'refactor'
 
   const results = []
@@ -262,7 +264,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
       log
     })
 
-    await moveTicket(ticket, doneDir)
+    await moveTicket(ticket, ticketDoneDir(config, ticket, state.feature))
     state.scopes.push({ name: ticket.slug, branch, ticket: ticket.id, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit })
     await stateStore.save(state)
     results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
@@ -284,7 +286,7 @@ export async function runPromote({ config, stateStore, options, log }) {
   if (groups.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
 
   const pending = selectPromotionGroups(groups, { chunk: options.chunk, completedPhases: state.completedPhases })
-  const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor, feature)
+  const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
   await ensureDir(outputDir)
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()

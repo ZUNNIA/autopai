@@ -9,8 +9,8 @@ The user request: $ARGUMENTS
 
 Compose the CLI arguments from the request (see the interpreting rules):
 
-- A named feature or refactor batch → `--feature <slug>`.
-- Nothing → no arguments: the orchestrator uses the last ready-for-refactor directory.
+- A named feature or refactor batch → `--feature <slug>` (filters by the ticket front matter).
+- Nothing → no arguments: the orchestrator drains the ready-for-refactor queue.
 
 Use the bash tool with a timeout of at least 14400000 ms:
 
