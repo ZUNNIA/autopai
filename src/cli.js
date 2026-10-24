@@ -155,9 +155,10 @@ Usage:
   autopai resume --repo <path>
   autopai abort --repo <path>
 
-Phase arguments are optional: the feature resolves from the previous run state
-or the latest ticket directory, and identify audits the scopes recorded by the
-last run when no --scope is given.
+Phase arguments are optional: prepare, approve, and dev resolve the feature
+from the previous run state or the latest ticket directory, and identify audits
+the scopes recorded by the last run when no --scope is given. Refactor drains
+the ready-for-refactor queue; --feature limits it to that front-matter feature.
 
 resume continues the stored run, skips completed work, and advances identify to
 promote or promote to refactor; human gates and releases stop it.

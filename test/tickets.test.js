@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { listTickets, orderTickets, branchNameFor, collectManualVerification } from '../src/lib/tickets.js'
+import { listTickets, orderTickets, branchNameFor, collectManualVerification, filterTicketsByFeature, ticketDoneDir } from '../src/lib/tickets.js'
 
 test('parses front matter and orders tickets by dependency', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-tickets-'))
@@ -35,6 +35,48 @@ test('builds a unique branch name without ticket identifiers', () => {
   const ticket = { type: 'feat', slug: 'model-params-panel' }
   assert.equal(branchNameFor(ticket, []), 'feat/model-params-panel')
   assert.equal(branchNameFor(ticket, ['feat/model-params-panel']), 'feat/model-params-panel-2')
+})
+
+test('filters the refactor queue by front-matter feature', () => {
+  const tickets = [
+    { feature: 'tech-debt' },
+    { feature: 'settings' },
+    { feature: null }
+  ]
+  assert.deepEqual(filterTicketsByFeature(tickets, 'tech-debt'), [tickets[0]])
+  assert.deepEqual(filterTicketsByFeature(tickets, 'missing'), [])
+  assert.deepEqual(filterTicketsByFeature(tickets, null), tickets)
+  assert.deepEqual(filterTicketsByFeature(null, 'tech-debt'), [])
+})
+
+test('groups done tickets by their own feature with a fallback', () => {
+  const config = { repoPath: path.resolve('repo'), ticketDirs: { done: path.join('tickets', 'done') } }
+  const expected = feature => path.join(config.repoPath, config.ticketDirs.done, feature)
+  assert.equal(ticketDoneDir(config, { feature: 'settings' }, 'tech-debt'), expected('settings'))
+  assert.equal(ticketDoneDir(config, { feature: null }, 'tech-debt'), expected('tech-debt'))
+  assert.equal(ticketDoneDir(config, {}, null), expected('tech-debt'))
+  assert.equal(ticketDoneDir(config, { feature: '  ' }, 'tech-debt'), expected('tech-debt'))
+})
+
+test('reads tickets from legacy feature subfolders', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-refactor-queue-'))
+  const legacy = path.join(root, 'tech-debt')
+  await fs.mkdir(legacy, { recursive: true })
+  await fs.writeFile(path.join(legacy, '001-parallel.md'), [
+    '---',
+    'id: parallel',
+    'feature: tech-debt',
+    'type: refactor',
+    'priority: urgent',
+    'depends_on: []',
+    '---',
+    '# Parallel'
+  ].join('\n'), 'utf8')
+
+  const tickets = await listTickets(root)
+  assert.equal(tickets.length, 1)
+  assert.equal(tickets[0].feature, 'tech-debt')
+  assert.equal(filterTicketsByFeature(tickets, 'tech-debt').length, 1)
 })
 
 test('collects manual verification sections from the done tickets', async () => {
