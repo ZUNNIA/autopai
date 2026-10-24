@@ -256,9 +256,9 @@ If you want to review the generated tickets before any branch is created, run `a
 
 **Flow.**
 
-1. Resolve the `feature` (explicit, or the feature of the last run, or `tech-debt`).
+1. Resolve the `feature` (explicit, or the feature of the last run, or `tech-debt`). The feature labels the tickets and the done directory; it does not create a subdirectory in the refactor queue.
 2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`.
-3. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets under `tickets/ready-for-refactor/<feature>/` with front matter, prefixed with the chunk name so chunks never collide.
+3. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets directly under `tickets/ready-for-refactor/` with front matter, prefixed with the chunk name so chunks never collide.
 4. Refuse to continue when no Identified ticket exists.
 5. Record every completed chunk in the state. An interrupted promotion resumes with `autopai resume`; `autopai promote --chunk <name>` processes one pending chunk without touching the rest.
 
@@ -268,7 +268,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every f
 
 **Purpose.** Execute ready-for-refactor tickets with the same gates as `dev`.
 
-**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/<feature>/` and every branch is forced to the `refactor` type. Tickets move to `tickets/done/<feature>/` after the merge.
+**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/` and every branch is forced to the `refactor` type. It drains the queue; `--feature <slug>` limits the run to tickets whose front matter matches. Tickets move to `tickets/done/<feature>/` using their own front matter (fallback: the run feature, then `tech-debt`). Legacy `tickets/ready-for-refactor/<feature>/` subfolders are read recursively.
 
 ### 4.8 release
 
@@ -297,7 +297,7 @@ All ticket directories are configurable through `ticketDirs` and default to:
 | `tickets/backlog/<feature>/` | `brief.md` and `backlog.md` |
 | `tickets/ready-for-dev/<feature>/` | tickets waiting for the dev loop |
 | `tickets/identified/<scope>/` | audit findings |
-| `tickets/ready-for-refactor/<feature>/` | tickets waiting for the refactor loop |
+| `tickets/ready-for-refactor/` | flat refactor queue (legacy `<feature>/` subfolders are read recursively) |
 | `tickets/ux/` | UX proposals written by the UX review command |
 | `tickets/qa/` | manual verification checklist collected after the dev loop |
 | `tickets/done/<feature>/` | tickets whose pull request merged |
@@ -331,7 +331,7 @@ The branch name comes from the ticket type and the file name without its numeric
 - Review `backlog.md` before running `approve`. Edit it freely; the planner reads it at that moment.
 - Review generated ready-for-dev tickets before running `dev` if the loop has not started.
 - Edit `depends_on`, `priority`, or `type` front matter to change execution order or branch type.
-- Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/<feature>/` with the required front matter.
+- Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/` with the required front matter.
 
 ## 6. Configuration
 
@@ -655,7 +655,7 @@ autopai identify --repo . --scope branch:feat/order-history --scope pr:412
 
 The auditor writes one Identified ticket per debt under `tickets/identified/feat-order-history/` and `tickets/identified/pr-412/`. Nothing is committed.
 
-2. Promote. `/autopai-identify` already chained `promote`, so every finding became a ready-for-refactor ticket under `tickets/ready-for-refactor/settings-panel/`. To run it alone, use `autopai promote --repo . --feature settings-panel`. The auditor never promotes its own findings; the planner does.
+2. Promote. `/autopai-identify` already chained `promote`, so every finding became a ready-for-refactor ticket under `tickets/ready-for-refactor/` with the `settings-panel` feature in its front matter. To run it alone, use `autopai promote --repo . --feature settings-panel`. The auditor never promotes its own findings; the planner does.
 
 3. Refactor:
 

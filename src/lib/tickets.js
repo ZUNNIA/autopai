@@ -129,6 +129,25 @@ export async function moveTicket(ticket, targetDir) {
   return target
 }
 
+/**
+ * Selects the tickets of one feature from the refactor queue. An empty feature
+ * returns the whole queue, which is the default drain behavior.
+ */
+export function filterTicketsByFeature(tickets, feature) {
+  const target = String(feature ?? '').trim()
+  if (!target) return tickets ?? []
+  return (tickets ?? []).filter(ticket => String(ticket.feature ?? '') === target)
+}
+
+/**
+ * Resolves the done directory for a ticket from its own front matter, falling
+ * back to the run feature and then to the tech-debt queue label.
+ */
+export function ticketDoneDir(config, ticket, fallbackFeature) {
+  const feature = String(ticket?.feature ?? fallbackFeature ?? '').trim() || 'tech-debt'
+  return path.join(config.repoPath, config.ticketDirs.done, feature)
+}
+
 export function branchNameFor(ticket, existingBranches = []) {
   const base = `${ticket.type}/${ticket.slug}`
   if (!existingBranches.includes(base)) return base

@@ -19,4 +19,4 @@ Examples:
 - `--from release --to release --version 1.2.3`
 - `--from adopt --to adopt --branch <name>`
 
-The feature and scope arguments are optional: they resolve from the previous run state or the latest ticket directory. Report the CLI output verbatim. If the command fails, report the exact error and stop.
+The feature and scope arguments are optional: prepare, approve, and dev resolve them from the previous run state or the latest ticket directory, and identify audits the scopes recorded by the last run when no scope is given. Refactor drains the ready-for-refactor queue unless `--feature` filters it by front matter. Report the CLI output verbatim. If the command fails, report the exact error and stop.
