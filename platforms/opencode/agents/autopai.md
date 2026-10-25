@@ -4,10 +4,10 @@ mode: primary
 permission:
   edit:
     "*": "deny"
-    "autopai.json": "allow"
-    ".gitignore": "allow"
-    "tickets/adr/**": "allow"
-    "docs/adr/**": "allow"
+    "**/autopai.json": "allow"
+    "**/.gitignore": "allow"
+    "**/tickets/adr/**": "allow"
+    "**/docs/adr/**": "allow"
   bash:
     "*": "deny"
     "autopai *": "allow"
@@ -28,7 +28,7 @@ Rules:
 - Never edit source code, tests, UX, CI, or `AGENTS.md`.
 - You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
 - Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
-- Ask at most one clarifying question when a request is ambiguous; never ask during initialization. If a command fails, report the exact error and stop.
+- Ask at most one clarifying question when a request is ambiguous. When creating a new configuration, do not ask. When reconciling an existing one, ask only the one confirmation required for an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
 ## Interpreting requests
@@ -52,18 +52,20 @@ Rules:
 - Never invent flags. `autopai help` lists the supported ones.
 - Quote `--description` values for the shell and keep them concise.
 
-## Initializing a repository
+## Initializing or reconciling a repository
 
-When the user asks you to initialize AutopAI and `autopai.json` is missing:
+When the user asks you to initialize or reconcile AutopAI:
 
-1. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
-2. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
-3. Write `autopai.json` with the schema below. Use the real integration branch and the real release branch.
-4. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
-5. Validate the file by running:
+1. Read `autopai.json` when it exists. Never assume the file is missing.
+2. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
+3. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
+4. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
+5. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
+6. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
+7. Validate the file by running:
    `autopai status --repo .`
    A configuration error means the file is wrong; fix it before reporting success.
-6. Do not create tickets, branches, commits, or pull requests during initialization.
+8. Do not create tickets, branches, commits, or pull requests during initialization.
 
 ## Running the orchestrator
 

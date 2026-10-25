@@ -76,12 +76,13 @@ The same workflow is available through slash commands or natural language. The o
 
 A pause is not an approval. `autopai resume` at a gate stops and prints the exact approval command. `autopai resume --approve <gate>` passes that gate and continues to the next one; `--auto` skips every human pause. The automatic gates (local commands, CI, and policy) always run.
 
-Add or remove gates in `autopai.json`; use `--pause-after` to override the list for one run.
+Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
 
 ## Commands and natural language
 
 | Step | Slash command | Natural language |
 | --- | --- | --- |
+| Initialize or adjust config | `/autopai-init` | `/autopai-init "stop after promote"` |
 | Discuss and formalize | `/autopai-plan` | `/autopai-plan "the feature we just discussed"` |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
@@ -135,7 +136,7 @@ autopai help
 
 ## Usage
 
-Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) inspects the repository and writes `autopai.json`. No language or framework is assumed.
+Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) creates `autopai.json` or reconciles the existing file. Re-run it at any time to audit the configuration: it applies safe corrections, preserves your choices, and asks before an ambiguous or destructive change. You can also request an adjustment in natural language (`/autopai-init "stop after promote"`). No language or framework is assumed.
 
 The assisted loop:
 
