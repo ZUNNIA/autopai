@@ -81,8 +81,15 @@ export async function runApprove({ config, stateStore, options, log }) {
   })
   if (generated.code !== 0) throw new Error('The planner could not generate ready-for-dev tickets.')
 
+  const state = previous ?? await stateStore.create('approve', { feature })
+  state.mode = 'approve'
+  state.phase = 'approved'
+  state.feature = feature
+  state.completedPhases = [...new Set([...state.completedPhases, 'approve'])]
+  await stateStore.save(state)
+
   await log?.(`Tickets generated at ${readyDir}.`)
-  return runDev({ config, stateStore, options: { ...options, feature }, log })
+  return { feature, readyDir }
 }
 
 export async function runDev({ config, stateStore, options, log }) {

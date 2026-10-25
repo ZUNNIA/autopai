@@ -24,7 +24,8 @@ The configuration file lives at the root of each target repository. It is genera
 | `checkPollSeconds` | integer | CI polling interval. Default 30. |
 | `checkTimeoutMinutes` | integer | CI wait budget. Default 30. |
 | `autoMerge` | boolean | Merge after required checks pass. Reserved: the implementation always merges after the required checks pass. |
-| `approvalRequired` | boolean | Stop after the backlog for human review. Reserved: prepare always stops at awaiting_approval. |
+| `approvalRequired` | boolean | Reserved and superseded by `pauseAfter`. |
+| `pauseAfter` | string array | Human gates where the assisted loop stops. Default `["backlog", "plan", "qa"]`; an empty array disables human pauses. |
 | `prTitle` | string or null | Null lets the executor decide the title. |
 | `runtimeLogs` | string array | Local runtime log globs for audit evidence. Use environment variables for machine-specific paths. |
 | `commitTypes` | string array | Allowed Conventional Commit types. |
@@ -43,6 +44,19 @@ Commands are arrays of arguments, never shell strings. Example shape:
 }
 ```
 
+`pauseAfter` values map to phase boundaries:
+
+| Gate | Stops after | Review |
+| --- | --- | --- |
+| `backlog` | `prepare` | brief and backlog |
+| `plan` | `approve` | ready-for-dev tickets |
+| `qa` | `dev` | `tickets/qa/<feature>.md` |
+| `findings` | `identify` | audit findings |
+| `promotion` | `promote` | ready-for-refactor tickets |
+| `refactor` | `refactor` | refactor changes before release |
+
+The automatic gates (local commands, CI, policy) always run. `pauseAfter` only controls the human stops. `--auto` and `--pause-after` override it for one run.
+
 Generation rules:
 
 - Determine branches from the repository and its CI workflows.
@@ -50,5 +64,6 @@ Generation rules:
 - Determine commands by reading the repository, not by assuming a language or framework.
 - Set `coverageThreshold` only when CI enforces one.
 - Set `runtimeLogs` only when the application writes local logs.
+- Write `pauseAfter` with the default gates unless the user asks for different pause points.
 - Keep tickets and state local; add them to `.gitignore` when needed.
 - Validate with `autopai status --repo .` after writing.

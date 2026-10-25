@@ -108,6 +108,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/gates.js`
 - `src/lib/git.js`
 - `src/lib/github.js`
+- `src/lib/pauses.js`
 - `src/lib/policy.js`
 - `src/lib/pr.js`
 - `src/lib/promotion.js`
@@ -152,6 +153,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/defaults.test.js`
 - `test/forbidden.test.js`
 - `test/git.test.js`
+- `test/pauses.test.js`
 - `test/policy.test.js`
 - `test/promotion.test.js`
 - `test/prompts.test.js`

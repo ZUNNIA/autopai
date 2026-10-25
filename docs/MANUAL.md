@@ -31,7 +31,7 @@ The division of responsibility is the key idea:
 - The **executor** (an agent inside the coding tool) makes commits. It never pushes and never merges.
 - **CI** is the merge authority. The orchestrator fails closed when a required check is missing or failing.
 
-Because state lives in local files, a run survives crashes, machine restarts, and tool restarts. You can stop after any phase and continue later.
+Because state lives in local files, a run survives crashes, machine restarts, and tool restarts. You can stop after any phase and continue later. By default the loop is **assisted**: it pauses after `prepare`, `approve`, and `dev` for the backlog, plan, and manual QA reviews. A pause is not an approval; `resume --approve <gate>` passes one gate, and `--auto` is the explicit full-auto override. The automatic gates (local commands, CI, and policy) always run.
 
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear"}}}%%
@@ -77,7 +77,9 @@ flowchart LR
 
 **Local artifacts.** Tickets, briefs, findings, UX proposals, and audit evidence. They stay on disk under the configured ticket directories and are excluded from Git.
 
-**Gates.** The checks a branch must pass before anything reaches the remote. Local gates run restore, build, test, and coverage. CI gates wait for the configured check names after the pull request exists.
+**Gates.** The checks a branch must pass before anything reaches the remote. Local gates run restore, build, test, and coverage. CI gates wait for the configured check names after the pull request exists. These automatic gates always run.
+
+**Human gate.** A configured stop after a phase: `backlog`, `plan`, `qa`, `findings`, `promotion`, or `refactor`. `pauseAfter` selects the stops; the default is `backlog`, `plan`, and `qa`. A pause is not an approval: `resume` without `--approve <gate>` stays at the gate, and `--auto` is the explicit full-auto override.
 
 **State.** `state.json` under the state directory. It stores the run mode, phase, feature, branch, SHAs, pull request number, merge commit, scopes, attempts, sessions, and blockers. Writes are atomic and a lock file prevents concurrent runs.
 
@@ -153,23 +155,35 @@ The prompts that drive each session are owned by the core and live in `src/promp
 ```mermaid
 %%{init: {"flowchart": {"curve": "linear"}}}%%
 flowchart TD
+    Idea["idea discussion"] --> Prepare["prepare<br/>brief and backlog"]
+    Prepare --> Backlog{"backlog gate"}
+    Backlog -->|approve| Approve["approve<br/>ready-for-dev plan"]
+    Backlog -->|pause| ReviewBacklog["review brief and backlog"]
+    ReviewBacklog --> Backlog
+    Approve --> Plan{"plan gate"}
+    Plan -->|approve| Dev["dev<br/>one pull request per ticket"]
+    Plan -->|pause| ReviewPlan["review ready-for-dev tickets"]
+    ReviewPlan --> Plan
+    Dev --> QA{"QA gate"}
+    QA -->|approve| Identify["identify<br/>audit the new pull requests"]
+    QA -->|pause| ReviewQA["review tickets/qa"]
+    ReviewQA --> QA
+    Identify --> Promote["promote<br/>refactor tickets"]
+    Promote --> Refactor["refactor<br/>one pull request per ticket"]
+    Refactor --> Repeat["next feature"]
+    Repeat --> Prepare
+    Refactor -->|release| Release["release<br/>merge and tag"]
     Adopt["adopt<br/>existing branch"] --> Merged["merged"]
-    Prepare["prepare<br/>brief and backlog"] --> Review{"human review"}
-    Review -->|approve| Dev["dev<br/>one pull request per ticket"]
-    Dev --> Refactor["refactor<br/>one pull request per ticket"]
-    Refactor --> Release["release<br/>merge and tag"]
-    Identify["identify<br/>local findings"] -.->|promote| Promote["promote<br/>refactor tickets"]
-    Promote -.-> Refactor
 
     classDef step fill:#ffffff,stroke:#8c959f,color:#24292f
     classDef gate fill:#fff8c5,stroke:#d4a72c,color:#7d4e00
     classDef done fill:#dafbe1,stroke:#4ac26b,color:#116329
-    class Prepare,Dev,Refactor,Release,Identify,Adopt,Promote step
-    class Review gate
+    class Prepare,Approve,Dev,Identify,Promote,Refactor,Release,Adopt step
+    class Backlog,Plan,QA gate
     class Merged done
 ```
 
-Phases can be run alone, in any supported range, or resumed. The phase order used by `run --from --to` is: `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`, `adopt`. Note that a chain from `prepare` to `release` therefore includes `identify` and `promote` between `dev` and `refactor`.
+The order used by `run --from --to` is `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`, `adopt`. The assisted loop pauses at the gates in `pauseAfter`, which defaults to `backlog`, `plan`, and `qa`. The optional gates `findings`, `promotion`, and `refactor` pause after `identify`, `promote`, and `refactor`. A pause is not an approval: `resume` without `--approve <gate>` stays at the gate. `--auto` skips every human gate and `--pause-after` overrides the list for one run.
 
 ### 4.1 adopt
 
@@ -199,21 +213,21 @@ Phases can be run alone, in any supported range, or resumed. The phase order use
 1. Require `--feature <slug>`.
 2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` was provided, run the planner to write the brief.
 3. Run the planner to write `backlog.md` next to the brief.
-4. Stop at `awaiting_approval`.
+4. Stop at the `backlog` gate.
 
-Nothing is implemented yet. This is the human checkpoint: read the brief, edit the backlog if needed, and decide whether to continue.
+Nothing is implemented yet. This is the human checkpoint: read the brief, edit the backlog if needed, and decide whether to continue. The next step is `autopai resume --approve backlog` or the `/autopai-resume --approve backlog` command, which runs `approve` and stops at the `plan` gate. A generic `resume` does not approve the backlog.
 
 ### 4.3 approve
 
-**Purpose.** Convert the approved backlog into tickets and run the development loop.
+**Purpose.** Convert the approved backlog into ready-for-dev tickets and stop for review.
 
 **Flow.**
 
 1. Require an existing backlog for the feature.
 2. Run the planner to write ready-for-dev tickets with front matter under `tickets/ready-for-dev/<feature>/`.
-3. Immediately run the `dev` loop (see below). `approve` is the entry point that combines ticket generation and execution.
+3. Save the state as `approve/approved` and stop at the `plan` gate.
 
-If you want to review the generated tickets before any branch is created, run `approve` and stop it before the loop, or generate the tickets manually and run `dev` later.
+`approve` does not start the development loop. Review the generated tickets and the technical plan, then run `autopai resume --approve plan` (or `/autopai-dev`) to implement them. This is the plan checkpoint before any branch is created.
 
 ### 4.4 dev
 
@@ -228,7 +242,7 @@ If you want to review the generated tickets before any branch is created, run `a
 5. Push, open or reuse the pull request, wait for CI, run the fix loop on failure, and merge when the required checks pass.
 6. Move the ticket file to `tickets/done/<feature>/` and record the scope in the state.
 
-**Completion.** The phase ends at `dev-complete` when every ticket merged.
+**Completion.** The phase ends at `dev-complete` when every ticket merged. The manual QA checklist is at `tickets/qa/<feature>.md`. The next step is the `qa` gate: review the checklist and run `autopai resume --approve qa` (or `/autopai-identify`) to audit the new pull requests. A generic `resume` stays at the gate.
 
 ### 4.5 identify
 
@@ -248,7 +262,7 @@ If you want to review the generated tickets before any branch is created, run `a
 
 **Dry run.** `--dry-run` resolves the scopes and reports the file counts without collecting evidence or running the auditor.
 
-**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Promotion is automatic: the `promote` phase turns every finding into a ready-for-refactor ticket, and the refactor loop executes them.
+**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Promotion is automatic: the `promote` phase turns every finding into a ready-for-refactor ticket, and the refactor loop executes them. Starting identify explicitly approves the `qa` gate; review `tickets/qa/<feature>.md` first. If `findings` is in `pauseAfter`, identify stops after the audit and `resume --approve findings` continues with promotion. If `promotion` is in `pauseAfter`, review the ready-for-refactor tickets before `resume --approve promotion`.
 
 ### 4.6 promote
 
@@ -262,13 +276,13 @@ If you want to review the generated tickets before any branch is created, run `a
 4. Refuse to continue when no Identified ticket exists.
 5. Record every completed chunk in the state. An interrupted promotion resumes with `autopai resume`; `autopai promote --chunk <name>` processes one pending chunk without touching the rest.
 
-Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect.
+Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect. If `promotion` is in `pauseAfter`, the phase stops after writing the tickets; review them and run `resume --approve promotion` before refactor.
 
 ### 4.7 refactor
 
 **Purpose.** Execute ready-for-refactor tickets with the same gates as `dev`.
 
-**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/` and every branch is forced to the `refactor` type. It drains the queue; `--feature <slug>` limits the run to tickets whose front matter matches. Tickets move to `tickets/done/<feature>/` using their own front matter (fallback: the run feature, then `tech-debt`). Legacy `tickets/ready-for-refactor/<feature>/` subfolders are read recursively.
+**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/` and every branch is forced to the `refactor` type. Starting refactor explicitly approves the `promotion` gate after the ready-for-refactor tickets have been reviewed. It drains the queue; `--feature <slug>` limits the run to tickets whose front matter matches. Tickets move to `tickets/done/<feature>/` using their own front matter (fallback: the run feature, then `tech-debt`). Legacy `tickets/ready-for-refactor/<feature>/` subfolders are read recursively. If `refactor` is in `pauseAfter`, the phase stops at `refactor-complete` for review before release.
 
 ### 4.8 release
 
@@ -284,9 +298,9 @@ Promotion is automatic: the auditor documents, the planner promotes, and every f
 
 ### 4.9 run and resume
 
-**run.** `autopai run --from <phase> --to <phase>` executes the phases in the fixed order above, inclusive. The default range is `prepare` to `refactor`.
+**run.** `autopai run --from <phase> --to <phase>` executes the phases in the fixed order above, inclusive. Starting a phase explicitly approves the gate before it, but not the gates after it. After a phase whose gate is in `pauseAfter`, the run stops successfully with `pausedAt` and the next phase. The automatic gates (local commands, CI, policy) always run. `--auto` skips every human gate; `--pause-after` overrides the list for one run.
 
-**resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes the interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. When the last phase completed, resume advances to the next local phase: `identify` to `promote`, and `promote` to `refactor`. It stops with a message at the human gates (backlog approval and manual QA after dev), at a completed refactor, adopt, or release, and for `approve` and `release`, which are not resumed automatically. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
+**resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes an interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. At a gate in `pauseAfter` it stops and prints the exact approval command. A generic `resume` is **not** approval: `--approve <gate>` passes that exact gate and continues to the next gate, and approving one gate does not approve the next. `--auto` skips every human gate; `--pause-after` overrides the list. It advances local non-gated phases (`identify` to `promote`, `promote` to `refactor`) and stops at a completed refactor, adopt, or release. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
 
 ## 5. Tickets
 
@@ -328,10 +342,12 @@ The branch name comes from the ticket type and the file name without its numeric
 
 ### 5.3 Reviewing and editing
 
-- Review `backlog.md` before running `approve`. Edit it freely; the planner reads it at that moment.
-- Review generated ready-for-dev tickets before running `dev` if the loop has not started.
+- Review `backlog.md` at the `backlog` gate before running `approve`. Edit it freely; the planner reads it at that moment.
+- Review the ready-for-dev tickets at the `plan` gate before running `dev`.
+- Review `tickets/qa/<feature>.md` at the `qa` gate before running identify.
 - Edit `depends_on`, `priority`, or `type` front matter to change execution order or branch type.
 - Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/` with the required front matter.
+- Add `findings`, `promotion`, or `refactor` to `pauseAfter` if you want to review the audit output, the ready-for-refactor tickets, or the refactor changes.
 
 ## 6. Configuration
 
@@ -361,7 +377,8 @@ The branch name comes from the ticket type and the file name without its numeric
 | `checkPollSeconds` | integer | `30` | CI polling interval. |
 | `checkTimeoutMinutes` | integer | `30` | CI wait budget per check cycle. |
 | `autoMerge` | boolean | `true` | Reserved: the implementation always merges after the required checks pass. |
-| `approvalRequired` | boolean | `true` | Reserved: `prepare` always stops at `awaiting_approval`. |
+| `approvalRequired` | boolean | `true` | Reserved and superseded by `pauseAfter`. |
+| `pauseAfter` | string array | `["backlog", "plan", "qa"]` | Human gates where the assisted loop stops. An empty array disables human pauses. |
 | `prTitle` | string or null | `null` | Null lets the executor decide the title. |
 | `runtimeLogs` | string array | `[]` | Local runtime log globs used as audit evidence. |
 | `commitTypes` | string array | `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore` | Allowed commit and pull request types. |
@@ -383,7 +400,28 @@ Default `agents` object:
 }
 ```
 
-### 6.2 Example
+### 6.2 Pause gates
+
+`pauseAfter` selects where the assisted loop stops for a human review. It defaults to the three professional gates:
+
+```json
+"pauseAfter": ["backlog", "plan", "qa"]
+```
+
+| Gate | Stops after | Review |
+| --- | --- | --- |
+| `backlog` | `prepare` | brief and backlog |
+| `plan` | `approve` | ready-for-dev tickets |
+| `qa` | `dev` | `tickets/qa/<feature>.md` |
+| `findings` | `identify` | audit findings |
+| `promotion` | `promote` | ready-for-refactor tickets |
+| `refactor` | `refactor` | refactor changes before release |
+
+An empty array disables every human pause. Listing all six pauses after every phase. The automatic gates (local commands, CI, and policy) always run; `pauseAfter` only controls the human stops. `--auto` skips every human gate for one run, and `--pause-after` overrides the list for one run.
+
+A pause is not an approval. `resume` without `--approve <gate>` stays at the gate and prints the exact approval command. `--approve <gate>` passes that gate only and stops at the next configured gate.
+
+### 6.3 Example
 
 ```json
 {
@@ -396,6 +434,7 @@ Default `agents` object:
   "buildCommand": ["npm", "run", "build"],
   "testCommand": ["npm", "test", "--", "--coverage"],
   "coverageThreshold": 0.7,
+  "pauseAfter": ["backlog", "plan", "qa"],
   "maxAttempts": 3,
   "ticketDirs": {
     "backlog": "tickets/backlog",
@@ -409,7 +448,7 @@ Default `agents` object:
 }
 ```
 
-### 6.3 Validation
+### 6.4 Validation
 
 `autopai status --repo .` loads the configuration and fails with a specific message when:
 
@@ -418,6 +457,7 @@ Default `agents` object:
 - `baseBranch` or `releaseBranch` is missing.
 - A command is present but is not an array of strings.
 - `maxAttempts` is not greater than zero.
+- `pauseAfter` contains an unknown gate.
 
 Commands are argument arrays, never shell strings, so no shell quoting or injection applies.
 
@@ -433,13 +473,15 @@ autopai approve --repo <path> [--feature <slug>]
 autopai dev --repo <path> [--feature <slug>]
 autopai refactor --repo <path> [--feature <slug>]
 autopai release --repo <path> --version <x.y.z>
-autopai run --repo <path> --from <phase> --to <phase> [phase options]
+autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [phase options]
 autopai status --repo <path>
-autopai resume --repo <path>
+autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>]
 autopai abort --repo <path>
 ```
 
 **Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope` can be repeated.
+
+**Human gate flags.** `--approve <gate>` passes one gate and continues to the next configured gate. `--auto` skips every human gate. `--pause-after <gates>` overrides `pauseAfter` for one run; the value is a comma-separated gate list or an empty string to disable every human pause. These flags never disable the automatic gates.
 
 **Defaults.** `--feature` resolves from the previous run state or the latest ticket directory, and `--scope` defaults to the scopes of the last run. Explicit flags always win, and the resolver fails with a clear error instead of guessing when no candidate exists.
 
@@ -453,17 +495,20 @@ autopai abort --repo <path>
 {
   "runId": "20261018010532-12345",
   "mode": "dev",
-  "phase": "dev",
+  "phase": "dev-complete",
   "feature": "settings-panel",
   "branch": null,
   "prNumber": null,
   "mergeCommit": null,
   "scopes": 0,
-  "completedPhases": []
+  "completedPhases": [],
+  "gate": "qa",
+  "paused": true,
+  "pauseAfter": ["backlog", "plan", "qa"]
 }
 ```
 
-When no state exists, `status` prints `No AutopAI state found for this repository.`
+When no state exists, `status` prints `No AutopAI state found for this repository.` The `gate` is the current human checkpoint (`null` when the run is mid-phase), and `paused` tells whether that gate is in `pauseAfter`. `status` is always read-only.
 
 ## 8. State, logs, and artifacts
 
@@ -625,19 +670,35 @@ The feature is a settings panel for a web application.
 autopai run --repo . --from prepare --to prepare --feature settings-panel --description "Add a settings panel with theme and language options"
 ```
 
-The planner writes `tickets/backlog/settings-panel/brief.md` and `backlog.md`. The phase stops at `awaiting_approval`.
+The planner writes `tickets/backlog/settings-panel/brief.md` and `backlog.md`. The phase stops at the `backlog` gate.
 
 2. Review the brief and the backlog. Fix any wrong assumption, reorder tasks, or clarify external API links. This is the cheapest moment to change direction.
 
-3. Approve and develop:
+3. Approve the backlog and generate the plan:
 
 ```
-autopai run --repo . --from approve --to dev --feature settings-panel
+autopai resume --repo . --approve backlog
 ```
 
-The planner generates ready-for-dev tickets with front matter. The dev loop then takes each ticket, creates its branch, runs the executor, verifies policy and gates, opens the pull request, waits for CI, merges, and moves the ticket to `tickets/done/settings-panel/`. Every merged pull request updates the state with its number and merge commit.
+The planner generates ready-for-dev tickets with front matter and the run stops at the `plan` gate. Review the technical plan in `tickets/ready-for-dev/settings-panel/`.
 
-4. Check progress at any time:
+4. Implement the plan:
+
+```
+autopai resume --repo . --approve plan
+```
+
+The dev loop takes each ticket, creates its branch, runs the executor, verifies policy and gates, opens the pull request, waits for CI, merges, and moves the ticket to `tickets/done/settings-panel/`. Every merged pull request updates the state with its number and merge commit. The run stops at the `qa` gate.
+
+5. Review `tickets/qa/settings-panel.md`. If the behavior is correct, continue:
+
+```
+autopai resume --repo . --approve qa
+```
+
+The audit runs against the pull requests of the last run, promotes the findings, and refactors the new debt. Add `promotion` to `pauseAfter` if you want to review the ready-for-refactor tickets before that phase.
+
+6. Check progress at any time:
 
 ```
 autopai status --repo .
@@ -647,7 +708,7 @@ If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fi
 
 ### 12.3 Walkthrough: identify, refactor, release
 
-1. Audit the merged work:
+1. Audit the merged work. Starting identify explicitly approves the `qa` gate, so review `tickets/qa/` first:
 
 ```
 autopai identify --repo . --scope branch:feat/order-history --scope pr:412
@@ -655,7 +716,7 @@ autopai identify --repo . --scope branch:feat/order-history --scope pr:412
 
 The auditor writes one Identified ticket per debt under `tickets/identified/feat-order-history/` and `tickets/identified/pr-412/`. Nothing is committed.
 
-2. Promote. `/autopai-identify` already chained `promote`, so every finding became a ready-for-refactor ticket under `tickets/ready-for-refactor/` with the `settings-panel` feature in its front matter. To run it alone, use `autopai promote --repo . --feature settings-panel`. The auditor never promotes its own findings; the planner does.
+2. Promote. `/autopai-identify` already chained `promote`, so every finding became a ready-for-refactor ticket under `tickets/ready-for-refactor/` with the `settings-panel` feature in its front matter. To run it alone, use `autopai promote --repo . --feature settings-panel`. The auditor never promotes its own findings; the planner does. If `promotion` is in `pauseAfter`, review the tickets and run `autopai resume --repo . --approve promotion`.
 
 3. Refactor:
 
@@ -716,7 +777,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 **`Executor failed with exit code <n>.`** Read the corresponding `executor-*.log` artifact. Common causes are missing build tools, a command timeout, or a blocker written under `needs-human/`.
 
-**Resume prints a message instead of running.** That is a human gate or a mode that does not resume automatically: review the backlog and run `/autopai-dev` (prepare), run the manual QA in `tickets/qa/` and then `/autopai-identify` (dev complete), or re-run `release` with its version. Completed refactors and adopted merges also stop; start the next step explicitly.
+**Resume prints a message instead of running.** That is a human gate or a mode that does not resume automatically. At a gate, review the artifacts and approve that exact gate: `autopai resume --approve backlog`, `--approve plan`, `--approve qa`, `--approve findings`, `--approve promotion`, or `--approve refactor`. A generic `resume` never approves a gate. Completed refactors and adopted merges also stop; start the next step explicitly.
 
 **The run stopped but `status` shows an old phase.** `status` shows the last saved state. Failed runs keep the phase they were in. The error output is the source of truth for why it stopped.
 
@@ -755,7 +816,9 @@ Decisions worth highlighting:
 
 **Executor.** The role that implements work items and commits. Default agent name: `executor`.
 
-**Gate.** A local check (restore, build, test, coverage) that runs before any push.
+**Gate.** An automatic check (local commands or CI) that blocks a push or merge, or a configured human stop. The automatic gates always run; human gates come from `pauseAfter`.
+
+**Human gate.** A configured pause after a phase (`backlog`, `plan`, `qa`, `findings`, `promotion`, or `refactor`). A pause is not approval: `resume --approve <gate>` passes one gate.
 
 **Identified ticket.** A local audit finding under `tickets/identified/`. Documentation only, no solutions.
 

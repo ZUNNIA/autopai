@@ -1,12 +1,15 @@
+import { DEFAULT_PAUSE_AFTER, currentGate, gateLabel, phaseAfterGate } from './pauses.js'
+
 const RESUMABLE = new Set(['adopt', 'prepare', 'dev', 'refactor', 'identify', 'promote'])
 
 /**
  * Decides what `resume` does from the stored state: continue the interrupted
  * phase, advance to the next local phase when the last one completed, or stop
- * at a human gate. Backlog approval, manual QA, and releases are never
+ * at a human gate. A paused gate never advances on its own; the caller must
+ * approve that exact gate explicitly. Releases and approvals are never
  * advanced automatically.
  */
-export function nextPhase(state) {
+export function nextPhase(state, pauseAfter = DEFAULT_PAUSE_AFTER) {
   if (!state) return { action: 'none', reason: 'No AutopAI state found for this repository.' }
 
   const mode = String(state.mode ?? '')
@@ -17,17 +20,20 @@ export function nextPhase(state) {
       ? { action: 'resume', mode }
       : { action: 'none', reason: `The last ${mode || 'unknown'} run was aborted. Re-run its command explicitly.` }
   }
-  if (mode === 'identify' && phase === 'identified') return { action: 'promote', feature: state.feature ?? null }
-  if (mode === 'promote' && phase === 'promoted') return { action: 'refactor', feature: state.feature ?? null }
-  if (mode === 'prepare' && phase === 'awaiting_approval') {
-    return { action: 'none', reason: 'The backlog is awaiting approval. Review it and run /autopai-dev.' }
-  }
-  if (mode === 'dev' && phase === 'dev-complete') {
-    return { action: 'none', reason: 'Development is complete. Review tickets/qa/ and run /autopai-identify.' }
-  }
-  if (mode === 'refactor' && phase === 'refactor-complete') {
+
+  const gate = currentGate(state)
+  if (gate) {
+    if (pauseAfter.includes(gate)) {
+      return {
+        action: 'none',
+        reason: `Paused at the ${gateLabel(gate)} gate. Review the artifacts, then run autopai resume --approve ${gate}.`
+      }
+    }
+    const next = phaseAfterGate(gate)
+    if (next) return { action: next, feature: state.feature ?? null }
     return { action: 'none', reason: 'Refactoring is complete. Start a new feature or run /autopai-release.' }
   }
+
   if (mode === 'adopt' && phase === 'merged') {
     return { action: 'none', reason: 'The adopted branch is merged. Start the next phase explicitly.' }
   }

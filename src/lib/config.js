@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { DEFAULT_PAUSE_AFTER, normalizePauseAfter } from './pauses.js'
 import { expandEnv, exists, readJson, assert } from './util.js'
 
 const DEFAULT_TICKET_DIRS = {
@@ -38,6 +39,7 @@ const DEFAULTS = {
   checkTimeoutMinutes: 30,
   autoMerge: true,
   approvalRequired: true,
+  pauseAfter: [...DEFAULT_PAUSE_AFTER],
   prTitle: null,
   runtimeLogs: [],
   commitTypes: ['feat', 'fix', 'refactor', 'perf', 'test', 'docs', 'chore'],
@@ -84,6 +86,7 @@ export async function loadConfig(repoPath) {
   config.ignoredChecks = asArray(config.ignoredChecks)
   config.commitTypes = asArray(config.commitTypes)
   config.protectedPaths = asArray(config.protectedPaths)
+  config.pauseAfter = normalizePauseAfter(config.pauseAfter)
 
   assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in autopai.json')
   assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')

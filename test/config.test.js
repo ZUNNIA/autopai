@@ -26,6 +26,7 @@ test('loads defaults and resolves the state directory', async () => {
   assert.equal(config.agents.executor, 'executor')
   assert.equal(config.agents.operator, 'autopai')
   assert.equal(config.models.operator, null)
+  assert.deepEqual(config.pauseAfter, ['backlog', 'plan', 'qa'])
   assert.ok(config.protectedPaths.includes('.github/**'))
   assert.ok(config.protectedPaths.includes('autopai.json'))
 })
@@ -65,6 +66,36 @@ test('validates the smoke command and defaults the qa directory', async () => {
     smokeCommand: 'npm run smoke'
   }), 'utf8')
   await assert.rejects(() => loadConfig(invalid), /smokeCommand/)
+})
+
+test('normalizes pauseAfter and rejects unknown gates', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-pauses-'))
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    pauseAfter: ['qa', 'findings']
+  }), 'utf8')
+  const config = await loadConfig(repo)
+  assert.deepEqual(config.pauseAfter, ['qa', 'findings'])
+
+  const none = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-pauses-none-'))
+  await fs.writeFile(path.join(none, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    pauseAfter: []
+  }), 'utf8')
+  assert.deepEqual((await loadConfig(none)).pauseAfter, [])
+
+  const invalid = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-pauses-invalid-'))
+  await fs.writeFile(path.join(invalid, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    pauseAfter: ['nope']
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(invalid), /Invalid pause gate/)
 })
 
 test('defaults the audit chunk size and rejects invalid values', async () => {
