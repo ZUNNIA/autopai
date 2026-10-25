@@ -7,6 +7,7 @@ import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
 import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
 import { nextPhase } from './lib/resume.js'
+import { currentGate, gateAfterPhase, gateLabel, normalizeApprovedGate, normalizePauseAfter } from './lib/pauses.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
@@ -20,7 +21,7 @@ async function main() {
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
 
-  if (command === 'status') return printStatus(await stateStore.load())
+  if (command === 'status') return printStatus(await stateStore.load(), config)
   if (command === 'abort') return abortRun(stateStore)
   if (command === 'resume') return resumeRun({ config, stateStore, options, log })
 
@@ -52,55 +53,110 @@ async function runSequence({ config, stateStore, options, log }) {
   const end = PHASES.indexOf(to)
   if (start < 0 || end < 0 || start > end) throw new Error(`Invalid phase range: ${from}..${to}`)
 
+  const pauseAfter = resolvePauseAfter(config, options)
+  const phases = PHASES.slice(start, end + 1)
   const results = []
-  for (const phase of PHASES.slice(start, end + 1)) {
-    if (!['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt'].includes(phase)) continue
+  for (const [index, phase] of phases.entries()) {
     log(`Running phase ${phase}.`)
-    const ctx = { config, stateStore, options, log }
-    if (phase === 'prepare') results.push(await runPrepare(ctx))
-    if (phase === 'approve') results.push(await runApprove(ctx))
-    if (phase === 'dev') results.push(await runDev(ctx))
-    if (phase === 'identify') results.push(await runIdentify(ctx))
-    if (phase === 'promote') results.push(await runPromote(ctx))
-    if (phase === 'refactor') results.push(await runRefactor(ctx))
-    if (phase === 'release') results.push(await runRelease(ctx))
-    if (phase === 'adopt') results.push(await runAdopt(ctx))
+    results.push(await runPhase(phase, { config, stateStore, options, log }))
+    const gate = gateAfterPhase(phase)
+    if (gate && pauseAfter.includes(gate) && index < phases.length - 1) {
+      const next = phases[index + 1]
+      log(`Paused at the ${gateLabel(gate)} gate after ${phase}. Review the artifacts and run autopai resume --approve ${gate}.`)
+      return { from, to, results, pausedAt: gate, nextPhase: next }
+    }
   }
   return { from, to, results }
 }
 
+async function runPhase(phase, ctx) {
+  if (phase === 'prepare') return runPrepare(ctx)
+  if (phase === 'approve') return runApprove(ctx)
+  if (phase === 'dev') return runDev(ctx)
+  if (phase === 'identify') return runIdentify(ctx)
+  if (phase === 'promote') return runPromote(ctx)
+  if (phase === 'refactor') return runRefactor(ctx)
+  if (phase === 'release') return runRelease(ctx)
+  if (phase === 'adopt') return runAdopt(ctx)
+  throw new Error(`Unknown phase: ${phase}`)
+}
+
+function resolvePauseAfter(config, options) {
+  if (options.auto === true) return []
+  if (options.pauseAfter !== undefined) return normalizePauseAfter(options.pauseAfter)
+  return config.pauseAfter
+}
+
 async function resumeRun({ config, stateStore, options, log }) {
-  const state = await stateStore.load()
-  const next = nextPhase(state)
+  const pauseAfter = resolvePauseAfter(config, options)
+  let state = await stateStore.load()
+  if (!state) {
+    process.stdout.write('No AutopAI state found for this repository.\n')
+    return
+  }
+
+  const approved = options.approve !== undefined ? normalizeApprovedGate(options.approve) : null
+  if (approved) {
+    const gate = currentGate(state)
+    if (!gate) throw new Error(`The run is not paused at a human gate; cannot approve ${approved}.`)
+    if (gate !== approved) throw new Error(`The run is paused at the ${gateLabel(gate)} gate; cannot approve ${approved}.`)
+  }
+
+  const effectivePause = approved ? pauseAfter.filter(gate => gate !== approved) : pauseAfter
+  let next = nextPhase(state, effectivePause)
   if (next.action === 'none') {
     process.stdout.write(`${next.reason}\n`)
     return
   }
 
-  log(`Continuing ${next.action === 'resume' ? state.mode : next.action} from ${state.mode}/${state.phase}.`)
   await stateStore.lock()
   try {
-    const ctx = {
-      config,
-      stateStore,
-      options: { ...options, resume: true, branch: state.branch, base: state.baseBranch, feature: next.feature ?? state.feature },
-      log
+    const results = []
+    while (next.action !== 'none') {
+      log(describeAction(next))
+      results.push(await runAction(next, {
+        config,
+        stateStore,
+        log,
+        options: {
+          ...options,
+          resume: next.action === 'resume',
+          branch: state.branch,
+          base: state.baseBranch,
+          feature: next.feature ?? state.feature
+        }
+      }))
+      state = await stateStore.load()
+      next = nextPhase(state, effectivePause)
     }
-    let result
-    if (next.action === 'promote') result = await runPromote(ctx)
-    else if (next.action === 'refactor') result = await runRefactor(ctx)
-    else if (state.mode === 'adopt') result = await runAdopt(ctx)
-    else if (state.mode === 'prepare') result = await runPrepare(ctx)
-    else if (state.mode === 'dev') result = await runDev(ctx)
-    else if (state.mode === 'refactor') result = await runRefactor(ctx)
-    else if (state.mode === 'identify') result = await runIdentify(ctx)
-    else if (state.mode === 'promote') result = await runPromote(ctx)
-    else throw new Error(`Cannot resume mode ${state.mode} automatically.`)
-    printResult(result)
-    return result
+    if (next.reason) process.stdout.write(`${next.reason}\n`)
+    printResult(results.length === 1 ? results[0] : { resumed: results })
+    return results
   } finally {
     await stateStore.unlock()
   }
+}
+
+async function runAction(next, ctx) {
+  if (next.action === 'approve') return runApprove(ctx)
+  if (next.action === 'dev') return runDev(ctx)
+  if (next.action === 'identify') return runIdentify(ctx)
+  if (next.action === 'promote') return runPromote(ctx)
+  if (next.action === 'refactor') return runRefactor(ctx)
+  if (next.action === 'resume') {
+    if (next.mode === 'adopt') return runAdopt(ctx)
+    if (next.mode === 'prepare') return runPrepare(ctx)
+    if (next.mode === 'dev') return runDev(ctx)
+    if (next.mode === 'refactor') return runRefactor(ctx)
+    if (next.mode === 'identify') return runIdentify(ctx)
+    if (next.mode === 'promote') return runPromote(ctx)
+  }
+  throw new Error(`Cannot continue action ${next.action}.`)
+}
+
+function describeAction(next) {
+  if (next.action === 'resume') return `Continuing ${next.mode} from the stored phase.`
+  return `Continuing with phase ${next.action}.`
 }
 
 function printResult(result) {
@@ -119,11 +175,12 @@ async function abortRun(stateStore) {
   process.stdout.write('AutopAI run marked as aborted and the lock was released.\n')
 }
 
-function printStatus(state) {
+function printStatus(state, config) {
   if (!state) {
     process.stdout.write('No AutopAI state found for this repository.\n')
     return
   }
+  const gate = currentGate(state)
   const summary = {
     runId: state.runId,
     mode: state.mode,
@@ -133,7 +190,10 @@ function printStatus(state) {
     prNumber: state.prNumber,
     mergeCommit: state.mergeCommit,
     scopes: state.scopes?.length ?? 0,
-    completedPhases: state.completedPhases
+    completedPhases: state.completedPhases,
+    gate,
+    paused: gate ? config.pauseAfter.includes(gate) : false,
+    pauseAfter: config.pauseAfter
   }
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
 }
@@ -150,9 +210,9 @@ Usage:
   autopai dev --repo <path> [--feature <slug>]
   autopai refactor --repo <path> [--feature <slug>]
   autopai release --repo <path> --version <x.y.z>
-  autopai run --repo <path> --from <phase> --to <phase> [phase options]
+  autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [phase options]
   autopai status --repo <path>
-  autopai resume --repo <path>
+  autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>]
   autopai abort --repo <path>
 
 Phase arguments are optional: prepare, approve, and dev resolve the feature
@@ -160,8 +220,13 @@ from the previous run state or the latest ticket directory, and identify audits
 the scopes recorded by the last run when no --scope is given. Refactor drains
 the ready-for-refactor queue; --feature limits it to that front-matter feature.
 
-resume continues the stored run, skips completed work, and advances identify to
-promote or promote to refactor; human gates and releases stop it.
+approve generates the ready-for-dev tickets and stops; dev implements them.
+
+Human gates pause the assisted loop after prepare, approve, dev, identify,
+promote, or refactor. pauseAfter defaults to backlog, plan, and qa. resume at a
+gate does not approve it: pass --approve <gate> only when you accept that exact
+gate, or --auto to skip every human pause. --pause-after overrides the list for
+one run. Gates: backlog, plan, qa, findings, promotion, refactor.
 `)
 }
 

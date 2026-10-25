@@ -12,11 +12,17 @@ Use the bash tool with a timeout of at least 14400000 ms:
 Examples:
 
 - `--from prepare --to prepare --description "<idea>"`
+- `--from prepare --to refactor`
 - `--from approve --to dev`
-- `--from identify --to promote`
 - `--from identify --to identify --scope branch:<name>`
 - `--from refactor --to refactor`
 - `--from release --to release --version 1.2.3`
 - `--from adopt --to adopt --branch <name>`
+- `--from prepare --to refactor --auto`
+- `--from prepare --to refactor --pause-after backlog,qa`
+
+The phase range starts at the phase the user chose. Starting a phase explicitly approves the gate before it; the gates after it still apply. A run that reaches a pause exits successfully and reports the gate; it does not approve it. To approve, run `/autopai-resume --approve <gate>`.
+
+The default pause list is `backlog`, `plan`, and `qa`. `--auto` skips every human pause. `--pause-after` overrides the list for this run. The automatic gates (local commands, CI, policy) always run.
 
 The feature and scope arguments are optional: prepare, approve, and dev resolve them from the previous run state or the latest ticket directory, and identify audits the scopes recorded by the last run when no scope is given. Refactor drains the ready-for-refactor queue unless `--feature` filters it by front matter. Report the CLI output verbatim. If the command fails, report the exact error and stop.

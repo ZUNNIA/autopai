@@ -22,6 +22,49 @@ test('decides the next action from the stored state', () => {
   assert.equal(nextPhase({ mode: 'unknown', phase: 'x' }).action, 'none')
 })
 
+test('respects the configured human gates', () => {
+  const backlog = nextPhase({ mode: 'prepare', phase: 'awaiting_approval' }, ['backlog'])
+  assert.equal(backlog.action, 'none')
+  assert.match(backlog.reason, /--approve backlog/)
+
+  const plan = nextPhase({ mode: 'approve', phase: 'approved', feature: 'settings' }, ['plan'])
+  assert.equal(plan.action, 'none')
+  assert.match(plan.reason, /--approve plan/)
+
+  const qa = nextPhase({ mode: 'dev', phase: 'dev-complete' }, ['qa'])
+  assert.equal(qa.action, 'none')
+  assert.match(qa.reason, /--approve qa/)
+
+  const findings = nextPhase({ mode: 'identify', phase: 'identified', feature: 'settings' }, ['findings'])
+  assert.equal(findings.action, 'none')
+  assert.match(findings.reason, /--approve findings/)
+
+  const promotion = nextPhase({ mode: 'promote', phase: 'promoted', feature: 'tech-debt' }, ['promotion'])
+  assert.equal(promotion.action, 'none')
+  assert.match(promotion.reason, /--approve promotion/)
+
+  const refactor = nextPhase({ mode: 'refactor', phase: 'refactor-complete' }, ['refactor'])
+  assert.equal(refactor.action, 'none')
+  assert.match(refactor.reason, /--approve refactor/)
+})
+
+test('advances through gates that are not configured to pause', () => {
+  assert.deepEqual(nextPhase({ mode: 'prepare', phase: 'awaiting_approval', feature: 'settings' }, []), { action: 'approve', feature: 'settings' })
+  assert.deepEqual(nextPhase({ mode: 'approve', phase: 'approved', feature: 'settings' }, []), { action: 'dev', feature: 'settings' })
+  assert.deepEqual(nextPhase({ mode: 'dev', phase: 'dev-complete' }, []), { action: 'identify', feature: null })
+  assert.deepEqual(nextPhase({ mode: 'identify', phase: 'identified', feature: 'settings' }, []), { action: 'promote', feature: 'settings' })
+  assert.deepEqual(nextPhase({ mode: 'promote', phase: 'promoted', feature: 'tech-debt' }, []), { action: 'refactor', feature: 'tech-debt' })
+
+  const complete = nextPhase({ mode: 'refactor', phase: 'refactor-complete' }, [])
+  assert.equal(complete.action, 'none')
+  assert.match(complete.reason, /Refactoring is complete/)
+
+  assert.deepEqual(nextPhase({ mode: 'prepare', phase: 'awaiting_approval' }, ['qa']), { action: 'approve', feature: null })
+  const dev = nextPhase({ mode: 'dev', phase: 'dev-complete' }, ['qa'])
+  assert.equal(dev.action, 'none')
+  assert.match(dev.reason, /manual QA/)
+})
+
 test('selects audit scopes that are not completed yet', () => {
   const scopes = [{ name: 'pr-298' }, { name: 'pr-297' }, { name: 'pr-296' }]
   assert.deepEqual(pendingScopes(scopes, []).map(scope => scope.name), ['pr-298', 'pr-297', 'pr-296'])

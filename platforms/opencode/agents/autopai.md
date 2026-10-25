@@ -40,7 +40,9 @@ request into the exact CLI flags before running:
 - A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
 - A release version → `--version <x.y.z>`.
-- "continue", "resume", "keep going", or a reference to the interrupted run → `autopai resume --repo .`. It resumes the interrupted phase and advances identify to promote or promote to refactor.
+- "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase or stops at the next human gate. A generic "continue" is **not** approval.
+- "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name.
+- "continue without stopping" or "run everything" → `--auto`, after confirming.
 - Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
 
 Rules:
@@ -95,7 +97,8 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `checkPollSeconds`: integer. CI polling interval, default 30.
 - `checkTimeoutMinutes`: integer. CI wait budget, default 30.
 - `autoMerge`: boolean. Merge after required checks pass. Reserved: accepted, not enforced yet.
-- `approvalRequired`: boolean. Stop after the backlog for human review. Reserved: accepted, not enforced yet.
+- `approvalRequired`: boolean. Reserved and superseded by `pauseAfter`.
+- `pauseAfter`: string array of human gates where the assisted loop stops. Default: `backlog`, `plan`, `qa`. Values: `backlog`, `plan`, `qa`, `findings`, `promotion`, `refactor`. An empty array disables human pauses. `--auto` and `--pause-after` override it per run.
 - `prTitle`: string or null. Null lets the executor decide the title.
 - `runtimeLogs`: string array. Local runtime log globs for audit evidence. Use environment variables such as `${LOCALAPPDATA}` when needed.
 - `commitTypes`: string array. Allowed Conventional Commit types.

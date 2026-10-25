@@ -18,3 +18,5 @@ Use the bash tool with a timeout of at least 14400000 ms:
 `autopai run --repo . --from prepare --to prepare <composed arguments>`
 
 Do not pass `--feature` unless the user named one; the orchestrator derives the slug from the description. The orchestrator writes the brief and the backlog and stops for human review. Report the output verbatim and the backlog path. If the command fails, report the exact error and stop.
+
+The next step is a human decision: after the user reviews the brief and backlog, run `/autopai-resume --approve backlog` to generate the ready-for-dev plan. Never approve the backlog on the user's behalf.

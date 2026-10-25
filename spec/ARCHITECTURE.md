@@ -8,7 +8,8 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
 - Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
 - One session per phase or per ticket. No long-running conversation carries the run.
-- The orchestrator starts at any phase. A run can adopt an existing branch, stop after a backlog, identify debt, refactor, or release.
+- The orchestrator starts at any phase. A run can adopt an existing branch, stop at a human gate, identify debt, refactor, or release.
+- Human gates pause the assisted loop after `prepare`, `approve`, `dev`, `identify`, `promote`, or `refactor`. The `pauseAfter` configuration selects them; a pause is never an implicit approval.
 - Phase arguments are optional: `--feature` and `--scope` resolve from the previous run state or the latest ticket directory. The resolver fails instead of guessing when no candidate exists.
 - State lives outside any conversation, in local files, and survives crashes.
 - The CI result is the merge authority. The orchestrator fails closed when a required check is missing.
@@ -20,25 +21,27 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 ## Phases
 
 - `adopt`: finishes an existing branch that already has commits.
-- `prepare`: generates a brief and a backlog, then stops for human approval.
-- `approve`: generates ready-for-dev tickets and starts the development loop.
-- `dev`: implements one ticket per branch through push, pull request, CI, and merge.
+- `prepare`: generates a brief and a backlog, then stops at the backlog gate.
+- `approve`: generates ready-for-dev tickets and stops at the plan gate.
+- `dev`: implements one ticket per branch through push, pull request, CI, and merge, then stops at the QA gate.
 - `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run; `--last <n>` audits the last n pull requests merged into the base branch. Directory scopes list tracked and untracked code files with Git ignore rules and split large trees into bounded audit chunks.
 - `promote`: the planner turns the Identified findings of the last audit into ready-for-refactor tickets, one session per audit chunk. Every completed chunk is recorded in the state, so an interrupted promotion resumes without redoing finished work. The auditor never promotes its own findings.
 - `refactor`: executes ready-for-refactor tickets with the same gates. Refactors preserve the user-visible behavior unless the finding documents a UX defect.
 - `release`: updates version and changelog, opens a release pull request, merges, and tags.
 
-`run --from <phase> --to <phase>` chains any range of phases.
+`run --from <phase> --to <phase>` chains any range of phases and stops after a phase whose gate is in `pauseAfter`.
 
 ## State
 
 `tickets/.autopai/state.json` stores the run mode, phase, feature, branch, base branch, SHAs, pull request, merge commit, scopes, changed files, attempts, sessions, and blockers. Writes are atomic. A lock file prevents concurrent runs. Logs are JSONL and artifacts are per run.
 
-Reconciliation on resume checks the real branch, commits, pull request, and checks before continuing. When the last phase completed, resume advances identify to promote or promote to refactor; human gates and releases stop it.
+Reconciliation on resume checks the real branch, commits, pull request, and checks before continuing. Resume advances local non-gated phases (`identify` to `promote`, `promote` to `refactor`), stops at every gate in `pauseAfter`, and never treats a resume as approval: `--approve <gate>` passes one exact gate and `--auto` skips every human pause. The default gates are `backlog`, `plan`, and `qa`.
 
 ## Gates
 
-Local gates run restore, build, test, the optional smoke command, and the configured coverage threshold before any push. CI gates require the configured check names after the pull request exists. On failure, the orchestrator sends the failed logs to the executor, which fixes and commits. After the configured attempts, the run stops with a blocker.
+Automatic gates always run. Local gates run restore, build, test, the optional smoke command, and the configured coverage threshold before any push. CI gates require the configured check names after the pull request exists. On failure, the orchestrator sends the failed logs to the executor, which fixes and commits. After the configured attempts, the run stops with a blocker.
+
+Human gates are separate: `pauseAfter` selects where the assisted loop stops for a human review. A resume at a gate prints the exact `--approve <gate>` command; a generic resume leaves the run at the gate. `--auto` and `--pause-after` are explicit overrides and never disable the automatic gates.
 
 ## Protected paths
 

@@ -1,5 +1,5 @@
 ---
-description: Show the current AutopAI run state
+description: Show the current AutopAI run state, gate, and pause policy
 agent: autopai
 ---
 

@@ -7,6 +7,8 @@ Run AutopAI in refactor mode.
 
 The user request: $ARGUMENTS
 
+Starting refactor explicitly approves the promotion gate. If the user has not reviewed the ready-for-refactor tickets, stop and ask them to review them first.
+
 Compose the CLI arguments from the request (see the interpreting rules):
 
 - A named feature or refactor batch → `--feature <slug>` (filters by the ticket front matter).
