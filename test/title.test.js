@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { clearAgentTitle, deriveTitle, readAgentTitle, resolveTitle } from '../src/lib/title.js'
+import { clearAgentTitle, deriveTitle, readAgentTitle, resolveTitle, ticketTitle } from '../src/lib/title.js'
 
 test('derives the title from the branch and commit types', () => {
   assert.equal(
@@ -18,6 +18,18 @@ test('derives the title from the branch and commit types', () => {
     deriveTitle('fix/panel', [{ subject: 'fix: panel' }, { subject: 'feat: new panel' }]),
     'feat: panel'
   )
+})
+
+test('builds the pull request title from the old ticket name', () => {
+  assert.equal(
+    ticketTitle({ id: 'local-engine-options-grouping', type: 'refactor' }),
+    'refactor: local engine options grouping'
+  )
+  assert.equal(
+    ticketTitle({ id: 'ggml-type-table', type: 'refactor' }),
+    'refactor: ggml type table'
+  )
+  assert.equal(ticketTitle({ type: 'feat' }), 'chore: ticket')
 })
 
 test('clears a stale agent title idempotently', async () => {
