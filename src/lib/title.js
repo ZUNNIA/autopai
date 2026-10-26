@@ -41,6 +41,17 @@ export function deriveTitle(branch, commits) {
   return `${type}: ${slugify(slug).replace(/-/g, ' ')}`
 }
 
+/**
+ * Builds the pull request title from the ticket name instead of the branch
+ * slug. Branch slugs carry audit chunk prefixes such as `pr-296-01`; the ticket
+ * id is the stable, human-readable name.
+ */
+export function ticketTitle(ticket) {
+  const type = String(ticket?.type ?? 'chore').trim() || 'chore'
+  const name = String(ticket?.id ?? ticket?.slug ?? '').trim().replace(/-/g, ' ')
+  return name ? `${type}: ${name}` : 'chore: ticket'
+}
+
 function highestType(commits) {
   const types = (commits ?? []).map(commit => String(commit.subject ?? '').split(':')[0].toLowerCase())
   for (const type of PRIORITY) {

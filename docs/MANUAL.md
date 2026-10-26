@@ -199,7 +199,7 @@ The order used by `run --from --to` is `prepare`, `approve`, `dev`, `identify`, 
 4. Refuse adoption when the branch modifies protected paths.
 5. Scan policy: branch name, commit subjects and bodies, added code lines, and the current content of changed code files. The repository-wide file scan also reports ticket or ADR references that predate the branch, because adoption must leave the touched files compliant.
 6. Run the local gates (restore, build, test, coverage).
-7. Run the executor: mode `finish` when there are violations or gate failures, mode `title` when the branch is already green. In both cases the executor can propose the pull request title in `<stateDir>/pr-title.txt`; only the adopt phase reads it. The file is cleared before the adopt session so a stale title never leaks into another phase. Dev, refactor, and release derive their titles from the branch and commits (release uses `chore: release v<version>`).
+7. Run the executor: mode `finish` when there are violations or gate failures, mode `title` when the branch is already green. In both cases the executor can propose the pull request title in `<stateDir>/pr-title.txt`; only the adopt phase reads it. The file is cleared before the adopt session so a stale title never leaks into another phase. Dev and refactor use the ticket name (`<type>: <ticket name>`) and release uses `chore: release v<version>`.
 8. Re-scan policy, re-run the gates, resolve the final title (`--title` override, then the executor title when valid, then a derived title), and continue with push, pull request, CI wait, fix loop, and merge.
 
 **Dry run.** `--dry-run` stops after the scan and prints the derived title, commits, changed files, and violations. No executor, no gates, no push.

@@ -4,7 +4,7 @@ import * as git from '../lib/git.js'
 import { runSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
-import { deriveTitle, generatePrBody } from '../lib/title.js'
+import { generatePrBody, ticketTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
@@ -267,7 +267,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
 
       stage = 'merge'
       const changedFiles = await git.diffNames(config.repoPath, range)
-      const title = deriveTitle(branch, commits)
+      const title = ticketTitle(ticket)
       const merge = await pushOpenWaitMerge({
         config,
         artifacts,
