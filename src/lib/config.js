@@ -31,6 +31,8 @@ const DEFAULTS = {
   smokeCommand: null,
   coverageThreshold: null,
   auditChunkFiles: 40,
+  localGateRetries: 1,
+  continueOnFailure: true,
   maxAttempts: 3,
   maxMinutes: 240,
   commandTimeoutMinutes: 30,
@@ -98,6 +100,8 @@ export async function loadConfig(repoPath) {
   validateCommand(config.smokeCommand, 'smokeCommand')
   assert(config.maxAttempts > 0, 'maxAttempts must be greater than zero')
   assert(Number.isInteger(config.auditChunkFiles) && config.auditChunkFiles > 0, 'auditChunkFiles must be a positive integer')
+  assert(Number.isInteger(config.localGateRetries) && config.localGateRetries >= 0, 'localGateRetries must be a non-negative integer')
+  assert(typeof config.continueOnFailure === 'boolean', 'continueOnFailure must be a boolean')
 
   return config
 }

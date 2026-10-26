@@ -2,10 +2,22 @@ import { runCommand } from './runner.js'
 import { readCoverage, formatCoverage } from './coverage.js'
 
 /**
- * Runs restore, build, test, smoke, and coverage locally. The GitHub workflow
- * remains the final authority; these gates catch failures before a push.
+ * Runs restore, build, test, smoke, and coverage locally. A failed attempt is
+ * retried up to `retries` times so a transient test failure does not stop an
+ * otherwise green ticket. The GitHub workflow remains the final authority.
  */
-export async function runGates({ config, artifacts, prefix = 'gate' }) {
+export async function runGates({ config, artifacts, prefix = 'gate', retries = 0 }) {
+  const attempts = Math.max(0, Number(retries) || 0) + 1
+  let result
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const attemptPrefix = attempt === 0 ? prefix : `${prefix}-retry-${attempt}`
+    result = await runGatesOnce({ config, artifacts, prefix: attemptPrefix })
+    if (result.ok) return { ...result, attempts: attempt + 1 }
+  }
+  return { ...result, attempts }
+}
+
+async function runGatesOnce({ config, artifacts, prefix }) {
   const steps = [
     ['restore', config.restoreCommand],
     ['build', config.buildCommand],

@@ -17,6 +17,8 @@ The configuration file lives at the root of each target repository. It is create
 | `smokeCommand` | string array or null | Optional smoke command. It runs after the test command as part of the local gates. |
 | `coverageThreshold` | number or null | Minimum line coverage between 0 and 1. Use the same value as CI. |
 | `auditChunkFiles` | integer | Maximum code files per directory audit chunk. Default 40. |
+| `localGateRetries` | integer | Retries after a failed local gate. Default 1; use 0 to disable. |
+| `continueOnFailure` | boolean | Continue with independent tickets after a ticket failure. Default true; false stops the loop. |
 | `maxAttempts` | integer | CI fix attempts. Default 3. |
 | `maxMinutes` | integer | Wall-clock budget. Default 240. Reserved: accepted, not enforced yet. |
 | `commandTimeoutMinutes` | integer | Timeout per local command. Default 30. |
@@ -71,5 +73,6 @@ Generation and reconciliation rules:
 - Set `coverageThreshold` only when CI enforces one.
 - Set `runtimeLogs` only when the application writes local logs.
 - Add the default `pauseAfter` when it is missing; preserve an existing list; apply explicit adjustments.
+- Keep `localGateRetries` at 1 and `continueOnFailure` at true unless the user asks for different failure behavior.
 - Keep tickets and state local; add them to `.gitignore` when needed.
 - Validate with `autopai status --repo .` after writing.

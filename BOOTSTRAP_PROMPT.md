@@ -152,6 +152,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/coverage.test.js`
 - `test/defaults.test.js`
 - `test/forbidden.test.js`
+- `test/gates.test.js`
 - `test/git.test.js`
 - `test/pauses.test.js`
 - `test/policy.test.js`

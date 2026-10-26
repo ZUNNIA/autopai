@@ -40,9 +40,12 @@ request into the exact CLI flags before running:
 - A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
 - A release version → `--version <x.y.z>`.
-- "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase or stops at the next human gate. A generic "continue" is **not** approval.
+- "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
+- "fix the failures and continue", "arregla los fallos y continúa", or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per failed ticket before recording the failure and continuing.
 - "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name.
 - "continue without stopping" or "run everything" → `--auto`, after confirming.
+- "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release.
+- If the request does not match the selected command, do not force it. Stop, name the phase that matches the request, and run it only after the user confirms. A release requires a version or an explicit release intent; never use release to resolve technical debt or audit.
 - Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
 
 Rules:
@@ -92,6 +95,8 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `smokeCommand`: string array or null. Optional smoke command that runs after the test command.
 - `coverageThreshold`: number between 0 and 1, or null. Use the same threshold as CI.
 - `auditChunkFiles`: integer. Maximum code files per directory audit chunk, default 40.
+- `localGateRetries`: integer. Retries after a failed local gate, default 1. Use 0 to disable.
+- `continueOnFailure`: boolean. Continue with independent tickets after a ticket failure, default true.
 - `maxAttempts`: integer. CI fix attempts, default 3.
 - `maxMinutes`: integer. Wall-clock budget, default 240.
 - `commandTimeoutMinutes`: integer. Timeout per local command, default 30.

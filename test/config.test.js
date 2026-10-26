@@ -27,6 +27,8 @@ test('loads defaults and resolves the state directory', async () => {
   assert.equal(config.agents.operator, 'autopai')
   assert.equal(config.models.operator, null)
   assert.deepEqual(config.pauseAfter, ['backlog', 'plan', 'qa'])
+  assert.equal(config.localGateRetries, 1)
+  assert.equal(config.continueOnFailure, true)
   assert.ok(config.protectedPaths.includes('.github/**'))
   assert.ok(config.protectedPaths.includes('autopai.json'))
 })
@@ -96,6 +98,26 @@ test('normalizes pauseAfter and rejects unknown gates', async () => {
     pauseAfter: ['nope']
   }), 'utf8')
   await assert.rejects(() => loadConfig(invalid), /Invalid pause gate/)
+})
+
+test('validates the local gate retry and failure continuation controls', async () => {
+  const invalidRetries = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-retries-'))
+  await fs.writeFile(path.join(invalidRetries, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    localGateRetries: -1
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(invalidRetries), /localGateRetries/)
+
+  const invalidContinuation = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-continue-'))
+  await fs.writeFile(path.join(invalidContinuation, 'autopai.json'), JSON.stringify({
+    runner: 'opencode',
+    baseBranch: 'develop',
+    releaseBranch: 'main',
+    continueOnFailure: 'yes'
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(invalidContinuation), /continueOnFailure/)
 })
 
 test('defaults the audit chunk size and rejects invalid values', async () => {

@@ -43,6 +43,7 @@ export class StateStore {
       attempts: 0,
       sessions: [],
       blockers: [],
+      failures: [],
       createdAt: now,
       updatedAt: now
     }

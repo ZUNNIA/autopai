@@ -124,7 +124,7 @@ export async function pushOpenWaitMerge({
 
   const validation = await validateHead({ config, artifacts, baseBranch, branch, executorPayload })
   if (validation.fixed) {
-    const validationGates = await runGates({ config, artifacts, prefix: 'policy-fix' })
+    const validationGates = await runGates({ config, artifacts, prefix: 'policy-fix', retries: config.localGateRetries })
     if (!validationGates.ok) {
       throw new Error(`Local gates failed after the policy fix: ${gateFailureText(validationGates)}`)
     }
@@ -178,7 +178,7 @@ export async function pushOpenWaitMerge({
     }
 
     await validateHead({ config, artifacts, baseBranch, branch, executorPayload })
-    const gates = await runGates({ config, artifacts, prefix: `fix-${attempt}` })
+    const gates = await runGates({ config, artifacts, prefix: `fix-${attempt}`, retries: config.localGateRetries })
     if (!gates.ok) {
       throw new Error(`Local gates failed after executor fix: ${gateFailureText(gates)}`)
     }

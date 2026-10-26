@@ -43,6 +43,10 @@ Automatic gates always run. Local gates run restore, build, test, the optional s
 
 Human gates are separate: `pauseAfter` selects where the assisted loop stops for a human review. A resume at a gate prints the exact `--approve <gate>` command; a generic resume leaves the run at the gate. `--auto` and `--pause-after` are explicit overrides and never disable the automatic gates.
 
+## Failure handling
+
+Local gates are retried once by default (`localGateRetries`). If a ticket still fails, its branch and commit stay available and the failure is recorded in `state.failures`. The next run reuses that ticket branch instead of creating a duplicate, retries the gates, and can repair the failure with `resume --fix` (one executor `autopai-finish` session with the gate logs). With `continueOnFailure` true, the loop skips only the failed ticket and its dependents, continues with independent tickets, and leaves the phase incomplete so `resume` retries the failure. The operator also refuses a command whose intent does not match: a release never resolves technical debt or continues a failed refactor.
+
 ## Protected paths
 
 The executor agent cannot edit tickets, ADRs, CI workflows, `autopai.json`, the repository `AGENTS.md`, or the coding tool configuration. The orchestrator re-checks protected paths before every push.

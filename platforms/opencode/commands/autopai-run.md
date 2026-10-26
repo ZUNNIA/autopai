@@ -25,4 +25,6 @@ The phase range starts at the phase the user chose. Starting a phase explicitly 
 
 The default pause list is `backlog`, `plan`, and `qa`. `--auto` skips every human pause. `--pause-after` overrides the list for this run. The automatic gates (local commands, CI, policy) always run.
 
+A failed ticket is recorded and the loop continues with independent tickets. Its branch is reused on the next run. Add `--fix` to run one executor repair attempt for a local gate failure before recording it. The run stops with the failure summary; tell the user to run `/autopai-resume --fix` to repair or `/autopai-resume` to retry.
+
 The feature and scope arguments are optional: prepare, approve, and dev resolve them from the previous run state or the latest ticket directory, and identify audits the scopes recorded by the last run when no scope is given. Refactor drains the ready-for-refactor queue unless `--feature` filters it by front matter. Report the CLI output verbatim. If the command fails, report the exact error and stop.
