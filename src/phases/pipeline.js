@@ -97,7 +97,8 @@ export async function runDev({ config, stateStore, options, log }) {
   const feature = await resolveFeature({ config, options, state: loaded, dirs: [config.ticketDirs.readyForDev] })
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
   const doneDir = path.join(config.repoPath, config.ticketDirs.done, feature)
-  const tickets = orderTickets(await listTickets(readyDir))
+  const doneRoot = path.join(config.repoPath, config.ticketDirs.done)
+  const tickets = orderTickets(await listTickets(readyDir), { completed: await listTickets(doneRoot) })
   if (tickets.length === 0) throw new Error(`No ready-for-dev tickets found in ${readyDir}.`)
 
   const state = loaded ?? await stateStore.create('dev', { feature })
@@ -140,7 +141,8 @@ export async function runRefactor({ config, stateStore, options, log }) {
   const loaded = await stateStore.load()
   const requested = String(options.feature ?? '').trim() || null
   const queueDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
-  const tickets = orderTickets(filterTicketsByFeature(await listTickets(queueDir), requested))
+  const doneRoot = path.join(config.repoPath, config.ticketDirs.done)
+  const tickets = orderTickets(filterTicketsByFeature(await listTickets(queueDir), requested), { completed: await listTickets(doneRoot) })
   if (tickets.length === 0) {
     const suffix = requested ? ` for feature ${requested}` : ''
     throw new Error(`No ready-for-refactor tickets found in ${queueDir}${suffix}.`)

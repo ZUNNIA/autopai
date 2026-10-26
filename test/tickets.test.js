@@ -115,6 +115,18 @@ test('reuses a ticket branch that already has commits over the base', async () =
   assert.equal(fresh.reuse, false)
 })
 
+test('satisfies dependencies already completed in done', () => {
+  const pending = [{ id: 'b', slug: 'b-slug', file: 'b.md', priority: 'important', dependsOn: ['a'] }]
+  const completed = [{ id: 'a', slug: 'a-slug' }]
+  assert.deepEqual(orderTickets(pending, { completed }).map(ticket => ticket.id), ['b'])
+
+  const bySlug = [{ ...pending[0], dependsOn: ['a-slug'] }]
+  assert.deepEqual(orderTickets(bySlug, { completed }).map(ticket => ticket.id), ['b'])
+
+  assert.throws(() => orderTickets(pending), /unknown ticket a/)
+  assert.throws(() => orderTickets(pending, { completed: [{ id: 'other' }] }), /unknown ticket a/)
+})
+
 test('blocks dependents of failed tickets transitively', () => {
   const tickets = [
     { id: 'a', dependsOn: [] },
