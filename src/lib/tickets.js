@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from './git.js'
 import { ensureDir, slugify, walkFiles } from './util.js'
+import { hasFilters, matchesFilters, normalizeClassification, normalizePriority, parseClassification, parsePriority } from './filters.js'
 
 const PRIORITY_ORDER = { urgent: 0, important: 1, minor: 2 }
 
@@ -22,7 +23,8 @@ export function parseTicket(text, file) {
   const slug = slugify(base.replace(/^\d+[-_]?/, ''))
   const id = String(meta.id ?? base)
   const type = String(meta.type ?? 'feat')
-  const priority = String(meta.priority ?? 'important').toLowerCase()
+  const priority = normalizePriority(meta.priority) ?? parsePriority(text) ?? 'important'
+  const classification = normalizeClassification(meta.classification) ?? parseClassification(text)
   const title = String(meta.title ?? firstHeading(text) ?? base)
   return {
     id,
@@ -30,6 +32,7 @@ export function parseTicket(text, file) {
     slug,
     type,
     priority: PRIORITY_ORDER[priority] == null ? 'important' : priority,
+    classification,
     title,
     feature: meta.feature ? String(meta.feature) : null,
     dependsOn: normalizeList(meta.depends_on ?? meta.dependsOn)
@@ -132,6 +135,50 @@ function compareTickets(left, right) {
   return left.file.localeCompare(right.file)
 }
 
+/**
+ * Orders the selected tickets and rejects a selection whose pending
+ * dependencies were filtered out. A dependency already present in done is
+ * satisfied by orderTickets itself.
+ */
+export function selectTickets({ allTickets, tickets, completed = [] }) {
+  const completedIds = new Set()
+  for (const ticket of completed) {
+    if (ticket.id) completedIds.add(ticket.id)
+    if (ticket.slug) completedIds.add(ticket.slug)
+  }
+
+  const allByKey = new Map()
+  for (const ticket of allTickets ?? []) {
+    allByKey.set(ticket.id, ticket)
+    allByKey.set(ticket.slug, ticket)
+  }
+
+  const selected = new Set()
+  for (const ticket of tickets ?? []) {
+    selected.add(ticket.id)
+    selected.add(ticket.slug)
+  }
+
+  const excluded = []
+  for (const ticket of tickets ?? []) {
+    for (const dependency of ticket.dependsOn ?? []) {
+      if (completedIds.has(dependency)) continue
+      const dependencyTicket = allByKey.get(dependency)
+      if (!dependencyTicket) continue
+      if (!selected.has(dependencyTicket.id) && !selected.has(dependencyTicket.slug)) {
+        excluded.push({ ticket: ticket.id, dependency: dependencyTicket.id })
+      }
+    }
+  }
+
+  if (excluded.length > 0) {
+    const details = excluded.map(item => `${item.ticket} depends on ${item.dependency}`).join('; ')
+    throw new Error(`The filter excludes pending dependencies required by the selected tickets: ${details}. Include them in the filter or run without filters.`)
+  }
+
+  return orderTickets(tickets ?? [], { completed })
+}
+
 export async function moveTicket(ticket, targetDir) {
   await ensureDir(targetDir)
   const target = path.join(targetDir, path.basename(ticket.file))
@@ -147,6 +194,27 @@ export function filterTicketsByFeature(tickets, feature) {
   const target = String(feature ?? '').trim()
   if (!target) return tickets ?? []
   return (tickets ?? []).filter(ticket => String(ticket.feature ?? '') === target)
+}
+
+/**
+ * Filters Identified finding files by their front matter or their checked
+ * body classification and priority. An unknown classification never matches an
+ * explicit classification filter.
+ */
+export async function filterFindingFiles(files, filters) {
+  const list = [...(files ?? [])]
+  if (!hasFilters(filters)) return list
+
+  const selected = []
+  for (const file of list) {
+    try {
+      const text = await fs.readFile(file, 'utf8')
+      if (matchesFilters(parseTicket(text, file), filters)) selected.push(file)
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+    }
+  }
+  return selected
 }
 
 /**

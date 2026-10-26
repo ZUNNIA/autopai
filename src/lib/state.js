@@ -39,6 +39,7 @@ export class StateStore {
       prTitle: null,
       mergeCommit: null,
       scopes: [],
+      filters: options.filters ?? { classifications: [], priorities: [] },
       changedFiles: [],
       attempts: 0,
       sessions: [],

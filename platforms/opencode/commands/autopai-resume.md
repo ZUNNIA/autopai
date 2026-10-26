@@ -21,6 +21,7 @@ Compose the arguments from the request:
 - "stop only at ..." → `--pause-after <gates>`.
 - "fix the failures and continue", "arregla los fallos y continúa", or a request to repair failed tickets → `--fix`. The orchestrator reuses each failed ticket branch, retries the local gates, and runs one executor fix attempt before recording the failure and continuing.
 - "continue", "resume", or "keep going" → no flags. It resumes the interrupted phase, reuses existing ticket branches, and retries local gates once.
+- A debt filter from the identify, promotion, or failed refactor is stored in the run state. `resume` keeps it, so do not pass classification or priority again and do not silently widen the run to every pending ticket.
 
 A failed ticket is not a human gate: do not pass `--approve` for it. If the run stopped because tickets failed, report the failed tickets and their branches, then tell the user to run `/autopai-resume` for a plain retry or `/autopai-resume` with a fix request. The examples are illustrative; understand the intent and do not require a fixed phrase.
 

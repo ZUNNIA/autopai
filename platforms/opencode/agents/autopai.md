@@ -39,12 +39,17 @@ request into the exact CLI flags before running:
 - "the last N branches/PRs merged" → `--last N` on identify.
 - A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
+- A debt classification → `--classification <name>` on identify, promote, or refactor. Accepted names: `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, `missing-documentation`. Map labels and Spanish terms to these values.
+- A priority or importance → `--priority <name>` on identify, promote, or refactor: `urgent`, `important`, or `minor`. Map urgent/urgente, important/importante, and minor/menor.
+- "only", "solo", or a restriction of the debt combines classification and priority with AND; multiple values in one flag are OR and may be comma-separated. For example, "solo code smell de importancia urgent" → `--classification code-smell --priority urgent`; "solo tickets lack of coverage o missing documentation con prioridad minor" → run the two filters separately or use the priority that applies to both, because one flat filter cannot express a different priority per classification.
+- Never map a classification or priority to `--feature`. `--feature` is the ticket front-matter feature, usually `tech-debt` for all debt tickets.
 - A release version → `--version <x.y.z>`.
 - "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
 - "fix the failures and continue", "arregla los fallos y continúa", or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per failed ticket before recording the failure and continuing.
 - "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name.
 - "continue without stopping" or "run everything" → `--auto`, after confirming.
-- "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release.
+- "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release. If the user restricts the debt, pass `--classification` and `--priority`; the orchestrator selects only matching pending tickets and reports zero if none match.
+- "identify only ..." restricts the audit and its promotion; "resolve only ..." restricts the pending refactor queue. Both use the same two flags.
 - If the request does not match the selected command, do not force it. Stop, name the phase that matches the request, and run it only after the user confirms. A release requires a version or an explicit release intent; never use release to resolve technical debt or audit.
 - Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
 
@@ -52,7 +57,7 @@ Rules:
 
 - Explicit flags in the request run verbatim; never rewrite them.
 - When the interpretation is not obvious, show the resolved command and ask one confirmation question before running.
-- Never invent flags. `autopai help` lists the supported ones.
+- Never invent flags. `autopai help` lists the supported ones. `--classification` and `--priority` are supported on identify, promote, and refactor; they are not `--feature`, `--type`, or `--scope`.
 - Quote `--description` values for the shell and keep them concise.
 
 ## Initializing or reconciling a repository

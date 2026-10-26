@@ -104,6 +104,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/config.js`
 - `src/lib/coverage.js`
 - `src/lib/defaults.js`
+- `src/lib/filters.js`
 - `src/lib/forbidden.js`
 - `src/lib/gates.js`
 - `src/lib/git.js`
@@ -147,10 +148,12 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `test/blockers.test.js`
 - `test/chunks.test.js`
+- `test/cli.test.js`
 - `test/codefiles.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`
+- `test/filters.test.js`
 - `test/forbidden.test.js`
 - `test/gates.test.js`
 - `test/git.test.js`

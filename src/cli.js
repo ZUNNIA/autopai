@@ -7,6 +7,7 @@ import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
 import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
 import { nextPhase } from './lib/resume.js'
+import { hasFilters, normalizeFilters } from './lib/filters.js'
 import { currentGate, gateAfterPhase, gateLabel, normalizeApprovedGate, normalizePauseAfter } from './lib/pauses.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
@@ -119,12 +120,21 @@ async function resumeRun({ config, stateStore, options, log }) {
     const results = []
     while (next.action !== 'none') {
       log(describeAction(next))
+      const filteredMode = state.mode === 'identify' || state.mode === 'promote' || state.mode === 'refactor'
+      const stateFilters = normalizeFilters(filteredMode ? state.filters ?? {} : {})
+      const filterArgs = hasFilters(stateFilters)
+        ? {
+            classification: stateFilters.classifications.join(','),
+            priority: stateFilters.priorities.join(',')
+          }
+        : {}
       const result = await runAction(next, {
         config,
         stateStore,
         log,
         options: {
           ...options,
+          ...filterArgs,
           resume: next.action === 'resume',
           branch: state.branch,
           base: state.baseBranch,
@@ -202,6 +212,7 @@ function printStatus(state, config) {
     scopes: state.scopes?.length ?? 0,
     completedPhases: state.completedPhases,
     failures: state.failures ?? [],
+    filters: normalizeFilters(state.filters ?? {}),
     gate,
     paused: gate ? config.pauseAfter.includes(gate) : false,
     pauseAfter: config.pauseAfter
@@ -214,14 +225,14 @@ function printHelp() {
 
 Usage:
   autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-  autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
-  autopai promote --repo <path> [--feature <slug>] [--chunk <name>]
+  autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
+  autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
   autopai prepare --repo <path> [--feature <slug>] [--description <text>]
   autopai approve --repo <path> [--feature <slug>]
   autopai dev --repo <path> [--feature <slug>]
-  autopai refactor --repo <path> [--feature <slug>]
+  autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
   autopai release --repo <path> --version <x.y.z>
-  autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [phase options]
+  autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
   autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
   autopai abort --repo <path>
@@ -230,6 +241,14 @@ Phase arguments are optional: prepare, approve, and dev resolve the feature
 from the previous run state or the latest ticket directory, and identify audits
 the scopes recorded by the last run when no --scope is given. Refactor drains
 the ready-for-refactor queue; --feature limits it to that front-matter feature.
+
+Technical debt filters: --classification accepts code-smell,
+unnecessary-complexity, lack-of-coverage, outdated-library, architecture, and
+missing-documentation. --priority accepts urgent, important, and minor. Both
+accept comma-separated or repeated values and combine with AND. They restrict
+the identify audit, its promotion, and the pending refactor queue. If a selected
+ticket depends on a pending ticket outside the filter, the run stops and lists
+the dependency. Filters persist through resume.
 
 approve generates the ready-for-dev tickets and stops; dev implements them.
 

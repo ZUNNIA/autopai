@@ -90,8 +90,11 @@ export function parseCliArgs(argv) {
       if (rest[index + 1] && !rest[index + 1].startsWith('--')) value = rest[++index]
       else value = true
     }
-    if (key === 'scope') options.scope = options.scope ? [].concat(options.scope, value) : [value]
-    else options[key] = value
+    if (key === 'scope' || key === 'classification' || key === 'priority') {
+      options[key] = options[key] ? [].concat(options[key], value) : [value]
+    } else {
+      options[key] = value
+    }
   }
   return { command, options }
 }
