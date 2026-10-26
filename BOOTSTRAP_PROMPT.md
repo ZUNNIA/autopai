@@ -162,6 +162,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/gates.test.js`
 - `test/git.test.js`
 - `test/pauses.test.js`
+- `test/platform-permissions.test.js`
 - `test/policy.test.js`
 - `test/promotion.test.js`
 - `test/prompts.test.js`

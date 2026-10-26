@@ -11,6 +11,8 @@ Read the request by meaning, not by exact wording. The examples in this command 
 
 Read `autopai.json` when it exists. Inspect the repository root, manifests, build files, test configuration, `.github/workflows/*.yml`, and the current configuration.
 
+Write `autopai.json` only with the edit tool at the repository root. Never use shell redirection, `Set-Content`, `Out-File`, `tee`, a different tool, or an alternative nested path. If the edit tool is denied, stop and report the exact path and error; do not try to bypass the permission.
+
 ## When autopai.json is missing
 
 Create it:
@@ -23,8 +25,9 @@ Create it:
 6. Set `runtimeLogs` only when the application writes local logs. Use environment variables for machine-specific paths.
 7. Include `pauseAfter` with the default gates `["backlog", "plan", "qa"]` unless the user asked for different stops.
 8. Ensure the state directory and the ticket directories stay local, and add them to `.gitignore` when needed.
-9. Validate with `autopai config check --repo .` and `autopai status --repo .`.
-10. Report the final configuration and any remaining uncertainty.
+9. Create `autopai.json` with the edit tool at the repository root once the values are resolved. Do not write it through the shell.
+10. Validate with `autopai config check --repo .` and `autopai status --repo .`.
+11. Report the final configuration and any remaining uncertainty.
 
 ## When autopai.json exists
 
