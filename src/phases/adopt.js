@@ -5,7 +5,7 @@ import { runSession } from '../lib/session.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { scanBranch, scanRepositoryFiles, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
-import { deriveTitle, generatePrBody, resolveTitle } from '../lib/title.js'
+import { clearAgentTitle, deriveTitle, generatePrBody, resolveTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { findForbidden } from '../lib/forbidden.js'
@@ -114,6 +114,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
     instructions: 'Do not push, merge, rebase, or edit tickets, ADRs, CI, or AutopAI configuration.'
   }
 
+  await clearAgentTitle(config)
   const execution = await runSession({
     config,
     prompt: 'autopai-finish',

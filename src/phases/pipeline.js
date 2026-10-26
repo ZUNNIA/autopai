@@ -4,7 +4,7 @@ import * as git from '../lib/git.js'
 import { runSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
-import { generatePrBody, resolveTitle } from '../lib/title.js'
+import { deriveTitle, generatePrBody } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
@@ -267,7 +267,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
 
       stage = 'merge'
       const changedFiles = await git.diffNames(config.repoPath, range)
-      const title = await resolveTitle({ config, branch, commits })
+      const title = deriveTitle(branch, commits)
       const merge = await pushOpenWaitMerge({
         config,
         artifacts,
@@ -421,7 +421,7 @@ export async function runRelease({ config, stateStore, options, log }) {
   const commits = await git.logCommits(config.repoPath, range)
   const gates = await runGates({ config, artifacts, prefix: `release-v${version}`, retries: config.localGateRetries })
   if (!gates.ok) throw new Error(`Release gates failed: ${gateFailureText(gates)}`)
-  const title = await resolveTitle({ config, branch, commits })
+  const title = `chore: release v${version}`
 
   const merge = await pushOpenWaitMerge({
     config,

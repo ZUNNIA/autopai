@@ -163,3 +163,4 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/runners.test.js`
 - `test/state.test.js`
 - `test/tickets.test.js`
+- `test/title.test.js`

@@ -17,6 +17,15 @@ export async function readAgentTitle(config) {
   }
 }
 
+export async function clearAgentTitle(config) {
+  const file = path.join(config.stateDir, 'pr-title.txt')
+  try {
+    await fs.unlink(file)
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+}
+
 export async function resolveTitle({ config, branch, commits }) {
   const agentTitle = await readAgentTitle(config)
   if (agentTitle) {
