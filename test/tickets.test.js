@@ -3,7 +3,16 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { listTickets, orderTickets, branchNameFor, collectManualVerification, filterTicketsByFeature, ticketDoneDir } from '../src/lib/tickets.js'
+import { execFileSync } from 'node:child_process'
+import { listTickets, orderTickets, branchNameFor, blockedDependents, collectManualVerification, filterTicketsByFeature, resolveTicketBranch, ticketDoneDir } from '../src/lib/tickets.js'
+
+function git(cwd, args) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' })
+}
+
+function commit(cwd, message) {
+  git(cwd, ['-c', 'user.email=test@example.com', '-c', 'user.name=AutopAI Test', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', message])
+}
 
 test('parses front matter and orders tickets by dependency', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-tickets-'))
@@ -77,6 +86,45 @@ test('reads tickets from legacy feature subfolders', async () => {
   assert.equal(tickets.length, 1)
   assert.equal(tickets[0].feature, 'tech-debt')
   assert.equal(filterTicketsByFeature(tickets, 'tech-debt').length, 1)
+})
+
+test('reuses a ticket branch that already has commits over the base', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-branch-'))
+  const remote = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-branch-remote-'))
+  git(remote, ['init', '--bare', '--quiet'])
+  git(repo, ['init', '-b', 'main', '--quiet'])
+  git(repo, ['remote', 'add', 'origin', remote])
+  await fs.writeFile(path.join(repo, 'seed.txt'), 'seed\n', 'utf8')
+  git(repo, ['add', 'seed.txt'])
+  commit(repo, 'chore: seed the test repository')
+  git(repo, ['push', '-u', 'origin', 'main'])
+
+  git(repo, ['switch', '-c', 'refactor/ticket-slug'])
+  await fs.writeFile(path.join(repo, 'change.txt'), 'change\n', 'utf8')
+  git(repo, ['add', 'change.txt'])
+  commit(repo, 'refactor: change the ticket scope')
+
+  const config = { repoPath: repo, baseBranch: 'main' }
+  const reused = await resolveTicketBranch({ config, ticket: { slug: 'ticket-slug' }, type: 'refactor' })
+  assert.equal(reused.branch, 'refactor/ticket-slug')
+  assert.equal(reused.reuse, true)
+  assert.equal(reused.commits, 1)
+
+  const fresh = await resolveTicketBranch({ config, ticket: { slug: 'other-ticket' }, type: 'refactor' })
+  assert.equal(fresh.branch, 'refactor/other-ticket')
+  assert.equal(fresh.reuse, false)
+})
+
+test('blocks dependents of failed tickets transitively', () => {
+  const tickets = [
+    { id: 'a', dependsOn: [] },
+    { id: 'b', dependsOn: ['a'] },
+    { id: 'c', dependsOn: ['b'] },
+    { id: 'd', dependsOn: [] }
+  ]
+  assert.deepEqual([...blockedDependents(tickets, ['a'])], ['b', 'c'])
+  assert.deepEqual([...blockedDependents(tickets, [])], [])
+  assert.deepEqual([...blockedDependents([{ id: 'x', dependsOn: ['a'] }], ['a'])], ['x'])
 })
 
 test('collects manual verification sections from the done tickets', async () => {

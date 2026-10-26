@@ -35,7 +35,8 @@ The same workflow is available through slash commands or natural language. The o
 
 - Assisted by default: review the backlog, the ready-for-dev plan, and the manual QA. Approve each gate explicitly.
 - Configurable gates: `pauseAfter` in `autopai.json` decides where the loop stops. Stop at every phase or only where you want.
-- One continuation command: `autopai resume`. Approve one gate with `--approve <gate>`; skip human pauses with `--auto`.
+- One continuation command: `autopai resume`. Approve one gate with `--approve <gate>`; skip human pauses with `--auto`; repair failed tickets with `--fix`.
+- Resilient loops: local gates are retried once, failed ticket branches are reused, independent tickets continue, and dependents are skipped.
 - CI-gated merges: a pull request merges only after the required checks pass.
 - Resumable phases: state lives in local files, and a crashed run resumes where it stopped.
 - Clean loops: after every merge it deletes the remote branch, fast-forwards the local base branch, and deletes the merged local branch.
@@ -78,6 +79,16 @@ A pause is not an approval. `autopai resume` at a gate stops and prints the exac
 
 Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
 
+## When a ticket fails
+
+A failed ticket is not a human gate. Local gates are retried once. If the ticket still fails, its branch stays available, the failure is recorded, and the loop continues with independent tickets while skipping dependents. The phase stays incomplete.
+
+- `autopai resume` reuses the failed ticket branch and retries the gates.
+- `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
+- `/autopai-status` shows the failed tickets and branches.
+
+The automatic gates are never bypassed, and a red branch is never pushed. A branch with commits is reused instead of creating a duplicate.
+
 ## Commands and natural language
 
 | Step | Slash command | Natural language |
@@ -88,9 +99,11 @@ Add or remove gates in `autopai.json`, or ask the operator in natural language a
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
+| Repair failed tickets | `/autopai-resume --fix` | "fix the failures and continue" |
+| Release | `/autopai-release <version>` | "release 1.3.0" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
-The operator agent translates the request and confirms ambiguous interpretations; it works in any language. Explicit flags run verbatim; the CLI underneath is deterministic.
+The operator agent translates the request and confirms ambiguous interpretations; it works in any language. Explicit flags run verbatim; the CLI underneath is deterministic. If a request does not match the command you opened, the operator stops and points to the right phase. A release never resolves technical debt.
 
 ## Requirements
 
@@ -154,6 +167,8 @@ The assisted loop:
 
 The phase commands (`/autopai-dev`, `/autopai-identify`, `/autopai-refactor`) remain available for manual control. Starting a phase explicitly approves the gate before it; the gates after it still apply.
 
+If a ticket fails, the run reports the failure and preserves its branch. Run `/autopai-resume` to retry or `/autopai-resume --fix` to attempt a repair; independent tickets have already continued.
+
 The same loop from the CLI:
 
 ```text
@@ -213,6 +228,7 @@ The core prompts, phases, state, policy, and merge logic do not change. Read `sp
 - `autopai` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\autopai.cmd`.
 - Two clones are linked: only one can own the `autopai` command. Run `npm link` in the clone you want to keep.
 - The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
+- A ticket failed local gates: run `/autopai-resume --fix` or `/autopai-resume`; do not create a duplicate branch. The failed branch is reused.
 
 ## Development
 

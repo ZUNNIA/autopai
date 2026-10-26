@@ -84,7 +84,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   await artifacts.write('commits.txt', commits.map(item => `${item.sha} ${item.subject}`).join('\n'))
   await artifacts.write('changed-files.txt', changedFiles.join('\n'))
 
-  let gates = await runGates({ config, artifacts, prefix: 'initial' })
+  let gates = await runGates({ config, artifacts, prefix: 'initial', retries: config.localGateRetries })
   await log?.(`Initial policy violations: ${violations.length}. Local gates: ${gates.ok ? 'passed' : gates.reason}`)
 
   const titleFile = path.join(config.stateDir, 'pr-title.txt')
@@ -138,7 +138,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   const updatedFiles = await git.diffNames(config.repoPath, range)
   violations = scanBranch({ branch, commits: updatedCommits, diff: updatedDiff })
   violations.push(...await scanRepositoryFiles(config.repoPath, updatedFiles))
-  gates = await runGates({ config, artifacts, prefix: 'final' })
+  gates = await runGates({ config, artifacts, prefix: 'final', retries: config.localGateRetries })
 
   if (violations.length > 0) {
     await artifacts.write('policy-final.json', JSON.stringify(violations, null, 2))

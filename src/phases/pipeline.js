@@ -8,7 +8,7 @@ import { generatePrBody, resolveTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
-import { branchNameFor, collectManualVerification, filterTicketsByFeature, listTickets, moveTicket, orderTickets, ticketDoneDir } from '../lib/tickets.js'
+import { blockedDependents, collectManualVerification, filterTicketsByFeature, listTickets, moveTicket, orderTickets, resolveTicketBranch, ticketDoneDir } from '../lib/tickets.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups } from '../lib/promotion.js'
 import { ensureDir, slugify } from '../lib/util.js'
@@ -106,91 +106,34 @@ export async function runDev({ config, stateStore, options, log }) {
   state.mode = 'dev'
   state.feature = feature
   state.phase = 'dev'
-
-  const results = []
-  for (const ticket of tickets) {
-    const branches = await git.listLocalBranches(config.repoPath)
-    const branch = branchNameFor(ticket, branches)
-    await git.fetch(config.repoPath)
-    await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
-    await log?.(`Ticket ${ticket.id}: branch ${branch}.`)
-
-    const payload = {
-      mode: 'dev',
-      ticketId: ticket.id,
-      ticketFile: ticket.file,
-      title: ticket.title,
-      type: ticket.type,
-      priority: ticket.priority,
-      branch,
-      baseBranch: config.baseBranch,
-      restoreCommand: config.restoreCommand,
-      buildCommand: config.buildCommand,
-      testCommand: config.testCommand,
-      smokeCommand: config.smokeCommand,
-      stateDir: config.stateDir,
-      instructions: 'Implement only this ticket. Do not push or merge. Commit with type: subject, no scope, no ticket or ADR references.'
-    }
-
-    const execution = await runSession({
-      config,
-      prompt: 'autopai-dev',
-      agent: config.agents.executor,
-      payload,
-      title: `AutopAI dev ${ticket.id}`,
-      logFile: artifacts.path(`executor-${ticket.slug}.log`),
-      role: 'executor'
-    })
-    const blockers = await listBlockers(config)
-    if (blockers.length > 0) {
-      state.blockers = blockers.map(blocker => blocker.file)
-      await stateStore.save(state)
-      throw new Error(blockerMessage(blockers))
-    }
-    if (execution.code !== 0) throw new Error(`Executor failed for ticket ${ticket.id}.`)
-
-    const range = `origin/${config.baseBranch}...${branch}`
-    const commits = await git.logCommits(config.repoPath, range)
-    if (commits.length === 0) throw new Error(`Ticket ${ticket.id} produced no commits on ${branch}.`)
-
-    const violations = scanBranch({ branch, commits, diff: await git.diff(config.repoPath, range) })
-    if (violations.length > 0) throw new Error(`Ticket ${ticket.id} violates policy:\n${formatViolations(violations)}`)
-
-    const gates = await runGates({ config, artifacts, prefix: ticket.slug })
-    if (!gates.ok) throw new Error(`Ticket ${ticket.id} failed local gates: ${gateFailureText(gates)}`)
-
-    const title = await resolveTitle({ config, branch, commits })
-    const prBody = generatePrBody({ commits, coverage: gates.coverage })
-    const merge = await pushOpenWaitMerge({
-      config,
-      artifacts,
-      branch,
-      baseBranch: config.baseBranch,
-      title,
-      prBody,
-      state,
-      stateStore,
-      executorPrompt: 'autopai-dev',
-      executorPayload: payload,
-      coverage: gates.coverage,
-      log
-    })
-
-    await moveTicket(ticket, doneDir)
-    state.scopes.push({ name: ticket.slug, branch, ticket: ticket.id, changedFiles: await git.diffNames(config.repoPath, range), prNumber: merge.prNumber, mergeCommit: merge.mergeCommit })
-    state.completedPhases = [...new Set([...state.completedPhases, `dev:${ticket.id}`])]
-    await stateStore.save(state)
-    results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
-  }
-
-  state.phase = 'dev-complete'
+  state.failures = []
+  state.blockers = []
   await stateStore.save(state)
-  const qaFile = await collectManualVerification({
-    doneDir,
-    outputFile: path.join(config.repoPath, config.ticketDirs.qa, `${feature}.md`)
+
+  const result = await runTicketQueue({
+    config,
+    stateStore,
+    options,
+    log,
+    state,
+    artifacts,
+    feature,
+    tickets,
+    mode: 'dev',
+    branchType: ticket => ticket.type,
+    doneDirFor: () => doneDir,
+    instructions: 'Implement only this ticket. Do not push or merge. Commit with type: subject, no scope, no ticket or ADR references.'
   })
-  if (qaFile) await log?.(`Manual verification checklist at ${qaFile}.`)
-  return { feature, tickets: results, manualVerification: qaFile }
+
+  let qaFile = null
+  if (result.failures.length === 0) {
+    qaFile = await collectManualVerification({
+      doneDir,
+      outputFile: path.join(config.repoPath, config.ticketDirs.qa, `${feature}.md`)
+    })
+    if (qaFile) await log?.(`Manual verification checklist at ${qaFile}.`)
+  }
+  return { feature, tickets: result.tickets, failures: result.failures, manualVerification: qaFile }
 }
 
 export async function runRefactor({ config, stateStore, options, log }) {
@@ -209,77 +152,186 @@ export async function runRefactor({ config, stateStore, options, log }) {
   state.mode = 'refactor'
   state.feature = requested ?? state.feature ?? null
   state.phase = 'refactor'
+  state.failures = []
+  state.blockers = []
+  await stateStore.save(state)
 
+  const result = await runTicketQueue({
+    config,
+    stateStore,
+    options,
+    log,
+    state,
+    artifacts,
+    feature: state.feature,
+    tickets,
+    mode: 'refactor',
+    branchType: () => 'refactor',
+    doneDirFor: ticket => ticketDoneDir(config, ticket, state.feature),
+    instructions: 'Refactor only the files in the ticket scope. Preserve the user-visible behavior. Keep tests green. Do not push or merge.'
+  })
+  return { feature: state.feature, tickets: result.tickets, failures: result.failures }
+}
+
+async function runTicketQueue({ config, stateStore, options, log, state, artifacts, feature, tickets, mode, branchType, doneDirFor, instructions }) {
   const results = []
+  const failures = []
+  const failedIds = new Set()
+  const blockedIds = new Set()
+
   for (const ticket of tickets) {
-    const branches = await git.listLocalBranches(config.repoPath)
-    const branch = branchNameFor({ ...ticket, type: 'refactor' }, branches)
-    await git.fetch(config.repoPath)
-    await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
-
-    const payload = {
-      mode: 'refactor',
-      ticketId: ticket.id,
-      ticketFile: ticket.file,
-      title: ticket.title,
-      priority: ticket.priority,
-      branch,
-      baseBranch: config.baseBranch,
-      restoreCommand: config.restoreCommand,
-      buildCommand: config.buildCommand,
-      testCommand: config.testCommand,
-      smokeCommand: config.smokeCommand,
-      stateDir: config.stateDir,
-      instructions: 'Refactor only the files in the ticket scope. Preserve the user-visible behavior. Keep tests green. Do not push or merge.'
-    }
-
-    const execution = await runSession({
-      config,
-      prompt: 'autopai-dev',
-      agent: config.agents.executor,
-      payload,
-      title: `AutopAI refactor ${ticket.id}`,
-      logFile: artifacts.path(`refactor-${ticket.slug}.log`),
-      role: 'executor'
-    })
-    const blockers = await listBlockers(config)
-    if (blockers.length > 0) {
-      state.blockers = blockers.map(blocker => blocker.file)
+    const blocked = blockedDependents(tickets, [...failedIds, ...blockedIds])
+    if (blocked.has(ticket.id)) {
+      const blockedBy = ticket.dependsOn.filter(dependency => failedIds.has(dependency) || blockedIds.has(dependency))
+      const failure = { ticket: ticket.id, slug: ticket.slug, branch: null, stage: 'blocked', blockedBy, error: `A dependency failed: ${blockedBy.join(', ')}.` }
+      blockedIds.add(ticket.id)
+      failures.push(failure)
+      state.failures = failures
       await stateStore.save(state)
-      throw new Error(blockerMessage(blockers))
+      await log?.(`Skipped ${ticket.id}: a dependency failed.`)
+      continue
     }
-    if (execution.code !== 0) throw new Error(`Executor failed for refactor ticket ${ticket.id}.`)
 
-    const range = `origin/${config.baseBranch}...${branch}`
-    const commits = await git.logCommits(config.repoPath, range)
-    const gates = await runGates({ config, artifacts, prefix: `refactor-${ticket.slug}` })
-    if (!gates.ok) throw new Error(`Refactor ticket ${ticket.id} failed local gates: ${gateFailureText(gates)}`)
+    let branch = null
+    let stage = 'branch'
+    try {
+      await git.fetch(config.repoPath)
+      const resolved = await resolveTicketBranch({ config, ticket, type: branchType(ticket) })
+      branch = resolved.branch
+      if (resolved.reuse) {
+        const switched = await git.switchBranchSafe(config.repoPath, branch)
+        if (!switched) throw new Error(`Could not switch to the existing ticket branch ${branch}.`)
+        await log?.(`Reusing branch ${branch} for ${ticket.id}.`)
+      } else {
+        await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
+        await log?.(`Ticket ${ticket.id}: branch ${branch}.`)
+      }
 
-    const title = await resolveTitle({ config, branch, commits })
-    const merge = await pushOpenWaitMerge({
-      config,
-      artifacts,
-      branch,
-      baseBranch: config.baseBranch,
-      title,
-      prBody: generatePrBody({ commits, coverage: gates.coverage }),
-      state,
-      stateStore,
-      executorPrompt: 'autopai-dev',
-      executorPayload: payload,
-      coverage: gates.coverage,
-      log
-    })
+      const payload = {
+        mode,
+        ticketId: ticket.id,
+        ticketFile: ticket.file,
+        title: ticket.title,
+        type: ticket.type,
+        priority: ticket.priority,
+        branch,
+        baseBranch: config.baseBranch,
+        restoreCommand: config.restoreCommand,
+        buildCommand: config.buildCommand,
+        testCommand: config.testCommand,
+        smokeCommand: config.smokeCommand,
+        stateDir: config.stateDir,
+        instructions
+      }
 
-    await moveTicket(ticket, ticketDoneDir(config, ticket, state.feature))
-    state.scopes.push({ name: ticket.slug, branch, ticket: ticket.id, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit })
-    await stateStore.save(state)
-    results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
+      if (!resolved.reuse) {
+        stage = 'executor'
+        const execution = await runSession({
+          config,
+          prompt: 'autopai-dev',
+          agent: config.agents.executor,
+          payload,
+          title: `AutopAI ${mode} ${ticket.id}`,
+          logFile: artifacts.path(`${mode === 'refactor' ? 'refactor' : 'executor'}-${ticket.slug}.log`),
+          role: 'executor'
+        })
+        const blockers = await listBlockers(config)
+        if (blockers.length > 0) {
+          state.blockers = blockers.map(blocker => blocker.file)
+          await stateStore.save(state)
+          throw new Error(blockerMessage(blockers))
+        }
+        if (execution.code !== 0) throw new Error(`Executor failed for ${mode} ticket ${ticket.id}.`)
+      }
+
+      stage = 'commits'
+      const range = `origin/${config.baseBranch}...${branch}`
+      let commits = await git.logCommits(config.repoPath, range)
+      if (commits.length === 0) throw new Error(`Ticket ${ticket.id} produced no commits on ${branch}.`)
+
+      stage = 'gates'
+      let gates = await runGates({ config, artifacts, prefix: `${mode}-${ticket.slug}`, retries: config.localGateRetries })
+      if (!gates.ok && options.fix === true) {
+        await log?.(`Local gates failed for ${ticket.id}; running the fix attempt.`)
+        gates = await fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode })
+      }
+      if (!gates.ok) throw new Error(`Ticket ${ticket.id} failed local gates: ${gateFailureText(gates)}`)
+
+      stage = 'policy'
+      commits = await git.logCommits(config.repoPath, range)
+      if (commits.length === 0) throw new Error(`Ticket ${ticket.id} produced no commits on ${branch}.`)
+      const violations = scanBranch({ branch, commits, diff: await git.diff(config.repoPath, range) })
+      if (violations.length > 0) throw new Error(`Ticket ${ticket.id} violates policy:\n${formatViolations(violations)}`)
+
+      stage = 'merge'
+      const changedFiles = await git.diffNames(config.repoPath, range)
+      const title = await resolveTitle({ config, branch, commits })
+      const merge = await pushOpenWaitMerge({
+        config,
+        artifacts,
+        branch,
+        baseBranch: config.baseBranch,
+        title,
+        prBody: generatePrBody({ commits, coverage: gates.coverage }),
+        state,
+        stateStore,
+        executorPrompt: 'autopai-dev',
+        executorPayload: payload,
+        coverage: gates.coverage,
+        log
+      })
+
+      await moveTicket(ticket, doneDirFor(ticket))
+      state.scopes.push({ name: ticket.slug, branch, ticket: ticket.id, changedFiles, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit })
+      state.completedPhases = [...new Set([...state.completedPhases, `${mode}:${ticket.id}`])]
+      await stateStore.save(state)
+      results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
+    } catch (error) {
+      const failedStage = (state.blockers ?? []).length > 0 ? 'blocker' : stage
+      const failure = { ticket: ticket.id, slug: ticket.slug, branch, stage: failedStage, error: error.message }
+      failures.push(failure)
+      failedIds.add(ticket.id)
+      state.failures = failures
+      await stateStore.save(state)
+      await log?.(`Ticket ${ticket.id} failed at ${failedStage}: ${error.message}`)
+      if (failedStage === 'blocker' || config.continueOnFailure !== true) throw error
+    }
   }
 
-  state.phase = 'refactor-complete'
+  state.phase = failures.length === 0 ? `${mode}-complete` : mode
+  state.failures = failures
   await stateStore.save(state)
-  return { feature, tickets: results }
+  return { feature, tickets: results, failures }
+}
+
+async function fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode }) {
+  const range = `origin/${config.baseBranch}...${branch}`
+  const patchPath = await artifacts.write(`ticket-${slugify(ticket.slug)}.patch`, await git.diff(config.repoPath, range))
+  const changedFiles = await git.diffNames(config.repoPath, range)
+  const execution = await runSession({
+    config,
+    prompt: 'autopai-finish',
+    agent: config.agents.executor,
+    payload: {
+      ...payload,
+      mode: 'finish',
+      patchPath,
+      changedFiles,
+      gateFailure: gateFailureText(gates),
+      instructions: 'Fix only the local gate failure on this ticket branch. Keep the ticket scope. Do not push or merge.'
+    },
+    title: `AutopAI fix ${ticket.id} local gates`,
+    logFile: artifacts.path(`executor-gate-fix-${ticket.slug}.log`),
+    role: 'executor'
+  })
+  const blockers = await listBlockers(config)
+  if (blockers.length > 0) {
+    state.blockers = blockers.map(blocker => blocker.file)
+    await stateStore.save(state)
+    throw new Error(blockerMessage(blockers))
+  }
+  if (execution.code !== 0) throw new Error(`Executor failed while fixing local gates for ticket ${ticket.id}.`)
+  return runGates({ config, artifacts, prefix: `fix-${mode}-${ticket.slug}`, retries: 0 })
 }
 
 /**
@@ -365,7 +417,7 @@ export async function runRelease({ config, stateStore, options, log }) {
 
   const range = `origin/${config.baseBranch}...${branch}`
   const commits = await git.logCommits(config.repoPath, range)
-  const gates = await runGates({ config, artifacts, prefix: `release-v${version}` })
+  const gates = await runGates({ config, artifacts, prefix: `release-v${version}`, retries: config.localGateRetries })
   if (!gates.ok) throw new Error(`Release gates failed: ${gateFailureText(gates)}`)
   const title = await resolveTitle({ config, branch, commits })
 

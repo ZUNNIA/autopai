@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import * as git from './git.js'
 import { ensureDir, slugify, walkFiles } from './util.js'
 
 const PRIORITY_ORDER = { urgent: 0, important: 1, minor: 2 }
@@ -154,6 +155,37 @@ export function branchNameFor(ticket, existingBranches = []) {
   let index = 2
   while (existingBranches.includes(`${base}-${index}`)) index += 1
   return `${base}-${index}`
+}
+
+/**
+ * Chooses the branch for a ticket. A deterministic branch that already has
+ * commits over the base is a previous attempt at the same ticket; reuse it
+ * instead of creating a duplicate branch. A clean branch keeps the collision
+ * suffix behavior.
+ */
+export async function resolveTicketBranch({ config, ticket, type }) {
+  const branches = await git.listLocalBranches(config.repoPath)
+  const preferred = `${type}/${ticket.slug}`
+  if (branches.includes(preferred)) {
+    const ahead = await git.countCommitsOver(config.repoPath, config.baseBranch, preferred)
+    if (ahead > 0) return { branch: preferred, reuse: true, commits: ahead, branches }
+  }
+  return { branch: branchNameFor({ ...ticket, type }, branches), reuse: false, commits: 0, branches }
+}
+
+/**
+ * Returns the tickets that cannot run because a ticket they depend on failed or
+ * was already blocked. Used when a loop continues after an independent failure.
+ */
+export function blockedDependents(tickets, failedIds) {
+  const failed = new Set(failedIds)
+  const blocked = new Set()
+  for (const ticket of tickets) {
+    if (ticket.dependsOn.some(dependency => failed.has(dependency) || blocked.has(dependency))) {
+      blocked.add(ticket.id)
+    }
+  }
+  return blocked
 }
 
 /**

@@ -87,7 +87,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
 
   let evidenceFile = artifacts.path('evidence.json')
   if (!state.completedPhases.includes('identify:evidence')) {
-    const gates = await runGates({ config, artifacts, prefix: 'evidence' })
+    const gates = await runGates({ config, artifacts, prefix: 'evidence', retries: config.localGateRetries })
     await log?.(`Evidence gates: ${gates.ok ? 'passed' : gates.reason}`)
 
     const runtimeLogs = await collectRuntimeLogs(config, artifacts)

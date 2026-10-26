@@ -58,7 +58,12 @@ async function runSequence({ config, stateStore, options, log }) {
   const results = []
   for (const [index, phase] of phases.entries()) {
     log(`Running phase ${phase}.`)
-    results.push(await runPhase(phase, { config, stateStore, options, log }))
+    const result = await runPhase(phase, { config, stateStore, options, log })
+    results.push(result)
+    if (result.failures?.length > 0) {
+      log(`${result.failures.length} ticket(s) failed in ${phase}. Fix them with autopai resume --fix or retry with autopai resume.`)
+      return { from, to, results, failures: result.failures, failedPhase: phase }
+    }
     const gate = gateAfterPhase(phase)
     if (gate && pauseAfter.includes(gate) && index < phases.length - 1) {
       const next = phases[index + 1]
@@ -114,7 +119,7 @@ async function resumeRun({ config, stateStore, options, log }) {
     const results = []
     while (next.action !== 'none') {
       log(describeAction(next))
-      results.push(await runAction(next, {
+      const result = await runAction(next, {
         config,
         stateStore,
         log,
@@ -125,7 +130,12 @@ async function resumeRun({ config, stateStore, options, log }) {
           base: state.baseBranch,
           feature: next.feature ?? state.feature
         }
-      }))
+      })
+      results.push(result)
+      if (result.failures?.length > 0) {
+        process.stdout.write(`Paused with ${result.failures.length} failed ticket(s). Run autopai resume --fix to fix them or autopai resume to retry.\n`)
+        break
+      }
       state = await stateStore.load()
       next = nextPhase(state, effectivePause)
     }
@@ -191,6 +201,7 @@ function printStatus(state, config) {
     mergeCommit: state.mergeCommit,
     scopes: state.scopes?.length ?? 0,
     completedPhases: state.completedPhases,
+    failures: state.failures ?? [],
     gate,
     paused: gate ? config.pauseAfter.includes(gate) : false,
     pauseAfter: config.pauseAfter
@@ -210,9 +221,9 @@ Usage:
   autopai dev --repo <path> [--feature <slug>]
   autopai refactor --repo <path> [--feature <slug>]
   autopai release --repo <path> --version <x.y.z>
-  autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [phase options]
+  autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [phase options]
   autopai status --repo <path>
-  autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>]
+  autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
   autopai abort --repo <path>
 
 Phase arguments are optional: prepare, approve, and dev resolve the feature
@@ -227,6 +238,9 @@ promote, or refactor. pauseAfter defaults to backlog, plan, and qa. resume at a
 gate does not approve it: pass --approve <gate> only when you accept that exact
 gate, or --auto to skip every human pause. --pause-after overrides the list for
 one run. Gates: backlog, plan, qa, findings, promotion, refactor.
+
+Local gate failures are retried once by default. --fix adds one executor fix
+attempt for a failed ticket before recording the failure.
 `)
 }
 
