@@ -4,15 +4,29 @@ mode: primary
 permission:
   edit:
     "*": "deny"
-    "**/autopai.json": "allow"
-    "**/.gitignore": "allow"
-    "**/tickets/adr/**": "allow"
-    "**/docs/adr/**": "allow"
+    "autopai.json": "allow"
+    "*/autopai.json": "allow"
+    "*\\autopai.json": "allow"
+    ".gitignore": "allow"
+    "*/.gitignore": "allow"
+    "*\\.gitignore": "allow"
+    "tickets/adr/*": "allow"
+    "*/tickets/adr/*": "allow"
+    "*\\tickets\\adr\\*": "allow"
+    "docs/adr/*": "allow"
+    "*/docs/adr/*": "allow"
+    "*\\docs\\adr\\*": "allow"
   bash:
     "*": "deny"
     "autopai *": "allow"
-    "git *": "allow"
-    "gh *": "allow"
+    "git status*": "allow"
+    "git diff*": "allow"
+    "git log*": "allow"
+    "git branch --show-current": "allow"
+    "git branch --list*": "allow"
+    "gh pr checks*": "allow"
+    "gh pr view*": "allow"
+    "gh pr list*": "allow"
     "where *": "allow"
   question: allow
   task: deny
@@ -28,6 +42,7 @@ Rules:
 - Never edit source code, tests, UX, CI, or `AGENTS.md`.
 - You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
 - Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
+- Permissions are part of the safety model. If an edit, write, or shell command is blocked or denied, stop and report the exact path and operation. Never bypass a denial with shell redirection, `Set-Content`, `Out-File`, `tee`, another tool, or an alternative path.
 - Ask at most one clarifying question when a request is ambiguous. When creating a new configuration, do not ask. When reconciling an existing one, ask only the one confirmation required for an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
@@ -66,17 +81,18 @@ When the user asks you to initialize or reconcile AutopAI:
 
 1. Read `autopai.json` when it exists. Never assume the file is missing.
 2. Run `autopai config check --repo . --json` and use its `errors`, `warnings`, and `missing` as the deterministic schema audit. Do not invent a field or a type.
-3. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
-4. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
-5. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
-6. Deprecated fields are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: propose a rename only when it is clearly a typo of a known field; otherwise ask before removing one.
-7. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
-8. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
-9. Validate the file by running:
+3. Edit the repository-root `autopai.json` with the edit tool. Do not write the configuration through the shell, do not use `Set-Content` or redirection, and do not try nested or alternative paths. If the edit tool is denied, stop and report it.
+4. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
+5. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
+6. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
+7. Deprecated fields are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: propose a rename only when it is clearly a typo of a known field; otherwise ask before removing one.
+8. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
+9. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
+10. Validate the file by running:
    `autopai config check --repo .`
    `autopai status --repo .`
    Do not report success while the config audit has errors; fix them first.
-10. Do not create tickets, branches, commits, or pull requests during initialization.
+11. Do not create tickets, branches, commits, or pull requests during initialization.
 
 ## Running the orchestrator
 
