@@ -1,63 +1,7 @@
 import path from 'node:path'
-import { DEFAULT_PAUSE_AFTER, normalizePauseAfter } from './pauses.js'
+import { DEFAULT_TICKET_DIRS, DEFAULTS } from './config-schema.js'
+import { normalizePauseAfter } from './pauses.js'
 import { expandEnv, exists, readJson, assert } from './util.js'
-
-const DEFAULT_TICKET_DIRS = {
-  backlog: 'tickets/backlog',
-  readyForDev: 'tickets/ready-for-dev',
-  identified: 'tickets/identified',
-  readyForRefactor: 'tickets/ready-for-refactor',
-  ux: 'tickets/ux',
-  qa: 'tickets/qa',
-  done: 'tickets/done'
-}
-
-const DEFAULT_PROTECTED_PATHS = [
-  '.github/**',
-  'AGENTS.md',
-  'autopai.json'
-]
-
-const DEFAULTS = {
-  runnerOptions: {},
-  protectedPaths: DEFAULT_PROTECTED_PATHS,
-  baseBranch: 'main',
-  releaseBranch: 'main',
-  requiredChecks: [],
-  ignoredChecks: [],
-  restoreCommand: null,
-  buildCommand: null,
-  testCommand: null,
-  smokeCommand: null,
-  coverageThreshold: null,
-  auditChunkFiles: 40,
-  localGateRetries: 1,
-  continueOnFailure: true,
-  maxAttempts: 3,
-  maxMinutes: 240,
-  commandTimeoutMinutes: 30,
-  sessionTimeoutMinutes: 90,
-  checkPollSeconds: 30,
-  checkTimeoutMinutes: 30,
-  autoMerge: true,
-  approvalRequired: true,
-  pauseAfter: [...DEFAULT_PAUSE_AFTER],
-  prTitle: null,
-  runtimeLogs: [],
-  commitTypes: ['feat', 'fix', 'refactor', 'perf', 'test', 'docs', 'chore'],
-  agents: {
-    executor: 'executor',
-    planner: 'planner',
-    auditor: 'auditor',
-    operator: 'autopai'
-  },
-  models: {
-    executor: null,
-    planner: null,
-    auditor: null,
-    operator: null
-  }
-}
 
 /**
  * Loads and normalizes the per-repository AutopAI configuration.

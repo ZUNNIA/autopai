@@ -54,6 +54,7 @@ The prompts, phases, state, policy, and merge logic do not change.
 - \`autopai status --repo <target>\` loads the generated configuration without errors.
 - \`autopai adopt --repo <target> --branch <branch> --dry-run\` reports the plan without pushing or merging.
 - \`autopai identify --repo <target> --scope branch:<branch> --dry-run\` reports the scope without running the auditor.
+- \`autopai config check --repo <target>\` reports the configuration schema state without writing.
 - No file outside the target repository state directory changed during a dry run.
 
 ## Source inventory

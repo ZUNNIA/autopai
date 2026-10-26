@@ -47,6 +47,7 @@ The prompts, phases, state, policy, and merge logic do not change.
 - `autopai status --repo <target>` loads the generated configuration without errors.
 - `autopai adopt --repo <target> --branch <branch> --dry-run` reports the plan without pushing or merging.
 - `autopai identify --repo <target> --scope branch:<branch> --dry-run` reports the scope without running the auditor.
+- `autopai config check --repo <target>` reports the configuration schema state without writing.
 - No file outside the target repository state directory changed during a dry run.
 
 ## Source inventory
@@ -101,6 +102,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/blockers.js`
 - `src/lib/chunks.js`
 - `src/lib/codefiles.js`
+- `src/lib/config-audit.js`
+- `src/lib/config-schema.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
 - `src/lib/defaults.js`
@@ -150,6 +153,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/chunks.test.js`
 - `test/cli.test.js`
 - `test/codefiles.test.js`
+- `test/config-audit.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`
