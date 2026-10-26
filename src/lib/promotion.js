@@ -1,4 +1,20 @@
 /**
+ * Returns the finding groups recorded by the current identify or promotion
+ * state, or null when the caller must fall back to the identified directory.
+ * An empty array is a real result: a filtered audit that found nothing must not
+ * make promotion walk older findings.
+ */
+export function stateFindingGroups(state) {
+  const scopes = Array.isArray(state?.scopes) ? state.scopes : []
+  if (scopes.length === 0) return null
+  if (state.mode !== 'identify' && state.mode !== 'promote') return null
+  return scopes.map(scope => ({
+    name: String(scope.name),
+    findings: (scope.tickets ?? []).filter(file => String(file).endsWith('.md'))
+  }))
+}
+
+/**
  * Selects the audit chunks whose promotion still has work. An explicit chunk
  * must exist, and chunks already recorded as promoted are skipped, so an
  * interrupted promotion resumes without redoing finished work.

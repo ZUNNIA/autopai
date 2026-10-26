@@ -98,12 +98,27 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
+| Audit filtered debt | `/autopai-identify "solo code smell urgent"` | "identify only urgent code smells" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
+| Refactor filtered debt | `/autopai-refactor "solo missing documentation minor"` | "resolve only minor missing documentation" |
 | Repair failed tickets | `/autopai-resume --fix` | "fix the failures and continue" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
 The operator agent translates the request and confirms ambiguous interpretations; it works in any language. Explicit flags run verbatim; the CLI underneath is deterministic. If a request does not match the command you opened, the operator stops and points to the right phase. A release never resolves technical debt.
+
+## Filtering technical debt
+
+`identify`, `promote`, and `refactor` accept two optional filters:
+
+```text
+autopai identify --repo . --classification code-smell --priority urgent
+autopai refactor --repo . --classification missing-documentation --priority minor
+```
+
+`--classification` accepts `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, and `missing-documentation`. `--priority` accepts `urgent`, `important`, and `minor`. Both accept comma-separated or repeated values; values inside one filter are OR, and the two filters combine with AND. An unknown value fails with the supported list.
+
+The identify filter reaches the auditor and the promotion, so non-matching findings are not documented as tickets. The refactor filter selects pending tickets; done tickets are never re-run. If no ticket matches, the run reports zero and does not drain the queue. If a selected ticket depends on a pending ticket outside the filter, the run stops and lists the dependency. Filters persist through `autopai resume`.
 
 ## Requirements
 

@@ -14,8 +14,9 @@ Examples:
 - `--from prepare --to prepare --description "<idea>"`
 - `--from prepare --to refactor`
 - `--from approve --to dev`
-- `--from identify --to identify --scope branch:<name>`
-- `--from refactor --to refactor`
+- `--from identify --to identify --scope branch:<name> --classification code-smell --priority urgent`
+- `--from refactor --to refactor --classification lack-of-coverage`
+- `--from refactor --to refactor --classification missing-documentation --priority minor`
 - `--from release --to release --version 1.2.3`
 - `--from adopt --to adopt --branch <name>`
 - `--from prepare --to refactor --auto`
@@ -27,4 +28,4 @@ The default pause list is `backlog`, `plan`, and `qa`. `--auto` skips every huma
 
 A failed ticket is recorded and the loop continues with independent tickets. Its branch is reused on the next run. Add `--fix` to run one executor repair attempt for a local gate failure before recording it. The run stops with the failure summary; tell the user to run `/autopai-resume --fix` to repair or `/autopai-resume` to retry.
 
-The feature and scope arguments are optional: prepare, approve, and dev resolve them from the previous run state or the latest ticket directory, and identify audits the scopes recorded by the last run when no scope is given. Refactor drains the ready-for-refactor queue unless `--feature` filters it by front matter. Report the CLI output verbatim. If the command fails, report the exact error and stop.
+The feature and scope arguments are optional: prepare, approve, and dev resolve them from the previous run state or the latest ticket directory, and identify audits the scopes recorded by the last run when no scope is given. Refactor drains the ready-for-refactor queue unless `--feature` filters it by front matter. `--classification` and `--priority` restrict the debt audit, its promotion, and the pending refactor queue; they accept comma-separated values and combine with AND. If none matches, report zero. If a selected ticket depends on a pending ticket outside the filter, report the dependency error. Report the CLI output verbatim. If the command fails, report the exact error and stop.

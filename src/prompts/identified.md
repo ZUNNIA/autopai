@@ -4,7 +4,7 @@ The orchestrator invoked you with this JSON payload:
 
 {{PAYLOAD}}
 
-The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `outputDir`.
+The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, `outputDir`, and `filters`.
 
 ## PHASE 0: Evidence and Scope (MANDATORY)
 1. Read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
@@ -13,6 +13,13 @@ The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, and `
 
 ## PHASE 1: Strict Verification
 Obtain exact line numbers, actual function or class names, and the directly affected files from the current code. Never invent paths or lines. If a datapoint cannot be verified, say so instead of guessing.
+
+### Matching the filter
+`filters.classifications` and `filters.priorities` may be empty. When a list is
+not empty, document only debts whose checked classification or priority is in
+that list. Both lists apply together. Never change a classification or priority
+to make a debt fit the filter. If no debt matches, write no files and state it
+in your final message.
 
 ## PHASE 2: Writing
 For each debt, create one independent Markdown file in English under the output directory, using the repository naming convention or `[number]-[short-name].md`.
@@ -77,4 +84,4 @@ Related issues, previous pull requests, and resources. Never reference a ticket 
 5. **NO DIAGNOSTIC REPORT:** do not create a separate diagnostics artifact. The evidence is an input.
 6. **LOCAL ONLY:** these tickets are local artifacts. Do not commit, push, or reference them from Git.
 
-End with a short summary: scope, files written, and debts found per severity.
+End with a short summary: scope, files written, debts found per priority, and any filter that matched nothing.

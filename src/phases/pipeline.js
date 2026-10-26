@@ -8,9 +8,10 @@ import { generatePrBody, ticketTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
-import { blockedDependents, collectManualVerification, filterTicketsByFeature, listTickets, moveTicket, orderTickets, resolveTicketBranch, ticketDoneDir } from '../lib/tickets.js'
+import { blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, listTickets, moveTicket, orderTickets, resolveTicketBranch, selectTickets, ticketDoneDir } from '../lib/tickets.js'
+import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '../lib/filters.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
-import { selectPromotionGroups } from '../lib/promotion.js'
+import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
 import { ensureDir, slugify } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
@@ -142,17 +143,40 @@ export async function runRefactor({ config, stateStore, options, log }) {
   const requested = String(options.feature ?? '').trim() || null
   const queueDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
   const doneRoot = path.join(config.repoPath, config.ticketDirs.done)
-  const tickets = orderTickets(filterTicketsByFeature(await listTickets(queueDir), requested), { completed: await listTickets(doneRoot) })
-  if (tickets.length === 0) {
+  const explicit = options.classification !== undefined || options.priority !== undefined
+  const filters = explicit
+    ? normalizeFilters(options)
+    : (options.resume === true ? normalizeFilters(loaded?.filters ?? {}) : { classifications: [], priorities: [] })
+  const queue = await listTickets(queueDir)
+  const done = await listTickets(doneRoot)
+  const candidates = filterTickets(filterTicketsByFeature(queue, requested), filters)
+
+  if (candidates.length === 0) {
+    if (!hasFilters(filters)) {
+      const suffix = requested ? ` for feature ${requested}` : ''
+      throw new Error(`No ready-for-refactor tickets found in ${queueDir}${suffix}.`)
+    }
+    const state = loaded ?? await stateStore.create('refactor', { feature: requested, filters })
+    state.mode = 'refactor'
+    state.feature = requested ?? state.feature ?? null
+    state.phase = 'refactor-complete'
+    state.filters = filters
+    state.failures = []
+    state.blockers = []
+    await stateStore.save(state)
     const suffix = requested ? ` for feature ${requested}` : ''
-    throw new Error(`No ready-for-refactor tickets found in ${queueDir}${suffix}.`)
+    const message = `No ready-for-refactor tickets match ${describeFilters(filters)}${suffix}.`
+    await log?.(message)
+    return { feature: state.feature, tickets: [], failures: [], filters, message }
   }
 
-  const state = loaded ?? await stateStore.create('refactor', { feature: requested })
+  const tickets = selectTickets({ allTickets: queue, tickets: candidates, completed: done })
+  const state = loaded ?? await stateStore.create('refactor', { feature: requested, filters })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
   state.mode = 'refactor'
   state.feature = requested ?? state.feature ?? null
+  state.filters = filters
   state.phase = 'refactor'
   state.failures = []
   state.blockers = []
@@ -172,7 +196,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
     doneDirFor: ticket => ticketDoneDir(config, ticket, state.feature),
     instructions: 'Refactor only the files in the ticket scope. Preserve the user-visible behavior. Keep tests green. Do not push or merge.'
   })
-  return { feature: state.feature, tickets: result.tickets, failures: result.failures }
+  return { feature: state.feature, tickets: result.tickets, failures: result.failures, filters }
 }
 
 async function runTicketQueue({ config, stateStore, options, log, state, artifacts, feature, tickets, mode, branchType, doneDirFor, instructions }) {
@@ -343,10 +367,32 @@ async function fixLocalGates({ config, stateStore, state, artifacts, ticket, bra
 export async function runPromote({ config, stateStore, options, log }) {
   const state = (await stateStore.load()) ?? await stateStore.create('promote', {})
   const feature = String(options.feature ?? state.feature ?? 'tech-debt').trim() || 'tech-debt'
+  const explicit = options.classification !== undefined || options.priority !== undefined
+  const audited = state.mode === 'identify' || state.mode === 'promote'
+  const filters = explicit
+    ? normalizeFilters(options)
+    : normalizeFilters(audited ? state.filters ?? {} : {})
+  state.filters = filters
   const groups = await resolveFindingGroups({ config, state })
-  if (groups.length === 0) throw new Error('No Identified tickets were found. Run identify first.')
+  const filteredGroups = []
+  for (const group of groups) {
+    const findings = await filterFindingFiles(group.findings, filters)
+    if (findings.length > 0) filteredGroups.push({ ...group, findings })
+  }
+  if (groups.length === 0 || filteredGroups.length === 0) {
+    if (!hasFilters(filters)) throw new Error('No Identified tickets were found. Run identify first.')
+    state.mode = 'promote'
+    state.phase = 'promoted'
+    state.feature = feature
+    state.completedPhases = [...new Set([...state.completedPhases, 'promote'])]
+    await stateStore.save(state)
+    const message = `No Identified findings match ${describeFilters(filters)}.`
+    await log?.(message)
+    const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
+    return { feature, outputDir, chunks: [], tickets: 0, filters, message }
+  }
 
-  const pending = selectPromotionGroups(groups, { chunk: options.chunk, completedPhases: state.completedPhases })
+  const pending = selectPromotionGroups(filteredGroups, { chunk: options.chunk, completedPhases: state.completedPhases })
   const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
   await ensureDir(outputDir)
   const artifacts = new Artifacts(config, state.runId)
@@ -381,7 +427,7 @@ export async function runPromote({ config, stateStore, options, log }) {
   await stateStore.save(state)
   if (pending.length === 0) await log?.('Every promotion chunk was already completed.')
   await log?.(`Ready-for-refactor tickets at ${outputDir}.`)
-  return { feature, outputDir, chunks: sessions, tickets: tickets.length }
+  return { feature, outputDir, chunks: sessions, tickets: tickets.length, filters }
 }
 
 export async function runRelease({ config, stateStore, options, log }) {
@@ -457,13 +503,8 @@ function resolvePrepareFeature(options) {
 }
 
 async function resolveFindingGroups({ config, state }) {
-  const groups = (state.scopes ?? [])
-    .map(scope => ({
-      name: String(scope.name),
-      findings: (scope.tickets ?? []).filter(file => String(file).endsWith('.md'))
-    }))
-    .filter(group => group.findings.length > 0)
-  if (groups.length > 0) return groups
+  const recorded = stateFindingGroups(state)
+  if (recorded !== null) return recorded.filter(group => group.findings.length > 0)
 
   const files = await listMarkdown(path.join(config.repoPath, config.ticketDirs.identified))
   const byScope = new Map()

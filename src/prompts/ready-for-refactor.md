@@ -32,10 +32,14 @@ Every ticket starts with this front matter so the orchestrator can order tickets
 id: [unique-short-id]
 feature: [feature-slug]
 type: refactor
+classification: [code-smell|unnecessary-complexity|lack-of-coverage|outdated-library|architecture|missing-documentation]
 priority: [urgent|important|minor]
 depends_on: [id-or-empty-list]
 ---
 ```
+
+Copy the checked classification and priority from the Identified document. If
+the finding has no checked classification, use `unspecified`; never invent one.
 
 Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
 

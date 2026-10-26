@@ -9,6 +9,8 @@ import { scopesFromState, lastMergedScopes } from '../lib/defaults.js'
 import { pendingScopes } from '../lib/resume.js'
 import { listCodeFiles } from '../lib/codefiles.js'
 import { chunkCodeFiles } from '../lib/chunks.js'
+import { normalizeFilters } from '../lib/filters.js'
+import { filterFindingFiles } from '../lib/tickets.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
 /**
@@ -25,6 +27,9 @@ export async function runIdentify({ config, stateStore, options, log }) {
 
   const feature = String(options.feature ?? previous?.feature ?? '').trim() || null
   const state = resuming ? previous : await stateStore.create('identify', { feature })
+  const filters = normalizeFilters(resuming ? state.filters : options)
+  state.filters = filters
+  await stateStore.save(state)
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
@@ -32,7 +37,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
   if (resuming) {
     resolvedScopes = []
     for (const scope of state.scopes ?? []) {
-      const tickets = await walkFiles(
+      const written = await walkFiles(
         path.join(config.repoPath, config.ticketDirs.identified, scope.name),
         file => file.endsWith('.md')
       )
@@ -41,7 +46,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
         kind: scope.kind,
         changedFiles: scope.changedFiles ?? [],
         patchPath: scope.patch ?? null,
-        tickets
+        tickets: await filterFindingFiles(written, filters)
       })
     }
     await log?.(`Resuming identify with ${resolvedScopes.length} recorded scopes.`)
@@ -63,6 +68,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
   if (options.dryRun) {
     return {
       dryRun: true,
+      filters,
       scopes: resolvedScopes.map(scope => ({ name: scope.name, kind: scope.kind, changedFiles: scope.changedFiles.length })),
       message: 'Dry run: no evidence collection, no auditor session, and no ticket writes were performed.'
     }
@@ -115,7 +121,8 @@ export async function runIdentify({ config, stateStore, options, log }) {
       changedFiles: resolved.changedFiles,
       evidenceFile,
       outputDir,
-      instructions: 'Write one Identified ticket per debt under outputDir. No source edits, no UX changes, no diagnostic report.'
+      filters,
+      instructions: 'Write one Identified ticket per debt under outputDir. Only document debts that match the filters. No source edits, no UX changes, no diagnostic report.'
     }
     const execution = await runSession({
       config,
@@ -129,7 +136,10 @@ export async function runIdentify({ config, stateStore, options, log }) {
     if (execution.code !== 0) {
       throw new Error(`Auditor failed for scope ${resolved.name} with exit code ${execution.code}.`)
     }
-    resolved.tickets = await walkFiles(outputDir, file => file.endsWith('.md'))
+    const written = await walkFiles(outputDir, file => file.endsWith('.md'))
+    resolved.tickets = await filterFindingFiles(written, filters)
+    const excluded = written.length - resolved.tickets.length
+    if (excluded > 0) await log?.(`Scope ${resolved.name}: ${excluded} findings excluded by the filter.`)
     state.completedPhases = [...new Set([...state.completedPhases, `identify:${resolved.name}`])]
     await stateStore.save(state)
     await log?.(`Scope ${resolved.name}: ${resolved.tickets.length} Identified tickets.`)
@@ -153,6 +163,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
 
   return {
     runId: state.runId,
+    filters,
     scopes: resolvedScopes.map(scope => ({ name: scope.name, tickets: (scope.tickets ?? []).length, files: scope.changedFiles.length })),
     evidence: evidenceFile,
     localOnly: true

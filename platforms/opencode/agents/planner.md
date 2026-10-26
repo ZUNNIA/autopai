@@ -32,4 +32,5 @@ Rules:
 - Research external APIs, libraries, and services with official sources before writing a backlog. The payload usually includes a brief path with the agreed scope.
 - Write artifacts in English. Do not detect or switch languages.
 - Ready-for-dev tickets must include front matter with `id`, `feature`, `type`, `priority`, and `depends_on` so the orchestrator can order them without ticket identifiers in Git.
+- Ready-for-refactor tickets must also include `classification`, copied from the checked classification of the Identified finding, so the debt filters can select them without reading Git.
 - Never reference ticket files or ADR numbers from code snippets, commit examples, or branch names inside the artifacts.

@@ -260,11 +260,14 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 3. Run the local gates and collect runtime logs configured in `runtimeLogs` (the five most recent files per pattern).
 4. Write `evidence.json` with the gate result, coverage, and log copies.
 5. Run the auditor once per scope. Each run writes one file per debt under `tickets/identified/<scope>/`.
-6. Verify that no tracked file changed during the run. Untracked files never block the phase.
+6. Apply the optional debt filters. `--classification <list>` and `--priority <list>` reach the auditor, and the orchestrator verifies every written finding against the selected values before recording it. Non-matching files stay on disk but are not promoted by this run. If nothing matches, identify succeeds with zero findings and does not fall back to older findings.
+7. Verify that no tracked file changed during the run. Untracked files never block the phase.
 
 **Dry run.** `--dry-run` resolves the scopes and reports the file counts without collecting evidence or running the auditor.
 
-**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Promotion is automatic: the `promote` phase turns every finding into a ready-for-refactor ticket, and the refactor loop executes them. Starting identify explicitly approves the `qa` gate; review `tickets/qa/<feature>.md` first. If `findings` is in `pauseAfter`, identify stops after the audit and `resume --approve findings` continues with promotion. If `promotion` is in `pauseAfter`, review the ready-for-refactor tickets before `resume --approve promotion`.
+**Debt filters.** `--classification` accepts `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, and `missing-documentation`. `--priority` accepts `urgent`, `important`, and `minor`. Both accept comma-separated or repeated values; multiple values in one flag are OR, and the two dimensions combine with AND. The filter is stored in the run state, so `resume` and the following promotion keep it. An unknown value fails before any session starts.
+
+**Output.** Identified tickets are local. Nothing is committed, pushed, or referenced from Git. Promotion is automatic: the `promote` phase turns every matching finding into a ready-for-refactor ticket, and the refactor loop executes them. Starting identify explicitly approves the `qa` gate; review `tickets/qa/<feature>.md` first. If `findings` is in `pauseAfter`, identify stops after the audit and `resume --approve findings` continues with promotion. If `promotion` is in `pauseAfter`, review the ready-for-refactor tickets before `resume --approve promotion`.
 
 ### 4.6 promote
 
@@ -273,18 +276,19 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 **Flow.**
 
 1. Resolve the `feature` (explicit, or the feature of the last run, or `tech-debt`). The feature labels the tickets and the done directory; it does not create a subdirectory in the refactor queue.
-2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`.
-3. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets directly under `tickets/ready-for-refactor/` with front matter, prefixed with the chunk name so chunks never collide.
-4. Refuse to continue when no Identified ticket exists.
-5. Record every completed chunk in the state. An interrupted promotion resumes with `autopai resume`; `autopai promote --chunk <name>` processes one pending chunk without touching the rest.
+2. Collect the Identified tickets of the last `identify` run from the state. When the state does not reference them, walk `tickets/identified/**`. When the state belongs to a filtered identify, only its matching findings are considered; the phase never falls back to every file on disk just because a filtered audit found nothing.
+3. Apply the same debt filters to the findings when they are supplied directly to `promote` or when the run state carries them.
+4. Run the planner once per audit chunk with the `ready-for-refactor` prompt. Each session writes its tickets directly under `tickets/ready-for-refactor/` with front matter, prefixed with the chunk name so chunks never collide.
+5. Refuse to continue when no Identified ticket exists and no filter is active. With an active filter that matches nothing, the phase succeeds with zero tickets and leaves older findings untouched.
+6. Record every completed chunk in the state. An interrupted promotion resumes with `autopai resume`; `autopai promote --chunk <name>` processes one pending chunk without touching the rest.
 
-Promotion is automatic: the auditor documents, the planner promotes, and every finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect. If `promotion` is in `pauseAfter`, the phase stops after writing the tickets; review them and run `resume --approve promotion` before refactor.
+Promotion is automatic: the auditor documents, the planner promotes, and every matching finding becomes a ticket. Generated tickets preserve the user-visible behavior; the UX stays frozen unless the finding documents a UX defect. If `promotion` is in `pauseAfter`, the phase stops after writing the tickets; review them and run `resume --approve promotion` before refactor.
 
 ### 4.7 refactor
 
 **Purpose.** Execute ready-for-refactor tickets with the same gates as `dev`.
 
-**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/` and every branch is forced to the `refactor` type. Starting refactor explicitly approves the `promotion` gate after the ready-for-refactor tickets have been reviewed. It drains the queue; `--feature <slug>` limits the run to tickets whose front matter matches. Tickets move to `tickets/done/<feature>/` using their own front matter (fallback: the run feature, then `tech-debt`). Legacy `tickets/ready-for-refactor/<feature>/` subfolders are read recursively. If `refactor` is in `pauseAfter`, the phase stops at `refactor-complete` for review before release.
+**Flow.** Identical to `dev` except the source directory is `tickets/ready-for-refactor/` and every branch is forced to the `refactor` type. Starting refactor explicitly approves the `promotion` gate after the ready-for-refactor tickets have been reviewed. It drains the queue; `--feature <slug>` limits the run to tickets whose front matter matches. `--classification` and `--priority` select only pending tickets whose debt classification and priority match; done tickets are never re-run. If no ticket matches an active filter, the phase succeeds with zero tickets and a clear message. If a selected ticket depends on a pending ticket outside the filter, the phase stops before creating a branch and lists the dependency; include it in the filter or run without the filter. Tickets move to `tickets/done/<feature>/` using their own front matter (fallback: the run feature, then `tech-debt`). Legacy `tickets/ready-for-refactor/<feature>/` subfolders are read recursively. Filters persist through `resume` for the failed-ticket retry. If `refactor` is in `pauseAfter`, the phase stops at `refactor-complete` for review before release.
 
 ### 4.8 release
 
@@ -333,16 +337,17 @@ Every ready-for-dev and ready-for-refactor ticket starts with:
 id: short-unique-id
 feature: feature-slug
 type: feat|fix|refactor|perf|test|docs|chore
+classification: code-smell|unnecessary-complexity|lack-of-coverage|outdated-library|architecture|missing-documentation
 priority: urgent|important|minor
 depends_on: []
 ---
 ```
 
-The orchestrator reads this front matter, not the ticket identifiers, so Git artifacts stay free of ticket references. `id` is required; `type` defaults to `feat`; `priority` defaults to `important`; unknown priorities fall back to `important`. `depends_on` accepts an inline list `[a, b]` or a YAML block list.
+The orchestrator reads this front matter, not the ticket identifiers, so Git artifacts stay free of ticket references. `id` is required; `type` defaults to `feat`; `priority` defaults to `important`; unknown priorities fall back to `important`. `classification` is optional for feature tickets and is written by the refactor planner from the Identified finding; when it is absent, the orchestrator falls back to the checked classification in the ticket body. `depends_on` accepts an inline list `[a, b]` or a YAML block list.
 
 ### 5.2 Ordering and branch naming
 
-Tickets run in dependency order. The order is a topological sort of `depends_on`, with ties broken by priority (`urgent`, then `important`, then `minor`) and then by file name. A dependency already present in the done directory is satisfied. An unknown pending dependency or a dependency cycle stops the phase with an error before any branch is created.
+Tickets run in dependency order. The order is a topological sort of `depends_on`, with ties broken by priority (`urgent`, then `important`, then `minor`) and then by file name. A dependency already present in the done directory is satisfied. An unknown pending dependency or a dependency cycle stops the phase with an error before any branch is created. When a classification or priority filter is active, a pending dependency that the filter excludes also stops the phase before any branch is created; the error names both tickets so the filter can be widened.
 
 The branch name comes from the ticket type and the file name without its numeric prefix, for example `feat/settings-panel`. When the branch already exists locally, `-2`, `-3`, and so on are appended. The refactor loop always uses the `refactor` type.
 
@@ -352,7 +357,7 @@ The branch name comes from the ticket type and the file name without its numeric
 - Review the ready-for-dev tickets at the `plan` gate before running `dev`.
 - Review `tickets/qa/<feature>.md` at the `qa` gate before running identify.
 - If a ticket fails, review `state.failures` and the preserved branch. Run `resume` to retry, or `resume --fix` to attempt a repair. Do not start a duplicate branch manually.
-- Edit `depends_on`, `priority`, or `type` front matter to change execution order or branch type.
+- Edit `depends_on`, `priority`, `classification`, or `type` front matter to change execution order, debt filters, or branch type.
 - Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/` with the required front matter.
 - Add `findings`, `promotion`, or `refactor` to `pauseAfter` if you want to review the audit output, the ready-for-refactor tickets, or the refactor changes.
 
@@ -480,20 +485,22 @@ Commands are argument arrays, never shell strings, so no shell quoting or inject
 ```
 autopai help
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
-autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--dry-run]
-autopai promote --repo <path> [--feature <slug>] [--chunk <name>]
+autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
+autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
 autopai prepare --repo <path> [--feature <slug>] [--description <text>]
 autopai approve --repo <path> [--feature <slug>]
 autopai dev --repo <path> [--feature <slug>]
-autopai refactor --repo <path> [--feature <slug>]
+autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
 autopai release --repo <path> --version <x.y.z>
-autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [phase options]
+autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
 autopai status --repo <path>
 autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
 autopai abort --repo <path>
 ```
 
-**Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope` can be repeated.
+**Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope`, `--classification`, and `--priority` can be repeated; the debt filters also accept comma-separated lists.
+
+**Debt filters.** `--classification` accepts `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, and `missing-documentation`. `--priority` accepts `urgent`, `important`, and `minor`. Values in one flag are OR; the two flags combine with AND. They apply to `identify`, `promote`, and `refactor`, never to `--feature`. The identify filter reaches the auditor and the promotion; the refactor filter selects only pending tickets. The run state stores the filters so `resume` keeps them; a new refactor command without filters drains the queue.
 
 **Human gate flags.** `--approve <gate>` passes one gate and continues to the next configured gate. `--auto` skips every human gate. `--pause-after <gates>` overrides `pauseAfter` for one run; the value is a comma-separated gate list or an empty string to disable every human pause. These flags never disable the automatic gates.
 
@@ -519,6 +526,7 @@ autopai abort --repo <path>
   "scopes": 0,
   "completedPhases": [],
   "failures": [],
+  "filters": { "classifications": [], "priorities": [] },
   "gate": "qa",
   "paused": true,
   "pauseAfter": ["backlog", "plan", "qa"]
@@ -554,7 +562,7 @@ tickets/.autopai/
 
 **Tool sessions.** The OpenCode runner deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. Set `runnerOptions.keepSessions` to true to keep the sessions in the tool history.
 
-**state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`.
+**state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `filters`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`. `filters` holds the canonical `classifications` and `priorities` arrays of the current run.
 
 **Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit.
 
@@ -743,6 +751,15 @@ autopai run --repo . --from refactor --to refactor --feature settings-panel
 
 Each refactor ticket becomes a `refactor/<slug>` branch through the same gates and merge rules.
 
+To restrict the debt, add the filters to identify or refactor:
+
+```
+autopai identify --repo . --last 3 --classification code-smell --priority urgent
+autopai refactor --repo . --classification missing-documentation --priority minor
+```
+
+The first command audits only the last three merged pull requests and records only urgent code smells. The second refactors only pending missing-documentation tickets with minor priority. Done tickets are not re-run. If the filter excludes a pending dependency, the refactor stops and lists it instead of silently skipping the work.
+
 4. Release:
 
 ```
@@ -779,6 +796,12 @@ A dev ticket needs a new pattern the repository has not decided yet.
 **`No audit scope could be resolved.`** `identify` found no explicit `--scope`, no state from a previous run, and the current branch has no commits over the base. Pass `--scope branch:<name>` or `--scope pr:<number>`.
 
 **`No Identified tickets were found.`** `promote` ran without findings. Run `identify` first, or generate the Identified tickets manually under `tickets/identified/`.
+
+**`Unknown classification: <value>` or `Unknown priority: <value>`.** The debt filter uses a value outside the supported list. Use `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, or `missing-documentation`; priorities are `urgent`, `important`, and `minor`.
+
+**`No ready-for-refactor tickets match ...`** The filter is valid but no pending ticket matches it. The command intentionally does not drain the rest of the queue. Widen the filter or run without classification and priority.
+
+**`The filter excludes pending dependencies required by the selected tickets: ...`** A selected ticket depends on another pending ticket that the filter excluded. Include the dependency in the filter or remove the filter; done dependencies are already satisfied.
 
 **`The executor is blocked:`** The executor wrote one or more JSON files under `needs-human/` and the phase stopped before any push. Read them, resolve the decision (architecture decisions: run `/autopai-adr` in the interactive coding tool), and run `autopai resume`.
 

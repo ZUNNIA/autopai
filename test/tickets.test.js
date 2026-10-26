@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { listTickets, orderTickets, branchNameFor, blockedDependents, collectManualVerification, filterTicketsByFeature, resolveTicketBranch, ticketDoneDir } from '../src/lib/tickets.js'
+import { listTickets, orderTickets, branchNameFor, blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, resolveTicketBranch, selectTickets, ticketDoneDir } from '../src/lib/tickets.js'
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -38,6 +38,43 @@ test('parses front matter and orders tickets by dependency', async () => {
   const tickets = await listTickets(dir)
   const ordered = orderTickets(tickets)
   assert.deepEqual(ordered.map(ticket => ticket.id), ['T1', 'T2'])
+})
+
+test('reads the classification from front matter or the checked body', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-classification-'))
+  await fs.writeFile(path.join(dir, '001-front.md'), [
+    '---',
+    'id: front',
+    'classification: lack-of-coverage',
+    'priority: minor',
+    '---',
+    '# Front'
+  ].join('\n'), 'utf8')
+  await fs.writeFile(path.join(dir, '002-body.md'), [
+    '---',
+    'id: body',
+    'priority: important',
+    '---',
+    '# Body',
+    '* [x] **Architecture:** mixed responsibilities.'
+  ].join('\n'), 'utf8')
+
+  const tickets = await listTickets(dir)
+  assert.equal(tickets[0].classification, 'lack-of-coverage')
+  assert.equal(tickets[0].priority, 'minor')
+  assert.equal(tickets[1].classification, 'architecture')
+  assert.equal(tickets[1].priority, 'important')
+})
+
+test('filters finding files by classification and priority', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-findings-'))
+  const keep = path.join(dir, 'keep.md')
+  const drop = path.join(dir, 'drop.md')
+  await fs.writeFile(keep, '# Keep\n* [x] **Code Smell:** duplication.\n* [x] **Urgent:** breaks.\n', 'utf8')
+  await fs.writeFile(drop, '# Drop\n* [x] **Architecture:** layering.\n* [x] **Minor:** cleanup.\n', 'utf8')
+
+  const selected = await filterFindingFiles([keep, drop], { classifications: ['code-smell'], priorities: ['urgent'] })
+  assert.deepEqual(selected, [keep])
 })
 
 test('builds a unique branch name without ticket identifiers', () => {
@@ -113,6 +150,25 @@ test('reuses a ticket branch that already has commits over the base', async () =
   const fresh = await resolveTicketBranch({ config, ticket: { slug: 'other-ticket' }, type: 'refactor' })
   assert.equal(fresh.branch, 'refactor/other-ticket')
   assert.equal(fresh.reuse, false)
+})
+
+test('rejects a filter that excludes a pending dependency', () => {
+  const allTickets = [
+    { id: 'a', slug: 'a', file: 'a.md', priority: 'important', dependsOn: [] },
+    { id: 'b', slug: 'b', file: 'b.md', priority: 'minor', dependsOn: ['a'] }
+  ]
+  assert.throws(
+    () => selectTickets({ allTickets, tickets: [allTickets[1]], completed: [] }),
+    /b depends on a/
+  )
+  assert.deepEqual(
+    selectTickets({ allTickets, tickets: [allTickets[1]], completed: [{ id: 'a' }] }).map(ticket => ticket.id),
+    ['b']
+  )
+  assert.deepEqual(
+    selectTickets({ allTickets, tickets: allTickets, completed: [] }).map(ticket => ticket.id),
+    ['a', 'b']
+  )
 })
 
 test('satisfies dependencies already completed in done', () => {
