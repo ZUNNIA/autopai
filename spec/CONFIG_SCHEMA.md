@@ -75,4 +75,5 @@ Generation and reconciliation rules:
 - Add the default `pauseAfter` when it is missing; preserve an existing list; apply explicit adjustments.
 - Keep `localGateRetries` at 1 and `continueOnFailure` at true unless the user asks for different failure behavior.
 - Keep tickets and state local; add them to `.gitignore` when needed.
-- Validate with `autopai status --repo .` after writing.
+- Run `autopai config check --repo . --json` before reconciling. It reports missing defaults, unknown or deprecated fields, invalid types, invalid paths, legacy agent names, and secret-like keys without writing.
+- Validate with `autopai config check --repo .` and `autopai status --repo .` after writing. Do not report success while the audit has errors.

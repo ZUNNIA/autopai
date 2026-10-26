@@ -94,6 +94,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Step | Slash command | Natural language |
 | --- | --- | --- |
 | Initialize or adjust config | `/autopai-init` | `/autopai-init "stop after promote"` |
+| Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
 | Discuss and formalize | `/autopai-plan` | `/autopai-plan "the feature we just discussed"` |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
@@ -106,6 +107,20 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Check progress | `/autopai-status` | "how is the run going?" |
 
 The operator agent translates the request and confirms ambiguous interpretations; it works in any language. Explicit flags run verbatim; the CLI underneath is deterministic. If a request does not match the command you opened, the operator stops and points to the right phase. A release never resolves technical debt.
+
+## Auditing autopai.json
+
+`/autopai-init` now runs a deterministic audit before touching an existing configuration:
+
+```text
+autopai config check --repo .
+autopai config check --repo . --json
+autopai config check --repo . --strict
+```
+
+The audit is read-only. It reports missing optional fields with their effective defaults, unknown or deprecated fields, invalid types, paths and pause gates, legacy agent names, secret-like keys, personal absolute paths, and checks that are both required and ignored. `/autopai-init` uses the report to fill safe defaults, preserves your explicit choices, and confirms deprecated-field removal or any other destructive change. `--strict` exits 1 on warnings and missing defaults; errors always exit 1.
+
+The schema audit does not need the repository. `/autopai-init` still inspects the repository and CI to detect a stale branch, command, or check name that is valid JSON but no longer matches the project.
 
 ## Filtering technical debt
 
@@ -164,7 +179,7 @@ autopai help
 
 ## Usage
 
-Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) creates `autopai.json` or reconciles the existing file. Re-run it at any time to audit the configuration: it applies safe corrections, preserves your choices, and asks before an ambiguous or destructive change. You can also request an adjustment in natural language (`/autopai-init "stop after promote"`). No language or framework is assumed.
+Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) creates `autopai.json` or reconciles the existing file. It runs `autopai config check` first and uses the deterministic report, so missing defaults, unknown fields, deprecated fields, and legacy agent names are visible before any write. Re-run it at any time to audit the configuration: it applies safe corrections, preserves your choices, and asks before an ambiguous or destructive change. You can also request an adjustment in natural language (`/autopai-init "stop after promote"`). No language or framework is assumed.
 
 The assisted loop:
 

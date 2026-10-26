@@ -144,7 +144,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Mission.** Maintain the repository configuration and run orchestrator commands on request.
 
-**Initialization and reconciliation.** `/autopai-init` runs the operator agent (`autopai`). It reads `autopai.json` when it exists, inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, and creates or reconciles the file with the real commands, branches, and check names. Safe changes (missing fields, the default `pauseAfter`, legacy agent names, and a stale branch, command, or check with an unambiguous replacement) are applied automatically. Explicit user choices (`pauseAfter`, `ticketDirs`, `stateDir`, `agents`, `models`, `protectedPaths` extras, and `runnerOptions`) are preserved. Ambiguous or destructive changes are shown and confirmed. A natural-language request can adjust a schema field; for example, "stop after promote" adds the `promotion` gate. It never guesses a language or framework, and it validates the result with `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
+**Initialization and reconciliation.** `/autopai-init` runs the operator agent (`autopai`). It reads `autopai.json` when it exists and runs `autopai config check --repo . --json` first; that deterministic audit reports missing defaults, unknown or deprecated fields, invalid types and paths, legacy agent names, and secret-like keys without writing. The operator then inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, and creates or reconciles the file with the real commands, branches, and check names. Safe changes (missing fields, the default `pauseAfter`, legacy agent names, and a stale branch, command, or check with an unambiguous replacement) are applied automatically. Explicit user choices (`pauseAfter`, `ticketDirs`, `stateDir`, `agents`, `models`, `protectedPaths` extras, and `runnerOptions`) are preserved. Deprecated fields are shown and confirmed before removal; unknown keys are errors and are never silently dropped. Ambiguous or destructive changes are shown and confirmed. A natural-language request can adjust a schema field; for example, "stop after promote" adds the `promotion` gate. It never guesses a language or framework, and it validates the result with `autopai config check --repo .` and `autopai status --repo .`. It does not create tickets, branches, commits, or pull requests.
 
 **Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
@@ -468,7 +468,21 @@ To change the gates, rerun `/autopai-init` with a natural-language request (for 
 
 ### 6.4 Validation
 
-`autopai status --repo .` loads the configuration and fails with a specific message when:
+`autopai config check --repo .` is the deterministic schema audit. It is read-only and reports:
+
+- Missing optional fields with their effective defaults, so `/autopai-init` can fill them.
+- Unknown top-level or nested keys.
+- Deprecated fields (`autoMerge` and `approvalRequired`).
+- Invalid types, enums, paths, commands, and pause gates.
+- Legacy agent names (`setup` or the old `autopai` executor mapping).
+- Secret-like keys and personal absolute paths.
+- Checks that are both required and ignored.
+
+Use `--json` for the machine-readable report and `--strict` to fail on warnings and missing defaults. It exits 1 on errors. `/autopai-init` runs this audit before reconciling and re-runs it after writing.
+
+The schema audit does not need the repository. `/autopai-init` still inspects the repository and CI to detect a stale branch, command, or check name that is valid JSON but no longer matches the project.
+
+`autopai status --repo .` then loads the configuration and fails with a specific message when:
 
 - `autopai.json` is missing.
 - `runner` is missing or empty.
@@ -494,9 +508,12 @@ autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--p
 autopai release --repo <path> --version <x.y.z>
 autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
 autopai status --repo <path>
+autopai config check --repo <path> [--json] [--strict]
 autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
 autopai abort --repo <path>
 ```
+
+**Config check.** `autopai config check --repo <path>` audits `autopai.json` against the schema without writing. `--json` prints the machine-readable report; `--strict` exits 1 on warnings and missing defaults. It is the audit `/autopai-init` uses before reconciling a configuration.
 
 **Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope`, `--classification`, and `--priority` can be repeated; the debt filters also accept comma-separated lists.
 
@@ -508,9 +525,9 @@ autopai abort --repo <path>
 
 **Defaults.** `--feature` resolves from the previous run state or the latest ticket directory, and `--scope` defaults to the scopes of the last run. Explicit flags always win, and the resolver fails with a clear error instead of guessing when no candidate exists.
 
-**Output.** Successful commands print a JSON result to standard output, except `status` and `abort`, which print short human-readable text. Errors go to standard error prefixed with `autopai: ` and the process exits with code 1.
+**Output.** Successful commands print a JSON result to standard output, except `status`, `abort`, and `config check`, which print short human-readable text by default. `config check --json` prints the full report. Errors go to standard error prefixed with `autopai: ` and the process exits with code 1. `config check` exits 1 on schema errors; `--strict` also exits 1 on warnings and missing defaults.
 
-**Locking.** Commands that run a phase take `run.lock` under the state directory. A second concurrent run fails with the active pid. `status` and `help` never lock.
+**Locking.** Commands that run a phase take `run.lock` under the state directory. A second concurrent run fails with the active pid. `status`, `config check`, and `help` never lock.
 
 **status output.**
 
@@ -827,7 +844,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 **How do I change a pause gate?** Run `/autopai-init "stop after promote"` or describe the change in your own words. The operator adjusts `pauseAfter`, preserves the rest of the configuration, and validates with `status`. Adding a gate is safe. "Only stop at X" proposes a list with that gate and confirms before replacing the current one.
 
-**How do I refresh an outdated autopai.json?** Run `/autopai-init` with no message. It applies safe corrections, preserves your explicit choices, and asks before an ambiguous or destructive change.
+**How do I refresh an outdated autopai.json?** Run `/autopai-init` with no message. It runs `autopai config check`, applies safe corrections, preserves your explicit choices, and asks before an ambiguous or destructive change. To inspect first without writing, run `autopai config check --repo .`; add `--json` for the full report or `--strict` to fail on warnings and missing defaults.
 
 **Where do I see what the agents did?** Every session writes a log under `<stateDir>/artifacts/<runId>/`, and the event stream is in `<stateDir>/logs/<runId>.jsonl`.
 

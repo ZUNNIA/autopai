@@ -65,15 +65,18 @@ Rules:
 When the user asks you to initialize or reconcile AutopAI:
 
 1. Read `autopai.json` when it exists. Never assume the file is missing.
-2. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
-3. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
-4. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
-5. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
-6. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
-7. Validate the file by running:
+2. Run `autopai config check --repo . --json` and use its `errors`, `warnings`, and `missing` as the deterministic schema audit. Do not invent a field or a type.
+3. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
+4. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
+5. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
+6. Deprecated fields are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: propose a rename only when it is clearly a typo of a known field; otherwise ask before removing one.
+7. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
+8. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
+9. Validate the file by running:
+   `autopai config check --repo .`
    `autopai status --repo .`
-   A configuration error means the file is wrong; fix it before reporting success.
-8. Do not create tickets, branches, commits, or pull requests during initialization.
+   Do not report success while the config audit has errors; fix them first.
+10. Do not create tickets, branches, commits, or pull requests during initialization.
 
 ## Running the orchestrator
 
@@ -83,7 +86,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `resume`, `abort`.
+Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`.
 
 ## autopai.json schema
 

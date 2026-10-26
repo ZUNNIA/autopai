@@ -2,6 +2,7 @@
 import path from 'node:path'
 import { parseCliArgs } from './lib/util.js'
 import { loadConfig } from './lib/config.js'
+import { auditConfig, formatConfigReport } from './lib/config-audit.js'
 import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
@@ -18,6 +19,7 @@ async function main() {
   const log = message => process.stdout.write(`${message}\n`)
 
   if (command === 'help' || options.help) return printHelp()
+  if (command === 'config') return runConfigCommand(repoPath, options)
 
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
@@ -195,6 +197,19 @@ async function abortRun(stateStore) {
   process.stdout.write('AutopAI run marked as aborted and the lock was released.\n')
 }
 
+async function runConfigCommand(repoPath, options) {
+  const action = String((options._ ?? [])[0] ?? 'check')
+  if (action !== 'check') throw new Error('Usage: autopai config check --repo <path> [--json] [--strict]')
+
+  const report = await auditConfig(repoPath)
+  if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+  else process.stdout.write(`${formatConfigReport(report)}\n`)
+
+  const strict = options.strict === true
+  if (!report.ok || (strict && (report.warnings.length > 0 || report.missing.length > 0))) process.exitCode = 1
+  return report
+}
+
 function printStatus(state, config) {
   if (!state) {
     process.stdout.write('No AutopAI state found for this repository.\n')
@@ -234,6 +249,7 @@ Usage:
   autopai release --repo <path> --version <x.y.z>
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
+  autopai config check --repo <path> [--json] [--strict]
   autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
   autopai abort --repo <path>
 
@@ -260,6 +276,11 @@ one run. Gates: backlog, plan, qa, findings, promotion, refactor.
 
 Local gate failures are retried once by default. --fix adds one executor fix
 attempt for a failed ticket before recording the failure.
+
+autopai config check audits autopai.json against the schema without writing:
+it reports missing defaults, unknown or deprecated fields, invalid types, paths,
+and legacy agent names. It exits 1 on errors; --strict also fails on warnings and
+missing defaults. --json prints the report for /autopai-init.
 `)
 }
 
