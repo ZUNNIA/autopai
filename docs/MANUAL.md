@@ -199,7 +199,7 @@ The order used by `run --from --to` is `prepare`, `approve`, `dev`, `identify`, 
 4. Refuse adoption when the branch modifies protected paths.
 5. Scan policy: branch name, commit subjects and bodies, added code lines, and the current content of changed code files. The repository-wide file scan also reports ticket or ADR references that predate the branch, because adoption must leave the touched files compliant.
 6. Run the local gates (restore, build, test, coverage).
-7. Run the executor: mode `finish` when there are violations or gate failures, mode `title` when the branch is already green. In both cases the executor can propose the pull request title in `<stateDir>/pr-title.txt`.
+7. Run the executor: mode `finish` when there are violations or gate failures, mode `title` when the branch is already green. In both cases the executor can propose the pull request title in `<stateDir>/pr-title.txt`; only the adopt phase reads it. The file is cleared before the adopt session so a stale title never leaks into another phase. Dev, refactor, and release derive their titles from the branch and commits (release uses `chore: release v<version>`).
 8. Re-scan policy, re-run the gates, resolve the final title (`--title` override, then the executor title when valid, then a derived title), and continue with push, pull request, CI wait, fix loop, and merge.
 
 **Dry run.** `--dry-run` stops after the scan and prints the derived title, commits, changed files, and violations. No executor, no gates, no push.
@@ -295,7 +295,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every f
 1. Require `--version` in `MAJOR.MINOR.PATCH` format.
 2. Create `chore/release-v<version>` from the base branch.
 3. Run the executor in release mode: update the version and the changelog.
-4. Run the local gates, resolve the title, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the fix loop, and merge.
+4. Run the local gates, use `chore: release v<version>` as the title, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the fix loop, and merge.
 5. Tag `v<version>` on the merge commit and push the tag.
 
 **Intent guard.** Release only ships a version. The operator refuses a request that is not a release (for example, resolving technical debt) and points to the correct phase; it never bumps the version for an unrelated request.
@@ -535,7 +535,7 @@ Everything runtime-related lives under the state directory. Nothing here is comm
 tickets/.autopai/
 ├── state.json              current run state
 ├── run.lock                present only while a run is active
-├── pr-title.txt            executor-proposed pull request title
+├── pr-title.txt            executor-proposed title for the adopted branch (cleared before the adopt session)
 ├── needs-human/            blocker JSON files written by the executor
 ├── artifacts/<runId>/
 │   ├── branch.patch
