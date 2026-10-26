@@ -342,7 +342,7 @@ The orchestrator reads this front matter, not the ticket identifiers, so Git art
 
 ### 5.2 Ordering and branch naming
 
-Tickets run in dependency order. The order is a topological sort of `depends_on`, with ties broken by priority (`urgent`, then `important`, then `minor`) and then by file name. An unknown dependency or a dependency cycle stops the phase with an error before any branch is created.
+Tickets run in dependency order. The order is a topological sort of `depends_on`, with ties broken by priority (`urgent`, then `important`, then `minor`) and then by file name. A dependency already present in the done directory is satisfied. An unknown pending dependency or a dependency cycle stops the phase with an error before any branch is created.
 
 The branch name comes from the ticket type and the file name without its numeric prefix, for example `feat/settings-panel`. When the branch already exists locally, `-2`, `-3`, and so on are appended. The refactor loop always uses the `refactor` type.
 

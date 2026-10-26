@@ -78,10 +78,18 @@ function firstHeading(text) {
 }
 
 /**
- * Orders tickets by dependencies and then by business priority. Throws on a
- * dependency cycle or an unknown dependency id.
+ * Orders tickets by dependencies and then by business priority. Dependencies
+ * that already completed in the done directory are satisfied and do not need to
+ * appear in the pending queue. Throws on a cycle or an unknown pending
+ * dependency.
  */
-export function orderTickets(tickets) {
+export function orderTickets(tickets, options = {}) {
+  const completed = new Set()
+  for (const ticket of options.completed ?? []) {
+    if (ticket.id) completed.add(ticket.id)
+    if (ticket.slug) completed.add(ticket.slug)
+  }
+
   const byId = new Map()
   const bySlug = new Map()
   for (const ticket of tickets) {
@@ -93,6 +101,7 @@ export function orderTickets(tickets) {
   for (const ticket of tickets) {
     const dependencies = []
     for (const dependency of ticket.dependsOn) {
+      if (completed.has(dependency)) continue
       const target = byId.get(dependency) ?? bySlug.get(dependency)
       if (!target) throw new Error(`Ticket ${ticket.id} depends on unknown ticket ${dependency}.`)
       dependencies.push(target.id)
