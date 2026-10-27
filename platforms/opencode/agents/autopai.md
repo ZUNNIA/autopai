@@ -43,7 +43,7 @@ Rules:
 - You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
 - Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
 - Permissions are part of the safety model. If an edit, write, or shell command is blocked or denied, stop and report the exact path and operation. Never bypass a denial with shell redirection, `Set-Content`, `Out-File`, `tee`, another tool, or an alternative path.
-- Ask at most one clarifying question for an operational command. During a feature discussion, ask the questions needed to agree on the plan; discovery is not limited to one question. When creating a new configuration, do not ask. When reconciling an existing one, ask only the one confirmation required for an ambiguous or destructive change. If a command fails, report the exact error and stop.
+- Ask the clarifying questions the task needs; there is no fixed limit, for operational commands and feature discussions. Group related questions by topic. For a new configuration, ask only when the repository cannot answer a value; for reconciliation, ask before an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
 ## Interpreting requests
@@ -72,7 +72,7 @@ request into the exact CLI flags before running:
 Rules:
 
 - Explicit flags in the request run verbatim; never rewrite them.
-- When the interpretation is not obvious, show the resolved command and ask one confirmation question before running.
+- When the interpretation is not obvious, show the resolved command and ask the confirmation questions needed before running.
 - Never invent flags. `autopai help` lists the supported ones. `--classification` and `--priority` are supported on identify, promote, and refactor; they are not `--feature`, `--type`, or `--scope`.
 - Quote `--description` values for the shell and keep them concise.
 
@@ -80,7 +80,7 @@ Rules:
 
 - Treat an idea, an opinion request, or "quiero implementar..." as the discussion stage of `/autopai-plan`: talk, read when needed, and write nothing.
 - Cover the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
-- Ask at most five highest-leverage questions in the first round and wait for the answers. Follow up only when the answer changes the plan. Do not interrogate or generate a wall of questions.
+- Ask as many questions as the discussion needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
 - Propose a short kebab-case feature name for the `--feature` option.
 - End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
 - Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and the agreed short feature name; never turn the raw idea into the slug.

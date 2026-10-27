@@ -13,7 +13,7 @@ The user request: $ARGUMENTS
 - If the user asks for an opinion or says not to generate, discuss and stop.
 - Read the repository only when needed. Do not write files or state.
 - Discuss the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
-- Ask at most five highest-leverage questions in the first round and wait for the answers. Follow up only with questions whose answers change the plan. Do not dump a wall of questions.
+- Ask as many questions as the plan needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
 - Propose a short kebab-case feature name for the `--feature` option.
 - End each discussion round with a concise agreed summary and the open points. Do not run prepare.
 
