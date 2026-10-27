@@ -14,7 +14,7 @@ Compose the CLI arguments from the request (see the interpreting rules):
 - A named feature or refactor batch → `--feature <slug>` (filters by the ticket front matter).
 - A debt classification → `--classification <name>`. Accepted names: `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, `missing-documentation`.
 - A priority or importance → `--priority <name>`: `urgent`, `important`, or `minor`.
-- "only", "solo", or a phrase that restricts the pending tickets combines the two flags. Multiple values are comma-separated and mean OR; classification and priority combine with AND. For example, "solo tickets lack of coverage" → `--classification lack-of-coverage`; "missing documentation con prioridad minor" → `--classification missing-documentation --priority minor`; "solo tickets urgent" → `--priority urgent`.
+- A restriction phrase combines the two flags. Multiple values are comma-separated and mean OR; classification and priority combine with AND. For example, "only lack-of-coverage tickets" → `--classification lack-of-coverage`; "missing documentation with minor priority" → `--classification missing-documentation --priority minor`; "only urgent tickets" → `--priority urgent`.
 - Never map a classification or priority to `--feature`: all tech-debt tickets usually share the `tech-debt` feature.
 - "Resolve all the technical debt", "clear the refactor queue", or nothing → no filter arguments: the orchestrator drains the ready-for-refactor queue.
 - "Fix the failures and continue" when a run stopped on failed tickets → use `/autopai-resume --fix` instead; it reuses the failed branches and retries the gates.

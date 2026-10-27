@@ -46,21 +46,30 @@ Rules:
 - Ask the clarifying questions the task needs; there is no fixed limit, for operational commands and feature discussions. Group related questions by topic. For a new configuration, ask only when the repository cannot answer a value; for reconciliation, ask before an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
+## Intent routing
+
+Decide from the intent and the conversation, never from a fixed phrase:
+
+- Conversation: the user shares an idea, describes a desired outcome, asks for an opinion, or asks to explore or design a feature. Discuss, read only when needed, and write nothing. A statement of intent to implement a feature is a goal, not an instruction to run a phase.
+- Operational: the user explicitly asks to run an AutopAI phase or gives an explicit slash command. Translate it into the exact CLI invocation and run it after resolving ambiguity.
+- Generation: the user explicitly asks to generate, formalize, or prepare the brief and backlog, or explicitly confirms the discussed summary. Only then run `prepare`.
+- Otherwise: ask which of the three the user wants. Never run a phase by default.
+
 ## Interpreting requests
 
-Commands may arrive in natural language and in any language. Translate the
-request into the exact CLI flags before running:
+Commands may arrive in natural language and in any language. Translate an
+operational request into the exact CLI flags before running:
 
 - "the last N branches/PRs merged" → `--last N` on identify.
 - A specific pull request → `--scope pr:<n>`; a branch → `--scope branch:<name>`; a folder → `--scope dir:<path>`; the whole project → `--scope dir:.` on identify.
 - A named feature, backlog, or refactor batch → `--feature <slug>`.
-- A debt classification → `--classification <name>` on identify, promote, or refactor. Accepted names: `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, `missing-documentation`. Map labels and Spanish terms to these values.
-- A priority or importance → `--priority <name>` on identify, promote, or refactor: `urgent`, `important`, or `minor`. Map urgent/urgente, important/importante, and minor/menor.
-- "only", "solo", or a restriction of the debt combines classification and priority with AND; multiple values in one flag are OR and may be comma-separated. For example, "solo code smell de importancia urgent" → `--classification code-smell --priority urgent`; "solo tickets lack of coverage o missing documentation con prioridad minor" → run the two filters separately or use the priority that applies to both, because one flat filter cannot express a different priority per classification.
+- A debt classification → `--classification <name>` on identify, promote, or refactor. Accepted names: `code-smell`, `unnecessary-complexity`, `lack-of-coverage`, `outdated-library`, `architecture`, `missing-documentation`. Map the user's labels, in any language, to these values.
+- A priority or importance → `--priority <name>` on identify, promote, or refactor: `urgent`, `important`, or `minor`. Map the user's priority words, in any language, to these canonical names.
+- A restriction of the debt combines classification and priority with AND; multiple values in one flag are OR and may be comma-separated. For example, "only urgent code smells" → `--classification code-smell --priority urgent`; "only lack-of-coverage or missing-documentation tickets with minor priority" → run the two filters separately or use the priority that applies to both, because one flat filter cannot express a different priority per classification.
 - Never map a classification or priority to `--feature`. `--feature` is the ticket front-matter feature, usually `tech-debt` for all debt tickets.
 - A release version → `--version <x.y.z>`.
 - "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
-- "fix the failures and continue", "arregla los fallos y continúa", or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per failed ticket before recording the failure and continuing.
+- "fix the failures and continue" or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per failed ticket before recording the failure and continuing.
 - "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name.
 - "continue without stopping" or "run everything" → `--auto`, after confirming.
 - "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release. If the user restricts the debt, pass `--classification` and `--priority`; the orchestrator selects only matching pending tickets and reports zero if none match.
@@ -78,7 +87,7 @@ Rules:
 
 ## Feature discussions
 
-- Treat an idea, an opinion request, or "quiero implementar..." as the discussion stage of `/autopai-plan`: talk, read when needed, and write nothing.
+- Treat a feature idea, an opinion question, or a design request as the discussion stage of `/autopai-plan`: talk, read when needed, and write nothing.
 - Cover the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
 - Ask as many questions as the discussion needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
 - Propose a short kebab-case feature name for the `--feature` option.
