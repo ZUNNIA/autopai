@@ -20,12 +20,12 @@ AutopAI is a workflow for using AI agents professionally across the whole delive
 
 It is language, repository, and coding-tool agnostic. The build, test, and check commands come from an `autopai.json` generated inside each target repository, the task prompts live in the core, and the coding tool is a replaceable runner.
 
-The same workflow is available through slash commands or natural language. The operator agent translates a request into the deterministic CLI and confirms ambiguous interpretations before running.
+The same workflow is available through slash commands or natural language. The operator first decides whether a request is a discussion, a phase to run, or an explicit request to generate artifacts; it translates operational requests into the deterministic CLI and confirms ambiguous interpretations before running.
 
 ## The loop
 
 1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name.
-2. **Formalize it** when you are ready: tell the operator to generate the brief and backlog (for example, "genera el brief y el backlog"). It runs `prepare`, which writes the brief and backlog and stops at the backlog gate. `/autopai-plan` remains the same command; it only generates after your explicit confirmation.
+2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog and stops at the backlog gate. `/autopai-plan` remains the same command; it only generates after your explicit confirmation.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist, then identify the pull requests of the new feature, promote the findings, and refactor them.
@@ -95,14 +95,14 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | --- | --- | --- |
 | Initialize or adjust config | `/autopai-init` | `/autopai-init "stop after promote"` |
 | Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
-| Discuss a feature | `/autopai-plan` | "quiero implementar..." or "discutamos esta feature" |
-| Generate the brief and backlog | `/autopai-plan` after confirmation | "genera el brief y el backlog de lo que discutimos" |
+| Discuss a feature | `/autopai-plan` | Share an idea, a design question, or a feature goal; the operator discusses first. |
+| Generate the brief and backlog | `/autopai-plan` after confirmation | Explicitly ask to generate, formalize, or prepare the brief and backlog. |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
-| Audit filtered debt | `/autopai-identify "solo code smell urgent"` | "identify only urgent code smells" |
+| Audit filtered debt | `/autopai-identify "only urgent code smells"` | "identify only urgent code smells" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
-| Refactor filtered debt | `/autopai-refactor "solo missing documentation minor"` | "resolve only minor missing documentation" |
+| Refactor filtered debt | `/autopai-refactor "only minor missing documentation"` | "resolve only minor missing documentation" |
 | Repair failed tickets | `/autopai-resume --fix` | "fix the failures and continue" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
 | Check progress | `/autopai-status` | "how is the run going?" |
@@ -185,8 +185,8 @@ Open a target repository in the coding tool and run `/autopai-init`. The operato
 The assisted loop:
 
 ```text
-# discuss first; when ready, ask for the generation
-/autopai-plan "genera el brief y el backlog de lo que discutimos"
+# discuss first; when ready, explicitly ask for the generation
+/autopai-plan "generate the brief and backlog from the discussed feature"
 # review tickets/backlog/<feature>/
 /autopai-resume --approve backlog
 # review tickets/ready-for-dev/<feature>/

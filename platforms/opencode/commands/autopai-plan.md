@@ -9,7 +9,7 @@ The user request: $ARGUMENTS
 
 ## Stage 1: discuss
 
-- A feature idea, a question, or "quiero implementar..." starts a discussion. Do not run the CLI.
+- A feature idea, a design question, or a request to explore a feature starts a discussion. Do not run the CLI.
 - If the user asks for an opinion or says not to generate, discuss and stop.
 - Read the repository only when needed. Do not write files or state.
 - Discuss the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
@@ -19,7 +19,7 @@ The user request: $ARGUMENTS
 
 ## Stage 2: generate
 
-Run prepare only when the user explicitly asks to generate, formalize or prepare the brief and backlog, or explicitly confirms the summary. Examples: "genera el brief y el backlog", "formaliza la feature", "prepara el plan", "adelante con el backlog".
+Run prepare only when the user explicitly asks to generate, formalize or prepare the brief and backlog, or explicitly confirms the discussed summary. Do not infer generation from a wish to implement the feature or from a general description.
 
 - If no agreed summary exists, ask for the idea and stay in Stage 1.
 - Summarize problem, scope, decisions, non-goals and acceptance in a concise `--description`.
