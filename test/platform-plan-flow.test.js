@@ -11,8 +11,11 @@ test('the plan command discusses before it prepares', async () => {
   assert.match(text, /Run prepare only when the user explicitly asks/)
   assert.match(text, /Do not infer generation from a wish to implement/)
   assert.match(text, /retained brief and backlog session titles and ids/)
-  assert.match(text, /Do not run prepare again/)
-  assert.match(text, /reload a prompt from `src\/prompts`/)
+  assert.match(text, /autopai revise --repo \. --message/)
+  assert.match(text, /do not tell the user to paste/i)
+  assert.match(text, /do not run prepare again/i)
+  assert.match(text, /loading a (core )?prompt from `src\/prompts`/)
+  assert.match(text, /plannerMessages/)
   assert.doesNotMatch(text, /Run AutopAI in prepare mode\./)
   assert.match(text, /Never approve the backlog/)
 })
@@ -25,8 +28,11 @@ test('the operator routes feature ideas to discussion, not prepare', async () =>
   assert.match(text, /no fixed limit/)
   assert.match(text, /## Feature discussions/)
   assert.match(text, /retained brief and backlog session titles and ids/)
-  assert.match(text, /Do not run prepare again/)
-  assert.match(text, /reload a prompt from `src\/prompts`/)
+  assert.match(text, /autopai revise --repo \. --message/)
+  assert.match(text, /do not tell the user to paste/i)
+  assert.match(text, /do not run prepare again/i)
+  assert.match(text, /loading a (core )?prompt from `src\/prompts`/)
+  assert.match(text, /plannerMessages/)
   assert.match(text, /deletes the retained prepare sessions only after a successful backlog approval/)
   assert.doesNotMatch(text, /Nothing, or a reference to this conversation/)
 })
@@ -40,6 +46,7 @@ test('retained planner sessions edit artifacts without a prompt reload', async (
   assert.match(brief, /## Review/)
   assert.match(backlog, /update the existing brief and backlog in place/)
   assert.match(backlog, /Do not restart from this prompt/)
+  assert.match(planner, /state the question in your final message/)
 })
 
 test('the operator routes by intent, not by a literal phrase', async () => {
@@ -50,6 +57,17 @@ test('the operator routes by intent, not by a literal phrase', async () => {
   assert.match(text, /Never run a phase by default/)
 })
 
+test('the revise path continues the existing session without loading a prompt', async () => {
+  const cli = await fs.readFile('src/cli.js', 'utf8')
+  const session = await fs.readFile('src/lib/session.js', 'utf8')
+  const runner = await fs.readFile('src/runners/opencode.js', 'utf8')
+  assert.match(cli, /continueSession/)
+  assert.match(session, /continueSession/)
+  assert.match(runner, /export async function continueSession/)
+  assert.doesNotMatch(cli, /loadPrompt/)
+  assert.doesNotMatch(runner, /loadPrompt/)
+})
+
 test('prompts and docs do not contain Spanish trigger examples', async () => {
   const paths = [
     'README.md',
@@ -57,7 +75,11 @@ test('prompts and docs do not contain Spanish trigger examples', async () => {
     'platforms/opencode/commands/autopai-plan.md',
     'platforms/opencode/commands/autopai-identify.md',
     'platforms/opencode/commands/autopai-refactor.md',
-    'platforms/opencode/commands/autopai-resume.md'
+    'platforms/opencode/commands/autopai-resume.md',
+    'platforms/opencode/agents/planner.md',
+    'platforms/opencode/commands/ux-review.md',
+    'src/prompts/feature-brief.md',
+    'src/prompts/backlog.md'
   ]
   const texts = await Promise.all(paths.map(file => fs.readFile(file, 'utf8')))
   const combined = texts.join('\n')

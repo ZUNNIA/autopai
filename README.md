@@ -24,8 +24,8 @@ The same workflow is available through slash commands or natural language. The o
 
 ## The loop
 
-1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name.
-2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or request changes in the retained backlog session; do not run prepare again. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
+1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name. Open questions stay in the conversation; they are never written into the brief or backlog.
+2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or ask the operator for changes; the operator runs `autopai revise` against the retained backlog session, so you never paste the change yourself and the original prompt is not reloaded. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist, then identify the pull requests of the new feature, promote the findings, and refactor them.
@@ -77,7 +77,7 @@ The same workflow is available through slash commands or natural language. The o
 
 A pause is not an approval. `autopai resume` at a gate stops and prints the exact approval command. `autopai resume --approve <gate>` passes that gate and continues to the next one; `--auto` skips every human pause. The automatic gates (local commands, CI, and policy) always run.
 
-The brief and backlog sessions stay open after `prepare`. Review them or request changes in the retained backlog session; never re-run `prepare` or reload a core prompt for a revision. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
+The brief and backlog sessions stay open after `prepare`. Review them or ask the operator for changes; the operator continues the retained backlog session with `autopai revise` and never re-runs `prepare` or reloads a core prompt. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
 
 Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
 
@@ -99,6 +99,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
 | Discuss a feature | `/autopai-plan` | Share an idea, a design question, or a feature goal; the operator discusses first. |
 | Generate the brief and backlog | `/autopai-plan` after confirmation | Explicitly ask to generate, formalize, or prepare the brief and backlog. |
+| Revise a pending brief or backlog | Operator runs `autopai revise` | Ask for the change; the operator applies it in the retained backlog session. |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |

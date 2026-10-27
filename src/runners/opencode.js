@@ -31,6 +31,17 @@ export function buildArgs({ config, agent, title, role }) {
 }
 
 /**
+ * Builds the arguments for a follow-up message in an existing session. The
+ * message travels through stdin and no title, prompt file, or session cleanup is
+ * involved; the planner's original context remains authoritative.
+ */
+export function buildContinueArgs({ config, sessionId, agent }) {
+  const args = ['run', '--auto', '--dir', config.repoPath, '--session', sessionId]
+  if (agent) args.push('--agent', agent)
+  return args
+}
+
+/**
  * Appends a random per-run token to the session title, so cleanup can only ever
  * match the session created by this exact run.
  */
@@ -118,6 +129,28 @@ export async function deleteSession({ config, session }) {
 function normalizeDirectory(directory) {
   const normalized = String(directory ?? '').replace(/\\/g, '/').replace(/\/+$/, '')
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
+export async function continueSession({ config, session, message, agent, logFile }) {
+  let sessionId = session?.id ?? null
+  if (!sessionId && session?.title) {
+    const found = pickSessionToDelete(await listRunSessions(config), {
+      title: session.title,
+      directory: config.repoPath,
+      since: 0
+    })
+    sessionId = found?.id ?? null
+  }
+  if (!sessionId) throw new Error('The retained planner session was not found.')
+
+  const result = await runCommand('opencode', buildContinueArgs({ config, sessionId, agent }), {
+    cwd: config.repoPath,
+    env: { ...(config.runnerOptions?.env ?? {}), OPENCODE_DISABLE_AUTOUPDATE: '1' },
+    timeoutMs: config.sessionTimeoutMinutes * 60000,
+    logFile,
+    stdin: message
+  })
+  return { ...result, sessionId }
 }
 
 export async function runSession({ config, agent, promptText, title, logFile, role, retainSession = false }) {

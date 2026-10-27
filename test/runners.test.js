@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { availableRunners, resolveRunner } from '../src/runners/index.js'
-import { buildArgs, writePromptFile, pickSessionToDelete, uniqueSessionTitle } from '../src/runners/opencode.js'
+import { buildArgs, buildContinueArgs, writePromptFile, pickSessionToDelete, uniqueSessionTitle } from '../src/runners/opencode.js'
 
 test('resolves a configured runner', async () => {
   const runner = await resolveRunner({ runner: 'opencode' })
@@ -39,6 +39,25 @@ test('builds OpenCode arguments with agent and model, without the prompt', () =>
     '--model',
     'provider/model'
   ])
+})
+
+test('builds continuation arguments for the existing session without a prompt title', () => {
+  const args = buildContinueArgs({
+    config: { repoPath: 'C:/repo' },
+    sessionId: 'ses_existing',
+    agent: 'planner'
+  })
+  assert.deepEqual(args, [
+    'run',
+    '--auto',
+    '--dir',
+    'C:/repo',
+    '--session',
+    'ses_existing',
+    '--agent',
+    'planner'
+  ])
+  assert.ok(!args.includes('--title'))
 })
 
 test('writes the prompt next to the session log', async () => {

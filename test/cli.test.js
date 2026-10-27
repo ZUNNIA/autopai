@@ -25,10 +25,11 @@ test('keeps unknown options for the phase instead of dropping them', () => {
   assert.equal(options.futureOption, 'value')
 })
 
-test('prints help including the config audit', () => {
+test('prints help including the config audit and revise command', () => {
   const output = execFileSync(process.execPath, [cli, 'help'], { encoding: 'utf8' })
   assert.match(output, /autopai config check/)
   assert.match(output, /audits autopai\.json/)
+  assert.match(output, /autopai revise --repo <path> --message <change>/)
 })
 
 test('runs config check through the CLI without loading a runtime config', async () => {

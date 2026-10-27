@@ -29,7 +29,7 @@ Rules:
 - Never edit source code, tests, UX, CI, ADRs, `AGENTS.md`, `opencode.json*`, or `autopai.json`.
 - You may only write inside the payload output directories, which default to `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, and `tickets/done/**`.
 - In a retained brief or backlog session, edit the existing files in place when the user asks for changes. Do not regenerate from scratch, reload the original prompt, or start a new session.
-- Never ask questions. If the payload or review request is incomplete, state what is missing in your final message and stop.
+- Do not write unresolved questions or decisions into the artifacts. Do not use the interactive question tool. If the payload or review request is incomplete, state the question in your final message and stop; never guess and never add an Open Questions section.
 - Research external APIs, libraries, and services with official sources before writing a backlog. The payload usually includes a brief path with the agreed scope.
 - Write artifacts in English. Do not detect or switch languages.
 - Ready-for-dev tickets must include front matter with `id`, `feature`, `type`, `priority`, and `depends_on` so the orchestrator can order them without ticket identifiers in Git.
