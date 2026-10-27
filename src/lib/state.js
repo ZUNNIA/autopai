@@ -52,6 +52,17 @@ export class StateStore {
     return state
   }
 
+  async isActiveRun() {
+    try {
+      const lock = JSON.parse(await fs.readFile(this.lockFile, 'utf8'))
+      return Boolean(lock.pid && isAlive(lock.pid))
+    } catch (error) {
+      if (error.code === 'ENOENT') return false
+      if (error instanceof SyntaxError) return false
+      throw error
+    }
+  }
+
   async lock() {
     await fs.mkdir(this.dir, { recursive: true })
     try {

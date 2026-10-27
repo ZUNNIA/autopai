@@ -16,7 +16,7 @@
 
 ## About
 
-AutopAI is a workflow for using AI agents professionally across the whole delivery cycle. It helps you discuss an idea, formalize it into a brief and backlog, plan the implementation, build it with tests and CI, audit the new feature for technical debt, refactor it, and repeat. The human makes the decisions that matter; the orchestrator runs each phase in a fresh session, owns every Git write, and stops at the gates you configure.
+AutopAI is a workflow for using AI agents professionally across the whole delivery cycle. It helps you discuss an idea, formalize it into a brief and backlog, plan the implementation, build it with tests and CI, audit the new feature for technical debt, refactor it, and repeat. The human makes the decisions that matter; the orchestrator runs each phase in a fresh session, owns every Git write, and stops at the gates you configure. The two prepare review sessions stay open until the backlog gate is resolved.
 
 It is language, repository, and coding-tool agnostic. The build, test, and check commands come from an `autopai.json` generated inside each target repository, the task prompts live in the core, and the coding tool is a replaceable runner.
 
@@ -25,7 +25,7 @@ The same workflow is available through slash commands or natural language. The o
 ## The loop
 
 1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name.
-2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog and stops at the backlog gate. `/autopai-plan` remains the same command; it only generates after your explicit confirmation.
+2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or request changes in the retained backlog session; do not run prepare again. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist, then identify the pull requests of the new feature, promote the findings, and refactor them.
@@ -48,7 +48,7 @@ The same workflow is available through slash commands or natural language. The o
 | Phase | What it does |
 | --- | --- |
 | `adopt` | Finishes an existing branch through push, pull request, CI, and merge. |
-| `prepare` | Writes the feature brief and backlog, then stops at the backlog gate. |
+| `prepare` | Writes the feature brief and backlog, retains both planner sessions for review, then stops at the backlog gate. |
 | `approve` | Writes ready-for-dev tickets with a technical plan, then stops at the plan gate. |
 | `dev` | Implements one ticket per branch through CI and merge, then stops at the QA gate. |
 | `identify` | Audits the new pull requests and writes local findings. |
@@ -76,6 +76,8 @@ The same workflow is available through slash commands or natural language. The o
 | `refactor` | `refactor` | refactor changes before release |
 
 A pause is not an approval. `autopai resume` at a gate stops and prints the exact approval command. `autopai resume --approve <gate>` passes that gate and continues to the next one; `--auto` skips every human pause. The automatic gates (local commands, CI, and policy) always run.
+
+The brief and backlog sessions stay open after `prepare`. Review them or request changes in the retained backlog session; never re-run `prepare` or reload a core prompt for a revision. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
 
 Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
 

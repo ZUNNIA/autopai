@@ -27,7 +27,7 @@ AutopAI is an external orchestrator. It runs as a Node CLI inside a target repos
 The division of responsibility is the key idea:
 
 - The **orchestrator** owns state, Git writes, pull requests, CI waits, and merges. It is deterministic code, not a conversation.
-- The **coding tool** owns implementation. Each phase or ticket runs in a fresh session with a core-owned prompt.
+- The **coding tool** owns implementation. Each phase or ticket runs in a fresh session with a core-owned prompt; the brief and backlog sessions are the exception and stay open for review until the backlog gate is resolved.
 - The **executor** (an agent inside the coding tool) makes commits. It never pushes and never merges.
 - **CI** is the merge authority. The orchestrator fails closed when a required check is missing or failing.
 
@@ -65,7 +65,7 @@ flowchart LR
 
 **Phase.** One step of the lifecycle: `adopt`, `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`. Each phase can be run alone, chained with `run --from --to`, or resumed after a failure.
 
-**Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. No long-running conversation carries a run.
+**Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. The brief and backlog sessions are retained after their runs so the user can request changes in place; no long-running conversation carries the run or approves a gate.
 
 **Runner.** The adapter between the orchestrator and the coding tool CLI. The bundled runner is `opencode`. Adding a tool means adding one runner module, never touching the core.
 
@@ -146,7 +146,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Initialization and reconciliation.** `/autopai-init` runs the operator agent (`autopai`). It reads `autopai.json` when it exists and runs `autopai config check --repo . --json` first; that deterministic audit reports missing defaults, unknown or deprecated fields, invalid types and paths, legacy agent names, and secret-like keys without writing. The operator then inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, and creates or reconciles the file with the real commands, branches, and check names. Safe changes (missing fields, the default `pauseAfter`, legacy agent names, and a stale branch, command, or check with an unambiguous replacement) are applied automatically. Explicit user choices (`pauseAfter`, `ticketDirs`, `stateDir`, `agents`, `models`, `protectedPaths` extras, and `runnerOptions`) are preserved. Deprecated fields are shown and confirmed before removal; unknown keys are errors and are never silently dropped. Ambiguous or destructive changes are shown and confirmed. A natural-language request can adjust a schema field; for example, "stop after promote" adds the `promotion` gate. It never guesses a language or framework, and it validates the result with `autopai config check --repo .` and `autopai status --repo .`. Permission denials are final: if the edit tool is blocked, it stops and reports; it never bypasses the restriction with shell redirection or another write path. It does not create tickets, branches, commits, or pull requests.
 
-**Feature discussions.** A feature idea starts a conversation, not a `prepare` run. The operator discusses the problem, scope, non-goals, providers and models, parameters, persistence, UX and acceptance criteria, proposes a short feature name, and writes nothing. It generates the brief and backlog only after an explicit request or confirmation. A wish to implement the feature is not, by itself, an explicit request to generate; when the intent is unclear, the operator asks. `/autopai-plan` is the same command for both stages: it discusses first and generates after the confirmation. The agent never infers approval from the original idea and never approves the backlog.
+**Feature discussions.** A feature idea starts a conversation, not a `prepare` run. The operator discusses the problem, scope, non-goals, providers and models, parameters, persistence, UX and acceptance criteria, proposes a short feature name, and writes nothing. It generates the brief and backlog only after an explicit request or confirmation. A wish to implement the feature is not, by itself, an explicit request to generate; when the intent is unclear, the operator asks. `/autopai-plan` is the same command for both stages: it discusses first and generates after the confirmation. After generation, the brief and backlog sessions remain open. A change request is made in the retained backlog session, never by re-running `prepare` or reloading a core prompt. The agent never infers approval from the original idea and never approves the backlog. The retained sessions are deleted only after a successful backlog approval.
 
 **Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
@@ -581,9 +581,9 @@ tickets/.autopai/
 └── logs/<runId>.jsonl      event log for the run
 ```
 
-**Tool sessions.** The OpenCode runner deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. Set `runnerOptions.keepSessions` to true to keep the sessions in the tool history.
+**Tool sessions.** The OpenCode runner normally deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The brief and backlog sessions are retained after `prepare`, recorded in `state.sessions`, and shown by `status` and the `prepare` result. Request changes in the retained backlog session; the original prompt stays in that conversation and is never loaded or injected again. After a successful backlog approval, both retained sessions are deleted. If approval fails, or a session cannot be deleted, they stay available for review. An interrupted prepare with both files is reconnected by `status` or `resume`; the state moves to `awaiting_approval` without running a prompt or approving. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. The operator conversation is not a planner session and is never deleted by AutopAI. Set `runnerOptions.keepSessions` to true to keep every session in the tool history; that also opts out of the prepare-session cleanup.
 
-**state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `filters`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`. `filters` holds the canonical `classifications` and `priorities` arrays of the current run.
+**state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `filters`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`. `filters` holds the canonical `classifications` and `priorities` arrays of the current run. `sessions` holds the retained prepare review conversations with `kind`, `feature`, `title`, `id`, and `createdAt`; the orchestrator records them before it stops at the backlog gate and clears them after a successful approval.
 
 **Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit.
 
@@ -852,7 +852,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 **How do I refresh an outdated autopai.json?** Run `/autopai-init` with no message. It runs `autopai config check`, applies safe corrections, preserves your explicit choices, and asks before an ambiguous or destructive change. To inspect first without writing, run `autopai config check --repo .`; add `--json` for the full report or `--strict` to fail on warnings and missing defaults.
 
-**Where do I see what the agents did?** Every session writes a log under `<stateDir>/artifacts/<runId>/`, and the event stream is in `<stateDir>/logs/<runId>.jsonl`.
+**Where do I see what the agents did?** Every session writes a log under `<stateDir>/artifacts/<runId>/`, and the event stream is in `<stateDir>/logs/<runId>.jsonl`. During a backlog review, `autopai status` also lists the retained brief and backlog session titles and ids.
 
 ## 14. Design decisions and where to read more
 

@@ -93,6 +93,9 @@ Rules:
 - Propose a short kebab-case feature name for the `--feature` option.
 - End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
 - Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and the agreed short feature name; never turn the raw idea into the slug.
+- After prepare succeeds, report the retained brief and backlog session titles and ids from the CLI result. Keep both sessions open for review until the backlog gate is decided.
+- A change request before approval belongs in the retained backlog session. Do not run prepare again, start a new session, or reload a prompt from `src/prompts`; the existing conversation already has the context.
+- The orchestrator deletes the retained prepare sessions only after a successful backlog approval. If approval fails or a session cannot be deleted, leave it and report it.
 - If the user says no or wants to keep discussing, stay in the discussion. Never approve the backlog.
 
 ## Initializing or reconciling a repository

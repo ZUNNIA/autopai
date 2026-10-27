@@ -115,6 +115,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/pauses.js`
 - `src/lib/policy.js`
 - `src/lib/pr.js`
+- `src/lib/prepare-review.js`
 - `src/lib/promotion.js`
 - `src/lib/prompts.js`
 - `src/lib/resume.js`
@@ -165,6 +166,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/platform-permissions.test.js`
 - `test/platform-plan-flow.test.js`
 - `test/policy.test.js`
+- `test/prepare-review.test.js`
 - `test/promotion.test.js`
 - `test/prompts.test.js`
 - `test/resume.test.js`

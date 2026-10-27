@@ -10,6 +10,7 @@ import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } f
 import { nextPhase } from './lib/resume.js'
 import { hasFilters, normalizeFilters } from './lib/filters.js'
 import { currentGate, gateAfterPhase, gateLabel, normalizeApprovedGate, normalizePauseAfter } from './lib/pauses.js'
+import { recoverPrepareReview } from './lib/prepare-review.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
@@ -24,7 +25,10 @@ async function main() {
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
 
-  if (command === 'status') return printStatus(await stateStore.load(), config)
+  if (command === 'status') {
+    if (!await stateStore.isActiveRun()) await recoverPrepareReview({ config, stateStore })
+    return printStatus(await stateStore.load(), config)
+  }
   if (command === 'abort') return abortRun(stateStore)
   if (command === 'resume') return resumeRun({ config, stateStore, options, log })
 
@@ -101,6 +105,10 @@ async function resumeRun({ config, stateStore, options, log }) {
   if (!state) {
     process.stdout.write('No AutopAI state found for this repository.\n')
     return
+  }
+
+  if (!await stateStore.isActiveRun()) {
+    state = await recoverPrepareReview({ config, stateStore, log }) ?? state
   }
 
   const approved = options.approve !== undefined ? normalizeApprovedGate(options.approve) : null
@@ -228,6 +236,11 @@ function printStatus(state, config) {
     completedPhases: state.completedPhases,
     failures: state.failures ?? [],
     filters: normalizeFilters(state.filters ?? {}),
+    sessions: (state.sessions ?? []).map(session => ({
+      kind: session.kind,
+      title: session.title,
+      id: session.id ?? null
+    })),
     gate,
     paused: gate ? config.pauseAfter.includes(gate) : false,
     pauseAfter: config.pauseAfter

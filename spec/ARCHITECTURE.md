@@ -1,13 +1,13 @@
 # Architecture
 
-AutopAI is an external Node orchestrator that coordinates agentic coding tools through resumable phases. It owns state, Git writes, pull requests, CI waits, and merges. The coding tool owns implementation inside a fresh session per phase.
+AutopAI is an external Node orchestrator that coordinates agentic coding tools through resumable phases. It owns state, Git writes, pull requests, CI waits, and merges. The coding tool owns implementation inside a fresh session per phase; the brief and backlog review sessions stay open until the backlog gate is resolved.
 
 ## Design rules
 
 - The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `autopai.json` or from the repository itself.
 - Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
 - Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
-- One session per phase or per ticket. No long-running conversation carries the run.
+- One session per phase or per ticket, except the retained brief and backlog review sessions. No long-running conversation carries the run or approves a gate; the review conversations only let the user edit the artifacts in place.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop at a human gate, identify debt, refactor, or release.
 - Human gates pause the assisted loop after `prepare`, `approve`, `dev`, `identify`, `promote`, or `refactor`. The `pauseAfter` configuration selects them; a pause is never an implicit approval.
 - Phase arguments are optional: `--feature` and `--scope` resolve from the previous run state or the latest ticket directory. The resolver fails instead of guessing when no candidate exists.
@@ -21,7 +21,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 ## Phases
 
 - `adopt`: finishes an existing branch that already has commits.
-- `prepare`: generates a brief and a backlog, then stops at the backlog gate.
+- `prepare`: generates a brief and a backlog in two retained planner sessions, records both in `state.sessions`, then stops at the backlog gate. The user can request changes in the backlog session without reloading a prompt or re-running prepare. Both sessions are deleted only after a successful backlog approval.
 - `approve`: generates ready-for-dev tickets and stops at the plan gate.
 - `dev`: implements one ticket per branch through push, pull request, CI, and merge, then stops at the QA gate.
 - `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run; `--last <n>` audits the last n pull requests merged into the base branch. Directory scopes list tracked and untracked code files with Git ignore rules and split large trees into bounded audit chunks.

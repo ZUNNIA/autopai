@@ -43,6 +43,19 @@ export function uniqueSessionTitle(title) {
  * directory, and created at or after the run started. Only an unambiguous
  * single match is returned; zero or several candidates delete nothing.
  */
+async function listRunSessions(config) {
+  const listed = await runCommand('opencode', ['session', 'list', '--max-count', '25', '--format', 'json'], {
+    cwd: config.repoPath,
+    timeoutMs: 60000
+  })
+  if (listed.code !== 0) return null
+  try {
+    return JSON.parse(listed.stdout)
+  } catch {
+    return null
+  }
+}
+
 export function pickSessionToDelete(sessions, { title, directory, since }) {
   const target = normalizeDirectory(directory)
   const matches = (sessions ?? []).filter(session => session
@@ -52,25 +65,54 @@ export function pickSessionToDelete(sessions, { title, directory, since }) {
   return matches.length === 1 ? matches[0] : null
 }
 
+async function findRunSession({ config, title, startedAt }) {
+  const sessions = await listRunSessions(config)
+  return pickSessionToDelete(sessions, { title, directory: config.repoPath, since: startedAt })
+}
+
 async function deleteRunSession({ config, title, startedAt }) {
   if (config.runnerOptions?.keepSessions === true) return
 
-  const listed = await runCommand('opencode', ['session', 'list', '--max-count', '25', '--format', 'json'], {
-    cwd: config.repoPath,
-    timeoutMs: 60000
-  })
-  if (listed.code !== 0) return
-
-  let sessions
-  try {
-    sessions = JSON.parse(listed.stdout)
-  } catch {
-    return
-  }
-
-  const session = pickSessionToDelete(sessions, { title, directory: config.repoPath, since: startedAt })
+  const session = await findRunSession({ config, title, startedAt })
   if (!session) return
   await runCommand('opencode', ['session', 'delete', session.id], { cwd: config.repoPath, timeoutMs: 60000 })
+}
+
+/**
+ * Lists the coding-tool sessions for review recovery. The core only uses the
+ * normalized title, id, directory and creation time; it never assumes the
+ * tool-specific fields beyond what the runner exposes.
+ */
+export async function listSessions({ config }) {
+  return (await listRunSessions(config)) ?? []
+}
+
+/**
+ * Deletes one retained session by id, or by its unique title when the id was
+ * not available when the session was stored. `keepSessions` remains an
+ * explicit opt-out from every cleanup.
+ */
+export async function deleteSession({ config, session }) {
+  if (config.runnerOptions?.keepSessions === true) {
+    return { deleted: false, reason: 'keepSessions is enabled' }
+  }
+
+  let id = session?.id ?? null
+  if (!id && session?.title) {
+    const found = pickSessionToDelete(await listRunSessions(config), {
+      title: session.title,
+      directory: config.repoPath,
+      since: 0
+    })
+    id = found?.id ?? null
+  }
+  if (!id) return { deleted: false, reason: 'session not found' }
+
+  const result = await runCommand('opencode', ['session', 'delete', id], { cwd: config.repoPath, timeoutMs: 60000 })
+  return {
+    deleted: result.code === 0,
+    reason: result.code === 0 ? null : (result.stderr || result.stdout || 'session deletion failed')
+  }
 }
 
 function normalizeDirectory(directory) {
@@ -78,7 +120,7 @@ function normalizeDirectory(directory) {
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized
 }
 
-export async function runSession({ config, agent, promptText, title, logFile, role }) {
+export async function runSession({ config, agent, promptText, title, logFile, role, retainSession = false }) {
   await writePromptFile(logFile, promptText)
   const sessionTitle = uniqueSessionTitle(title)
   const args = buildArgs({ config, agent, title: sessionTitle, role })
@@ -90,6 +132,20 @@ export async function runSession({ config, agent, promptText, title, logFile, ro
     logFile,
     stdin: promptText
   })
+
+  if (retainSession) {
+    const found = await findRunSession({ config, title: sessionTitle, startedAt })
+    return {
+      ...result,
+      session: {
+        id: found?.id ?? null,
+        title: sessionTitle,
+        directory: config.repoPath,
+        created: found?.created ?? null
+      }
+    }
+  }
+
   await deleteRunSession({ config, title: sessionTitle, startedAt })
   return result
 }

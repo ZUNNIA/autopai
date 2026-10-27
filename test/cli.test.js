@@ -39,3 +39,25 @@ test('runs config check through the CLI without loading a runtime config', async
   assert.equal(report.status, 'outdated')
   assert.ok(report.missing.some(item => item.field === 'pauseAfter'))
 })
+
+test('status exposes retained review sessions', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-status-'))
+  const stateDir = path.join(repo, 'tickets', '.autopai')
+  await fs.mkdir(stateDir, { recursive: true })
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({ runner: 'opencode' }), 'utf8')
+  await fs.writeFile(path.join(stateDir, 'state.json'), JSON.stringify({
+    mode: 'prepare',
+    phase: 'awaiting_approval',
+    feature: 'settings',
+    completedPhases: ['prepare', 'backlog'],
+    sessions: [
+      { kind: 'brief', id: 'brief-1', title: 'AutopAI brief settings [a1b2c3d4]' },
+      { kind: 'backlog', id: 'backlog-1', title: 'AutopAI backlog settings [a1b2c3d4]' }
+    ]
+  }), 'utf8')
+
+  const output = execFileSync(process.execPath, [cli, 'status', '--repo', repo], { encoding: 'utf8' })
+  const status = JSON.parse(output)
+  assert.equal(status.gate, 'backlog')
+  assert.deepEqual(status.sessions.map(session => session.id), ['brief-1', 'backlog-1'])
+})

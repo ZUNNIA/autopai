@@ -10,6 +10,9 @@ test('the plan command discusses before it prepares', async () => {
   assert.match(text, /no fixed limit/)
   assert.match(text, /Run prepare only when the user explicitly asks/)
   assert.match(text, /Do not infer generation from a wish to implement/)
+  assert.match(text, /retained brief and backlog session titles and ids/)
+  assert.match(text, /Do not run prepare again/)
+  assert.match(text, /reload a prompt from `src\/prompts`/)
   assert.doesNotMatch(text, /Run AutopAI in prepare mode\./)
   assert.match(text, /Never approve the backlog/)
 })
@@ -21,7 +24,22 @@ test('the operator routes feature ideas to discussion, not prepare', async () =>
   assert.match(text, /as many questions as the discussion needs/)
   assert.match(text, /no fixed limit/)
   assert.match(text, /## Feature discussions/)
+  assert.match(text, /retained brief and backlog session titles and ids/)
+  assert.match(text, /Do not run prepare again/)
+  assert.match(text, /reload a prompt from `src\/prompts`/)
+  assert.match(text, /deletes the retained prepare sessions only after a successful backlog approval/)
   assert.doesNotMatch(text, /Nothing, or a reference to this conversation/)
+})
+
+test('retained planner sessions edit artifacts without a prompt reload', async () => {
+  const planner = await fs.readFile('platforms/opencode/agents/planner.md', 'utf8')
+  const brief = await fs.readFile('src/prompts/feature-brief.md', 'utf8')
+  const backlog = await fs.readFile('src/prompts/backlog.md', 'utf8')
+  assert.match(planner, /follow-up review message/)
+  assert.match(planner, /edit the existing files in place/)
+  assert.match(brief, /## Review/)
+  assert.match(backlog, /update the existing brief and backlog in place/)
+  assert.match(backlog, /Do not restart from this prompt/)
 })
 
 test('the operator routes by intent, not by a literal phrase', async () => {
