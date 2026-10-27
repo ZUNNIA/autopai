@@ -66,7 +66,7 @@ Generation and reconciliation rules:
 - When `autopai.json` exists, read it first and reconcile it; never recreate it from scratch.
 - Apply safe changes automatically: fill missing fields, add the default `pauseAfter`, migrate legacy agent names, add missing local paths to `.gitignore`, and update a stale branch, command, or check only when the replacement is unambiguous.
 - Preserve explicit user choices: `pauseAfter`, `ticketDirs`, `stateDir`, `agents`, `models`, `protectedPaths` extras, and `runnerOptions`.
-- Show the current and proposed value and ask one question before an ambiguous or destructive change. Destructive changes are confirmed even when the user requested them; safe additions are automatic.
+- Show the current and proposed value and ask the questions needed before an ambiguous or destructive change. Destructive changes are confirmed even when the user requested them; safe additions are automatic.
 - Determine branches from the repository and its CI workflows.
 - Determine check names from the actual CI job names.
 - Determine commands by reading the repository, not by assuming a language or framework.
