@@ -29,3 +29,11 @@ test('locks and unlocks a run', async () => {
   await store.lock()
   await store.unlock()
 })
+
+test('detects a stale run lock as inactive', async () => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-stale-lock-'))
+  const store = new StateStore({ stateDir })
+  await fs.writeFile(store.lockFile, JSON.stringify({ pid: 999999, startedAt: new Date().toISOString() }), 'utf8')
+  assert.equal(await store.isActiveRun(), false)
+  await store.unlock()
+})

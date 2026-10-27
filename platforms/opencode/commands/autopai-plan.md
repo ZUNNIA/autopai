@@ -28,6 +28,8 @@ Run prepare only when the user explicitly asks to generate, formalize or prepare
 
 `autopai run --repo . --from prepare --to prepare <composed arguments>`
 
-Report the CLI output verbatim and the backlog path. The orchestrator writes the brief and the backlog and stops at the backlog gate.
+Report the CLI output verbatim, the backlog path, and the retained brief and backlog session titles and ids. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
+
+After prepare, a change request belongs in the retained backlog session. Do not run prepare again, start a replacement session, or reload a prompt from `src/prompts`; the retained conversation already has the brief and backlog context. The orchestrator deletes the two sessions only after the backlog approval succeeds.
 
 Never approve the backlog on the user's behalf. The next step is a human decision: review the brief and backlog, then run `/autopai-resume --approve backlog` to generate the ready-for-dev plan.

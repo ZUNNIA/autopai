@@ -11,7 +11,7 @@ If the run is paused at a human gate, report the gate, the artifacts to review, 
 
 Compose the arguments from the request:
 
-- "approve the backlog and continue" → `--approve backlog`.
+- "approve the backlog and continue" → `--approve backlog`. After the ready-for-dev generation succeeds, the orchestrator deletes the retained brief and backlog sessions; if it fails, keep them for review.
 - "approve the plan" or "approve ready-for-dev" → `--approve plan`.
 - "approve QA" → `--approve qa`.
 - "approve the findings" → `--approve findings`.

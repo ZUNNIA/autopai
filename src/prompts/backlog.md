@@ -58,3 +58,7 @@ Repeat the structure for Task 2, Task 3, and so on, numbering their subtasks as 
 * **MANDATORY:** Every task and subtask must include one or more links to the official documentation of the external APIs or third-party services involved. If a task does not use any external service, explicitly state "N/A - Internal logic only".
 * If a task depends on another, indicate it explicitly.
 * If a task requires validations or tests, describe them explicitly in the Acceptance Criteria.
+
+## Review
+
+This session stays open after the backlog is written. If the user asks for changes in this same conversation, update the existing brief and backlog in place. Do not restart from this prompt, wait for another JSON payload, or generate a replacement conversation.

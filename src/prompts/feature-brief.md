@@ -34,3 +34,7 @@ Official links for every external API, library, or service the feature may need.
 Decisions a human must resolve before implementation.
 
 Write the brief in English. Never reference ticket files or ADR numbers from code snippets, branch names, or commit examples.
+
+## Review
+
+This session stays open after the brief is written. If the user asks for changes in this same conversation, edit the existing brief in place. Do not restart from this prompt, wait for another JSON payload, or generate a replacement conversation.

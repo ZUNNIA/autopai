@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
-import { runSession } from '../lib/session.js'
+import { runSession, deleteSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, ticketTitle } from '../lib/title.js'
@@ -12,6 +12,7 @@ import { blockedDependents, collectManualVerification, filterFindingFiles, filte
 import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '../lib/filters.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
+import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { ensureDir, slugify } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
@@ -20,7 +21,19 @@ export async function runPrepare({ config, stateStore, options, log }) {
   const briefPath = path.join(backlogDir, 'brief.md')
   await ensureDir(backlogDir)
 
-  const state = await stateStore.create('prepare', { feature, phase: 'backlog' })
+  const recovered = await recoverPrepareReview({ config, stateStore, log, feature })
+  if (recovered) {
+    const backlogFiles = await listMarkdown(backlogDir)
+    await log?.(`Backlog ready for review at ${backlogDir}.`)
+    return { feature, backlogDir, backlogFiles, phase: 'awaiting_approval', sessions: recovered.sessions ?? [], recovered: true }
+  }
+
+  const previous = await stateStore.load()
+  const state = previous?.mode === 'prepare' && previous.feature === feature
+    ? previous
+    : await stateStore.create('prepare', { feature, phase: 'backlog' })
+  state.phase = 'backlog'
+  await stateStore.save(state)
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
@@ -35,8 +48,16 @@ export async function runPrepare({ config, stateStore, options, log }) {
       payload: { feature, description: String(options.description), briefPath },
       title: `AutopAI brief ${feature}`,
       logFile: artifacts.path('planner-brief.log'),
-      role: 'planner'
+      role: 'planner',
+      retainSession: true
     })
+    state.sessions = mergePrepareSession(state.sessions, prepareSessionRecord({
+      kind: 'brief',
+      feature,
+      session: briefRun.session,
+      title: `AutopAI brief ${feature}`
+    }))
+    await stateStore.save(state)
     if (briefRun.code !== 0) throw new Error('The planner could not write the feature brief.')
   }
 
@@ -47,9 +68,19 @@ export async function runPrepare({ config, stateStore, options, log }) {
     payload: { feature, briefPath, outputDir: backlogDir },
     title: `AutopAI backlog ${feature}`,
     logFile: artifacts.path('planner-backlog.log'),
-    role: 'planner'
+    role: 'planner',
+    retainSession: true
   })
-  if (backlogRun.code !== 0) throw new Error('The planner could not generate the backlog.')
+  state.sessions = mergePrepareSession(state.sessions, prepareSessionRecord({
+    kind: 'backlog',
+    feature,
+    session: backlogRun.session,
+    title: `AutopAI backlog ${feature}`
+  }))
+  if (backlogRun.code !== 0) {
+    await stateStore.save(state)
+    throw new Error('The planner could not generate the backlog.')
+  }
 
   state.phase = 'awaiting_approval'
   state.completedPhases = [...new Set([...state.completedPhases, 'prepare', 'backlog'])]
@@ -57,11 +88,12 @@ export async function runPrepare({ config, stateStore, options, log }) {
 
   const backlogFiles = await listMarkdown(backlogDir)
   await log?.(`Backlog ready for review at ${backlogDir}.`)
-  return { feature, backlogDir, backlogFiles, phase: 'awaiting_approval' }
+  return { feature, backlogDir, backlogFiles, phase: 'awaiting_approval', sessions: state.sessions ?? [] }
 }
 
 export async function runApprove({ config, stateStore, options, log }) {
-  const previous = await stateStore.load()
+  const recovered = await recoverPrepareReview({ config, stateStore, log })
+  const previous = recovered ?? await stateStore.load()
   const feature = await resolveFeature({ config, options, state: previous, dirs: [config.ticketDirs.backlog] })
   const backlogDir = path.join(config.repoPath, config.ticketDirs.backlog, feature)
   if (!await exists(backlogDir)) throw new Error(`No backlog found for feature ${feature}. Run prepare first.`)
@@ -89,8 +121,43 @@ export async function runApprove({ config, stateStore, options, log }) {
   state.completedPhases = [...new Set([...state.completedPhases, 'approve'])]
   await stateStore.save(state)
 
+  const cleanup = await cleanupPrepareSessions({ config, state, log })
+  if (cleanup.deleted.length > 0) {
+    state.sessions = (state.sessions ?? []).filter(session => !cleanup.deleted.some(deleted => sameSession(deleted, session)))
+    await stateStore.save(state)
+  }
+
   await log?.(`Tickets generated at ${readyDir}.`)
-  return { feature, readyDir }
+  return {
+    feature,
+    readyDir,
+    sessionsDeleted: cleanup.deleted.map(session => session.title),
+    sessionsRetained: cleanup.retained
+  }
+}
+
+export async function cleanupPrepareSessions({ config, state, log, removeSession = deleteSession }) {
+  const sessions = prepareSessionsToDelete(state)
+  const deleted = []
+  for (const session of sessions) {
+    try {
+      const result = await removeSession({ config, session })
+      if (result.deleted) {
+        deleted.push(session)
+        await log?.(`Deleted retained session ${session.title}.`)
+      } else {
+        await log?.(`Retained session ${session.title}: ${result.reason}.`)
+      }
+    } catch (error) {
+      await log?.(`Could not delete retained session ${session.title}: ${error.message}`)
+    }
+  }
+  return { deleted, retained: sessions.length - deleted.length }
+}
+
+function sameSession(left, right) {
+  if (left.id && right.id) return left.id === right.id
+  return Boolean(left.title && right.title && left.title === right.title)
 }
 
 export async function runDev({ config, stateStore, options, log }) {
