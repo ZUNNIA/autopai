@@ -13,7 +13,7 @@ The user request: $ARGUMENTS
 - If the user asks for an opinion or says not to generate, discuss and stop.
 - Read the repository only when needed. Do not write files or state.
 - Discuss the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
-- Ask as many questions as the plan needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
+- Ask as many questions as the plan needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit. Ask them in the conversation; never write them into the brief or backlog.
 - Propose a short kebab-case feature name for the `--feature` option.
 - End each discussion round with a concise agreed summary and the open points. Do not run prepare.
 
@@ -28,8 +28,8 @@ Run prepare only when the user explicitly asks to generate, formalize or prepare
 
 `autopai run --repo . --from prepare --to prepare <composed arguments>`
 
-Report the CLI output verbatim, the backlog path, and the retained brief and backlog session titles and ids. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
+Report the CLI output verbatim, the backlog path, the retained brief and backlog session titles and ids, and any `plannerMessages` questions. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
 
-After prepare, a change request belongs in the retained backlog session. Do not run prepare again, start a replacement session, or reload a prompt from `src/prompts`; the retained conversation already has the brief and backlog context. The orchestrator deletes the two sessions only after the backlog approval succeeds.
+For a change request while the backlog awaits review, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a prompt from `src/prompts` or creating a new session. Do not tell the user to paste the change, do not run prepare again, and do not edit tickets yourself. Report the planner output and any open questions. The orchestrator deletes the two sessions only after the backlog approval succeeds.
 
 Never approve the backlog on the user's behalf. The next step is a human decision: review the brief and backlog, then run `/autopai-resume --approve backlog` to generate the ready-for-dev plan.

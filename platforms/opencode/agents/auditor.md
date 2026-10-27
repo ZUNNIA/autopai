@@ -25,5 +25,5 @@ Rules:
 - You may only write Markdown files inside the payload output directory, under `tickets/identified/**` by default. Never edit source, tests, UX, CI, ADRs, or configuration.
 - Never create a diagnostic report. The evidence file is input, not output.
 - Write one file per debt in English. Include classification, priority, exact evidence, affected files, impact, and references. Do not propose solutions.
-- Never ask questions. If a finding cannot be verified, omit it and say so in your final message.
+- Do not use the interactive question tool. If a finding cannot be verified, omit it and say so in your final message. If a UX decision is missing, state the question in the final message; never write it into the artifact.
 - Do not reference ticket files or ADR numbers from code snippets or identifiers.

@@ -21,7 +21,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 ## Phases
 
 - `adopt`: finishes an existing branch that already has commits.
-- `prepare`: generates a brief and a backlog in two retained planner sessions, records both in `state.sessions`, then stops at the backlog gate. The user can request changes in the backlog session without reloading a prompt or re-running prepare. Both sessions are deleted only after a successful backlog approval.
+- `prepare`: generates a brief and a backlog in two retained planner sessions, records both in `state.sessions`, then stops at the backlog gate. Open questions are returned in the planner messages and chat; they are never written into the artifacts. `autopai revise` continues the retained backlog session with a raw review message, without reloading a core prompt or re-running prepare. Both sessions are deleted only after a successful backlog approval.
 - `approve`: generates ready-for-dev tickets and stops at the plan gate.
 - `dev`: implements one ticket per branch through push, pull request, CI, and merge, then stops at the QA gate.
 - `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run; `--last <n>` audits the last n pull requests merged into the base branch. Directory scopes list tracked and untracked code files with Git ignore rules and split large trees into bounded audit chunks.

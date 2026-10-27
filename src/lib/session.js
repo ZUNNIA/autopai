@@ -34,3 +34,15 @@ export async function deleteSession({ config, session }) {
   }
   return runner.deleteSession({ config, session })
 }
+
+/**
+ * Sends a review message to an existing session. Unlike runSession, this path
+ * never calls loadPrompt and never creates a new conversation.
+ */
+export async function continueSession({ config, session, message, agent, logFile }) {
+  const runner = await resolveRunner(config)
+  if (typeof runner.continueSession !== 'function') {
+    throw new Error('The configured runner cannot continue an existing session.')
+  }
+  return runner.continueSession({ config, session, message, agent, logFile })
+}

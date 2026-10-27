@@ -36,7 +36,6 @@ The recommended change, described at UX level only. No implementation steps.
 ## Alternatives
 At least one alternative and its tradeoff.
 
-## Open Questions
-Decisions a human must resolve before implementation.
+Do not add an Open Questions section and do not write unresolved decisions into the proposal. State them in the final chat message instead. The proposal must contain the review, not the pending questions.
 
-Write proposals in English. End with a short list of the files you created.
+Write proposals in English. End with a short list of the files you created and any questions the user must answer.

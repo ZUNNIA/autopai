@@ -94,7 +94,8 @@ Rules:
 - End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
 - Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and the agreed short feature name; never turn the raw idea into the slug.
 - After prepare succeeds, report the retained brief and backlog session titles and ids from the CLI result. Keep both sessions open for review until the backlog gate is decided.
-- A change request before approval belongs in the retained backlog session. Do not run prepare again, start a new session, or reload a prompt from `src/prompts`; the existing conversation already has the context.
+- When the backlog is awaiting review and the user requests a change, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a core prompt from `src/prompts`. Do not edit tickets yourself, do not run prepare again, and do not tell the user to paste the change.
+- Relay the planner response and any open questions from `autopai revise` or the `plannerMessages` field of the prepare result. Open questions belong in the conversation, never in the brief, backlog, or UX proposal.
 - The orchestrator deletes the retained prepare sessions only after a successful backlog approval. If approval fails or a session cannot be deleted, leave it and report it.
 - If the user says no or wants to keep discussing, stay in the discussion. Never approve the backlog.
 

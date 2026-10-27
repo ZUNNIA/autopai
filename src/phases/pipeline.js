@@ -25,9 +25,18 @@ export async function runPrepare({ config, stateStore, options, log }) {
   if (recovered) {
     const backlogFiles = await listMarkdown(backlogDir)
     await log?.(`Backlog ready for review at ${backlogDir}.`)
-    return { feature, backlogDir, backlogFiles, phase: 'awaiting_approval', sessions: recovered.sessions ?? [], recovered: true }
+    return {
+      feature,
+      backlogDir,
+      backlogFiles,
+      phase: 'awaiting_approval',
+      sessions: recovered.sessions ?? [],
+      plannerMessages: [],
+      recovered: true
+    }
   }
 
+  const plannerMessages = []
   const previous = await stateStore.load()
   const state = previous?.mode === 'prepare' && previous.feature === feature
     ? previous
@@ -57,6 +66,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
       session: briefRun.session,
       title: `AutopAI brief ${feature}`
     }))
+    if (briefRun.stdout?.trim()) plannerMessages.push({ kind: 'brief', text: briefRun.stdout.trim() })
     await stateStore.save(state)
     if (briefRun.code !== 0) throw new Error('The planner could not write the feature brief.')
   }
@@ -77,6 +87,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
     session: backlogRun.session,
     title: `AutopAI backlog ${feature}`
   }))
+  if (backlogRun.stdout?.trim()) plannerMessages.push({ kind: 'backlog', text: backlogRun.stdout.trim() })
   if (backlogRun.code !== 0) {
     await stateStore.save(state)
     throw new Error('The planner could not generate the backlog.')
@@ -88,7 +99,14 @@ export async function runPrepare({ config, stateStore, options, log }) {
 
   const backlogFiles = await listMarkdown(backlogDir)
   await log?.(`Backlog ready for review at ${backlogDir}.`)
-  return { feature, backlogDir, backlogFiles, phase: 'awaiting_approval', sessions: state.sessions ?? [] }
+  return {
+    feature,
+    backlogDir,
+    backlogFiles,
+    phase: 'awaiting_approval',
+    sessions: state.sessions ?? [],
+    plannerMessages
+  }
 }
 
 export async function runApprove({ config, stateStore, options, log }) {

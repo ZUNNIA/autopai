@@ -7,6 +7,8 @@ import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
 import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
+import { Artifacts } from './lib/artifacts.js'
+import { continueSession } from './lib/session.js'
 import { nextPhase } from './lib/resume.js'
 import { hasFilters, normalizeFilters } from './lib/filters.js'
 import { currentGate, gateAfterPhase, gateLabel, normalizeApprovedGate, normalizePauseAfter } from './lib/pauses.js'
@@ -45,11 +47,44 @@ async function main() {
     else if (command === 'refactor') result = await runRefactor(ctx)
     else if (command === 'release') result = await runRelease(ctx)
     else if (command === 'run') result = await runSequence(ctx)
+    else if (command === 'revise') result = await runRevise(ctx)
     else throw new Error(`Unknown command: ${command}`)
     printResult(result)
     return result
   } finally {
     await stateStore.unlock()
+  }
+}
+
+async function runRevise({ config, stateStore, options, log }) {
+  const message = String(options.message ?? '').trim()
+  if (!message || message === 'true') throw new Error('Usage: autopai revise --repo <path> --message <change>')
+
+  const recovered = await recoverPrepareReview({ config, stateStore, log })
+  const state = recovered ?? await stateStore.load()
+  if (!state || state.mode !== 'prepare' || state.phase !== 'awaiting_approval') {
+    throw new Error('There is no backlog awaiting review. Run prepare first.')
+  }
+
+  const session = [...(state.sessions ?? [])].reverse().find(item => item.kind === 'backlog')
+  if (!session) throw new Error('No retained backlog session was found. Run status before revising.')
+
+  const artifacts = new Artifacts(config, state.runId)
+  await artifacts.init()
+  const result = await continueSession({
+    config,
+    session,
+    message,
+    agent: config.agents.planner,
+    logFile: artifacts.path('planner-revision.log')
+  })
+
+  return {
+    feature: state.feature,
+    session: { title: session.title, id: session.id ?? null },
+    output: String(result.stdout ?? '').trim(),
+    stderr: String(result.stderr ?? '').trim() || null,
+    code: result.code
   }
 }
 
@@ -260,6 +295,7 @@ Usage:
   autopai dev --repo <path> [--feature <slug>]
   autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
   autopai release --repo <path> --version <x.y.z>
+  autopai revise --repo <path> --message <change>
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
   autopai config check --repo <path> [--json] [--strict]
@@ -280,6 +316,9 @@ ticket depends on a pending ticket outside the filter, the run stops and lists
 the dependency. Filters persist through resume.
 
 approve generates the ready-for-dev tickets and stops; dev implements them.
+
+revise continues the retained backlog session with a review message. It never
+loads the original prompt, creates a new session, or approves the backlog.
 
 Human gates pause the assisted loop after prepare, approve, dev, identify,
 promote, or refactor. pauseAfter defaults to backlog, plan, and qa. resume at a

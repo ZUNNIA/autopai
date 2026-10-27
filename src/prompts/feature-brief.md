@@ -30,8 +30,7 @@ Observable conditions that prove the feature works.
 ## External References
 Official links for every external API, library, or service the feature may need. Write "N/A" when the feature is internal only.
 
-## Open Questions
-Decisions a human must resolve before implementation.
+Do not add an Open Questions section and do not write unresolved decisions into the brief. If a decision is missing, stop and state the question in your final message; never guess.
 
 Write the brief in English. Never reference ticket files or ADR numbers from code snippets, branch names, or commit examples.
 

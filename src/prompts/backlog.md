@@ -17,7 +17,7 @@ Before writing a single line of the backlog, research the topic.
 ## PHASE 2: Backlog Generation
 Once the research is complete, create the backlog file following this structure exactly. Save it in English under the payload `outputDir` as `backlog.md`.
 
-Never cite ticket files or ADR numbers from code snippets or branch examples inside the backlog. Open questions that a human must resolve belong in a final "Open questions" section.
+Never cite ticket files or ADR numbers from code snippets or branch examples inside the backlog. Do not add an Open Questions section and do not write unresolved decisions into the backlog. If a decision is missing, stop and state the question in your final message; never guess.
 
 ### Document Structure
 
