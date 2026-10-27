@@ -24,8 +24,8 @@ The same workflow is available through slash commands or natural language. The o
 
 ## The loop
 
-1. **Discuss the idea** with the operator. Nothing is written yet.
-2. **Formalize it** with `/autopai-plan "<idea>"`. The planner writes the brief and backlog and stops at the backlog gate.
+1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name.
+2. **Formalize it** when you are ready: tell the operator to generate the brief and backlog (for example, "genera el brief y el backlog"). It runs `prepare`, which writes the brief and backlog and stops at the backlog gate. `/autopai-plan` remains the same command; it only generates after your explicit confirmation.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist, then identify the pull requests of the new feature, promote the findings, and refactor them.
@@ -95,7 +95,8 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | --- | --- | --- |
 | Initialize or adjust config | `/autopai-init` | `/autopai-init "stop after promote"` |
 | Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
-| Discuss and formalize | `/autopai-plan` | `/autopai-plan "the feature we just discussed"` |
+| Discuss a feature | `/autopai-plan` | "quiero implementar..." or "discutamos esta feature" |
+| Generate the brief and backlog | `/autopai-plan` after confirmation | "genera el brief y el backlog de lo que discutimos" |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
@@ -184,7 +185,8 @@ Open a target repository in the coding tool and run `/autopai-init`. The operato
 The assisted loop:
 
 ```text
-/autopai-plan "the feature we just discussed"
+# discuss first; when ready, ask for the generation
+/autopai-plan "genera el brief y el backlog de lo que discutimos"
 # review tickets/backlog/<feature>/
 /autopai-resume --approve backlog
 # review tickets/ready-for-dev/<feature>/

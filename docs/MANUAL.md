@@ -146,6 +146,8 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Initialization and reconciliation.** `/autopai-init` runs the operator agent (`autopai`). It reads `autopai.json` when it exists and runs `autopai config check --repo . --json` first; that deterministic audit reports missing defaults, unknown or deprecated fields, invalid types and paths, legacy agent names, and secret-like keys without writing. The operator then inspects the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`, and creates or reconciles the file with the real commands, branches, and check names. Safe changes (missing fields, the default `pauseAfter`, legacy agent names, and a stale branch, command, or check with an unambiguous replacement) are applied automatically. Explicit user choices (`pauseAfter`, `ticketDirs`, `stateDir`, `agents`, `models`, `protectedPaths` extras, and `runnerOptions`) are preserved. Deprecated fields are shown and confirmed before removal; unknown keys are errors and are never silently dropped. Ambiguous or destructive changes are shown and confirmed. A natural-language request can adjust a schema field; for example, "stop after promote" adds the `promotion` gate. It never guesses a language or framework, and it validates the result with `autopai config check --repo .` and `autopai status --repo .`. Permission denials are final: if the edit tool is blocked, it stops and reports; it never bypasses the restriction with shell redirection or another write path. It does not create tickets, branches, commits, or pull requests.
 
+**Feature discussions.** A feature idea starts a conversation, not a `prepare` run. The operator discusses the problem, scope, non-goals, providers and models, parameters, persistence, UX and acceptance criteria, proposes a short feature name, and writes nothing. It generates the brief and backlog only after an explicit request or confirmation. `/autopai-plan` is the same command for both stages: it discusses first and generates after the confirmation. The agent never infers approval from the original idea and never approves the backlog.
+
 **Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
 **Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. `/autopai-adr` and `/autopai-init` are the exceptions: they do not call the operational CLI; the operator agent authors the decision record or reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
@@ -208,12 +210,14 @@ The order used by `run --from --to` is `prepare`, `approve`, `dev`, `identify`, 
 
 ### 4.2 prepare
 
-**Purpose.** Turn an idea into a reviewable brief and backlog.
+**Purpose.** Turn an agreed feature into a reviewable brief and backlog.
+
+**Before the phase.** The original idea is discussed with the operator first. The discussion is not a phase: it writes no state and no files. The operator asks the questions that change the plan, proposes a short feature name, summarizes the agreement, and waits. `/autopai-plan` is the same command for the discussion and for the later generation; it only runs `prepare` after an explicit request or confirmation. A feature idea alone never starts this phase.
 
 **Flow.**
 
-1. Require `--feature <slug>`.
-2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` was provided, run the planner to write the brief.
+1. Resolve a concise feature slug from `--feature` or the agreed name. A description can derive it, but prefer a short explicit name over an 80-character sentence.
+2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` was provided, run the planner to write the brief from the agreed summary.
 3. Run the planner to write `backlog.md` next to the brief.
 4. Stop at the `backlog` gate.
 
@@ -843,6 +847,8 @@ A dev ticket needs a new pattern the repository has not decided yet.
 **The run stopped but `status` shows an old phase.** `status` shows the last saved state. Failed runs keep the phase they were in. The error output is the source of truth for why it stopped.
 
 **How do I change a pause gate?** Run `/autopai-init "stop after promote"` or describe the change in your own words. The operator adjusts `pauseAfter`, preserves the rest of the configuration, and validates with `status`. Adding a gate is safe. "Only stop at X" proposes a list with that gate and confirms before replacing the current one.
+
+**How do I discuss a feature before generating the brief?** Start with a plain message or `/autopai-plan "<idea>"`. The operator discusses and writes nothing. When you are ready, ask it to generate the brief and backlog; `/autopai-plan` then runs `prepare`. It never generates from the idea alone and never approves the backlog.
 
 **How do I refresh an outdated autopai.json?** Run `/autopai-init` with no message. It runs `autopai config check`, applies safe corrections, preserves your explicit choices, and asks before an ambiguous or destructive change. To inspect first without writing, run `autopai config check --repo .`; add `--json` for the full report or `--strict` to fail on warnings and missing defaults.
 

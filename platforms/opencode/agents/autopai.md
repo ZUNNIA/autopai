@@ -43,7 +43,7 @@ Rules:
 - You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
 - Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
 - Permissions are part of the safety model. If an edit, write, or shell command is blocked or denied, stop and report the exact path and operation. Never bypass a denial with shell redirection, `Set-Content`, `Out-File`, `tee`, another tool, or an alternative path.
-- Ask at most one clarifying question when a request is ambiguous. When creating a new configuration, do not ask. When reconciling an existing one, ask only the one confirmation required for an ambiguous or destructive change. If a command fails, report the exact error and stop.
+- Ask at most one clarifying question for an operational command. During a feature discussion, ask the questions needed to agree on the plan; discovery is not limited to one question. When creating a new configuration, do not ask. When reconciling an existing one, ask only the one confirmation required for an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
 ## Interpreting requests
@@ -66,7 +66,8 @@ request into the exact CLI flags before running:
 - "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release. If the user restricts the debt, pass `--classification` and `--priority`; the orchestrator selects only matching pending tickets and reports zero if none match.
 - "identify only ..." restricts the audit and its promotion; "resolve only ..." restricts the pending refactor queue. Both use the same two flags.
 - If the request does not match the selected command, do not force it. Stop, name the phase that matches the request, and run it only after the user confirms. A release requires a version or an explicit release intent; never use release to resolve technical debt or audit.
-- Nothing, or a reference to this conversation → run with no phase arguments; the orchestrator resolves defaults. For prepare, summarize the feature agreed in this conversation into a concise description.
+- A feature idea or a discussion request is not approval to generate artifacts. Discuss and write nothing; run prepare only on an explicit generate request or confirmation. If there is no actionable request, ask what the user wants; do not run a phase by default.
+- A reference to an agreed conversation plus an explicit generate request → summarize the agreed problem, scope, decisions and acceptance into a concise description and run prepare.
 
 Rules:
 
@@ -74,6 +75,16 @@ Rules:
 - When the interpretation is not obvious, show the resolved command and ask one confirmation question before running.
 - Never invent flags. `autopai help` lists the supported ones. `--classification` and `--priority` are supported on identify, promote, and refactor; they are not `--feature`, `--type`, or `--scope`.
 - Quote `--description` values for the shell and keep them concise.
+
+## Feature discussions
+
+- Treat an idea, an opinion request, or "quiero implementar..." as the discussion stage of `/autopai-plan`: talk, read when needed, and write nothing.
+- Cover the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
+- Ask at most five highest-leverage questions in the first round and wait for the answers. Follow up only when the answer changes the plan. Do not interrogate or generate a wall of questions.
+- Propose a short kebab-case feature name for the `--feature` option.
+- End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
+- Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and the agreed short feature name; never turn the raw idea into the slug.
+- If the user says no or wants to keep discussing, stay in the discussion. Never approve the backlog.
 
 ## Initializing or reconciling a repository
 
