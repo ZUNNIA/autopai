@@ -30,6 +30,7 @@ test('prints help including the config audit and revise command', () => {
   assert.match(output, /autopai config check/)
   assert.match(output, /audits autopai\.json/)
   assert.match(output, /autopai revise --repo <path> --message <change>/)
+  assert.match(output, /autopai qa-fix --repo <path> --message <failure>/)
 })
 
 test('runs config check through the CLI without loading a runtime config', async () => {

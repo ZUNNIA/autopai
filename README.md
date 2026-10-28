@@ -28,7 +28,7 @@ The same workflow is available through slash commands or natural language. The o
 2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or ask the operator for changes; the operator runs `autopai revise` against the retained backlog session, so you never paste the change yourself and the original prompt is not reloaded. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
-5. **Verify and audit.** Review the QA checklist, then identify the pull requests of the new feature, promote the findings, and refactor them.
+5. **Verify and audit.** Review the QA checklist. If an item fails, report it to the operator; it runs `autopai qa-fix`, creates fix tickets for the current feature, and restarts dev. When QA passes, identify the pull requests of the new feature, promote the findings, and refactor them.
 6. **Repeat** with the next idea. Run `/autopai-release` when you decide to publish.
 
 ## Highlights
@@ -77,7 +77,7 @@ The same workflow is available through slash commands or natural language. The o
 
 A pause is not an approval. `autopai resume` at a gate stops and prints the exact approval command. `autopai resume --approve <gate>` passes that gate and continues to the next one; `--auto` skips every human pause. The automatic gates (local commands, CI, and policy) always run.
 
-Before approving, the operator runs `autopai status` and reads the reported `gate`. It passes `--approve` only when the user approves that exact gate and the status reports it. A failed ticket or a blocker is not a gate; a plain resume retries after the blocker is resolved. `/autopai-adr` records a decision only: it checks the status after writing and never approves a gate or starts a phase.
+Before approving, the operator runs `autopai status` and reads the reported `gate`. It passes `--approve` only when the user approves that exact gate and the status reports it. A failed ticket or a blocker is not a gate; a plain resume retries after the blocker is resolved. A failed manual QA item is not an approval either: the operator runs `autopai qa-fix --message "<failure>"`, which creates fix tickets for the current feature and starts dev. `/autopai-adr` records a decision only: it checks the status after writing and never approves a gate or starts a phase.
 
 The brief and backlog sessions stay open after `prepare`. Review them or ask the operator for changes; the operator continues the retained backlog session with `autopai revise` and never re-runs `prepare` or reloads a core prompt. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
 
@@ -107,6 +107,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
+| Fix failed QA | Operator runs `autopai qa-fix` | Report the failed QA item; the operator creates fix tickets and restarts dev. |
 | Audit filtered debt | `/autopai-identify "only urgent code smells"` | "identify only urgent code smells" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
 | Refactor filtered debt | `/autopai-refactor "only minor missing documentation"` | "resolve only minor missing documentation" |
