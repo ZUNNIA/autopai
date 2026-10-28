@@ -147,6 +147,20 @@ test('reuses a ticket branch that already has commits over the base', async () =
   assert.equal(reused.reuse, true)
   assert.equal(reused.commits, 1)
 
+  git(repo, ['switch', '-c', 'refactor/ticket-slug-3'])
+  await fs.writeFile(path.join(repo, 'change-3.txt'), 'change 3\n', 'utf8')
+  git(repo, ['add', 'change-3.txt'])
+  commit(repo, 'refactor: retry the ticket scope')
+  const suffixed = await resolveTicketBranch({
+    config,
+    ticket: { slug: 'ticket-slug' },
+    type: 'refactor',
+    previousBranch: 'refactor/ticket-slug-3'
+  })
+  assert.equal(suffixed.branch, 'refactor/ticket-slug-3')
+  assert.equal(suffixed.reuse, true)
+  assert.equal(suffixed.commits, 2)
+
   const fresh = await resolveTicketBranch({ config, ticket: { slug: 'other-ticket' }, type: 'refactor' })
   assert.equal(fresh.branch, 'refactor/other-ticket')
   assert.equal(fresh.reuse, false)

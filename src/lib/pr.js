@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import * as git from './git.js'
 import * as github from './github.js'
 import { runSession } from './session.js'
@@ -6,7 +8,7 @@ import { scanBranch, scanRepositoryFiles, formatViolations, validatePrBody } fro
 import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
 import { generateMergeBody } from './title.js'
-import { sleep, truncate } from './util.js'
+import { ensureDir, sleep, truncate } from './util.js'
 
 const FAILED_STATES = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
 const PENDING_STATES = new Set(['PENDING', 'QUEUED', 'IN_PROGRESS', 'WAITING', 'REQUESTED'])
@@ -88,13 +90,36 @@ export async function waitForChecks({ config, artifacts, prNumber }) {
 export async function collectFailureLogs({ config, artifacts, checks, attempt }) {
   const failed = checks.filter(check => FAILED_STATES.has(check.state))
   const sections = []
+  let usable = false
   for (const check of failed) {
     const log = await github.runFailedLog(config.repoPath, check)
-    sections.push(`### ${check.name} (${check.state})\n${log || check.link || 'No log available.'}`)
+    if (log.ok) usable = true
+    sections.push(`### ${check.name} (${check.state})\n${log.text || check.link || 'No log available.'}`)
   }
   const text = sections.join('\n\n')
   await artifacts.write(`ci-failure-${attempt}.log`, text)
-  return truncate(text, 20000)
+  return { text: truncate(text, 20000), usable, checks }
+}
+
+async function writeCiLogBlocker({ config, state, stateStore, executorPayload, checks }) {
+  const failed = checks.filter(check => FAILED_STATES.has(check.state))
+  const links = failed.map(check => check.link).filter(Boolean)
+  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+  const dir = path.join(config.stateDir, 'needs-human')
+  await ensureDir(dir)
+  const file = path.join(dir, `${stamp}-ci-log-unavailable.json`)
+  const blocker = {
+    ticketId: executorPayload?.ticketId ?? null,
+    ticketFile: executorPayload?.ticketFile ?? null,
+    reason: 'CI failed but no failure log is available. The orchestrator cannot tell the executor what to fix.',
+    files: links,
+    decision: 'A human must inspect the failed GitHub Actions job, restore log access, permissions, runner or billing, and re-run the job before resuming.',
+    suggestedAction: 'Inspect the linked GitHub Actions job and restore CI access; then run autopai resume without --fix.'
+  }
+  await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
+  state.blockers = [...(state.blockers ?? []), file]
+  await stateStore.save(state)
+  return { ...blocker, file }
 }
 
 /**
@@ -150,7 +175,18 @@ export async function pushOpenWaitMerge({
   while (!checks.ok && attempt < config.maxAttempts) {
     attempt += 1
     state.attempts = attempt
-    const failureLogs = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
+    const failure = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
+    if (!failure.usable) {
+      const blocker = await writeCiLogBlocker({
+        config,
+        state,
+        stateStore,
+        executorPayload,
+        checks: failure.checks
+      })
+      throw new Error(blockerMessage([blocker]))
+    }
+    const failureLogs = failure.text
     await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
 
     const execution = await runSession({

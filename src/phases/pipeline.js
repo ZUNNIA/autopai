@@ -180,6 +180,7 @@ function sameSession(left, right) {
 
 export async function runDev({ config, stateStore, options, log }) {
   const loaded = await stateStore.load()
+  const previousFailures = loaded?.failures ?? []
   const feature = await resolveFeature({ config, options, state: loaded, dirs: [config.ticketDirs.readyForDev] })
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
   const doneDir = path.join(config.repoPath, config.ticketDirs.done, feature)
@@ -208,6 +209,7 @@ export async function runDev({ config, stateStore, options, log }) {
     artifacts,
     feature,
     tickets,
+    previousFailures,
     mode: 'dev',
     branchType: ticket => ticket.type,
     doneDirFor: () => doneDir,
@@ -227,6 +229,7 @@ export async function runDev({ config, stateStore, options, log }) {
 
 export async function runRefactor({ config, stateStore, options, log }) {
   const loaded = await stateStore.load()
+  const previousFailures = loaded?.failures ?? []
   const requested = String(options.feature ?? '').trim() || null
   const queueDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
   const doneRoot = path.join(config.repoPath, config.ticketDirs.done)
@@ -280,6 +283,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
     artifacts,
     feature: state.feature,
     tickets,
+    previousFailures,
     mode: 'refactor',
     branchType: () => 'refactor',
     doneDirFor: ticket => ticketDoneDir(config, ticket, state.feature),
@@ -288,7 +292,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
   return { feature: state.feature, tickets: result.tickets, failures: result.failures, filters }
 }
 
-async function runTicketQueue({ config, stateStore, options, log, state, artifacts, feature, tickets, mode, branchType, doneDirFor, instructions }) {
+async function runTicketQueue({ config, stateStore, options, log, state, artifacts, feature, tickets, previousFailures = [], mode, branchType, doneDirFor, instructions }) {
   const results = []
   const failures = []
   const failedIds = new Set()
@@ -311,7 +315,8 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
     let stage = 'branch'
     try {
       await git.fetch(config.repoPath)
-      const resolved = await resolveTicketBranch({ config, ticket, type: branchType(ticket) })
+      const previousBranch = previousFailures.find(failure => failure.ticket === ticket.id)?.branch ?? null
+      const resolved = await resolveTicketBranch({ config, ticket, type: branchType(ticket), previousBranch })
       branch = resolved.branch
       if (resolved.reuse) {
         const switched = await git.switchBranchSafe(config.repoPath, branch)

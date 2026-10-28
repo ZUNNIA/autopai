@@ -54,5 +54,5 @@ export function blockerMessage(blockers) {
     const action = String(blocker.suggestedAction ?? '').trim()
     return `${blocker.file}${reason ? `: ${reason}` : ''}${action ? ` (${action})` : ''}`
   })
-  return `The executor is blocked:\n${lines.join('\n')}\nResolve the blocker and run autopai resume. Architecture decisions: run /autopai-adr in your coding tool first.`
+  return `The executor is blocked:\n${lines.join('\n')}\nResolve the blocker and run autopai resume.`
 }

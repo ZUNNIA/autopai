@@ -87,10 +87,11 @@ Add or remove gates in `autopai.json`, or ask the operator in natural language a
 
 A failed ticket is not a human gate. Local gates are retried once. If the ticket still fails, its branch stays available, the failure is recorded, and the loop continues with independent tickets while skipping dependents. The phase stays incomplete.
 
-- `autopai resume` reuses the failed ticket branch and retries the gates.
+- `autopai resume` reuses the failed ticket branch and retries the gates. A branch with commits is reused even when its name has a suffix, so a retry does not create `-4` versions of the same work.
 - `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
 - `/autopai-status` shows the failed tickets and branches.
 - An explicit dev or refactor resume archives the blockers recorded by the previous attempt under the run artifacts. A new blocker still stops the run.
+- If CI fails and no failure log is available, the run stops before asking the executor to fix an invisible failure and writes a CI-access blocker with the job links.
 
 The automatic gates are never bypassed, and a red branch is never pushed. A branch with commits is reused instead of creating a duplicate.
 

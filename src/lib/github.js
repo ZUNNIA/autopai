@@ -64,9 +64,11 @@ export async function prUpdateBranch(repo, number) {
 
 export async function runFailedLog(repo, check) {
   const runId = runIdFromUrl(check.link ?? '')
-  if (!runId) return ''
+  if (!runId) return { ok: false, text: '' }
   const result = await gh(repo, ['run', 'view', String(runId), '--log-failed'], { allowFailure: true })
-  return result.stdout || result.stderr
+  const text = (result.stdout || result.stderr).trim()
+  const missing = !text || /^log not found\b|^no log available\b/i.test(text)
+  return { ok: result.code === 0 && !missing, text }
 }
 
 export function runIdFromUrl(url) {
