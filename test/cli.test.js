@@ -51,6 +51,8 @@ test('status exposes retained review sessions', async () => {
     phase: 'awaiting_approval',
     feature: 'settings',
     completedPhases: ['prepare', 'backlog'],
+    filters: { classifications: [], priorities: [] },
+    blockers: [],
     sessions: [
       { kind: 'brief', id: 'brief-1', title: 'AutopAI brief settings [a1b2c3d4]' },
       { kind: 'backlog', id: 'backlog-1', title: 'AutopAI backlog settings [a1b2c3d4]' }

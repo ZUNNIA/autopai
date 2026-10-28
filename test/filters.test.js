@@ -21,6 +21,7 @@ test('normalizes classifications and priorities', () => {
   assert.equal(normalizeClassification('unknown'), null)
   assert.deepEqual(normalizeClassificationList('code smell, architecture'), ['code-smell', 'architecture'])
   assert.deepEqual(normalizePriorityList('urgente,Important'), ['urgent', 'important'])
+  assert.deepEqual(normalizeFilters({ classifications: [], priorities: [] }), { classifications: [], priorities: [] })
   assert.throws(() => normalizeClassificationList('unknown'), /Unknown classification: unknown/)
   assert.throws(() => normalizePriorityList(true), /priority filter needs a value/)
 })

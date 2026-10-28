@@ -96,6 +96,20 @@ test('operational commands do not cap clarifying questions', async () => {
   assert.match(agent, /there is no fixed limit, for operational commands and feature discussions/)
 })
 
+test('approval and ADR commands require a status preflight', async () => {
+  const agent = await fs.readFile('platforms/opencode/agents/autopai.md', 'utf8')
+  const resume = await fs.readFile('platforms/opencode/commands/autopai-resume.md', 'utf8')
+  const adr = await fs.readFile('platforms/opencode/commands/autopai-adr.md', 'utf8')
+  assert.match(agent, /Before any `--approve`, run `autopai status/)
+  assert.match(agent, /gate` is null/)
+  assert.match(agent, /failures or blockers/)
+  assert.match(resume, /Before composing the command, run `autopai status/)
+  assert.match(resume, /failed ticket or a blocker is not a human gate/)
+  assert.match(adr, /Run `autopai status/)
+  assert.match(adr, /Do not approve a gate/)
+  assert.match(adr, /never pass `--approve plan`/)
+})
+
 test('the readme documents the two-stage plan flow', async () => {
   const text = await fs.readFile('README.md', 'utf8')
   assert.match(text, /Nothing is written yet/)

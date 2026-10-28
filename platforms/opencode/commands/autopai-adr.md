@@ -13,6 +13,7 @@ Steps:
 2. Identify the technical problem and analyze at least two alternatives, including "do nothing" or "keep the current standard".
 3. If the decision is not already stated, present the alternatives and ask which one to record.
 4. Write the ADR to the repository ADR directory (the repository `AGENTS.md` states the convention; `tickets/adr/` by default), incrementing the highest existing number (`004-short-name.md`).
+5. Run `autopai status --repo .` and report the mode, phase, gate, blockers, and failures. Do not approve a gate, start a phase, or run resume from this command. If the user also asked to continue, give the exact next command. For a blocked dev run, that is a plain `/autopai-resume` after the blocker is resolved; never pass `--approve plan` when the plan was already approved.
 
 Document structure:
 
