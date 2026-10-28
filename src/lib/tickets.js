@@ -240,12 +240,14 @@ export function branchNameFor(ticket, existingBranches = []) {
  * instead of creating a duplicate branch. A clean branch keeps the collision
  * suffix behavior.
  */
-export async function resolveTicketBranch({ config, ticket, type }) {
+export async function resolveTicketBranch({ config, ticket, type, previousBranch = null }) {
   const branches = await git.listLocalBranches(config.repoPath)
   const preferred = `${type}/${ticket.slug}`
-  if (branches.includes(preferred)) {
-    const ahead = await git.countCommitsOver(config.repoPath, config.baseBranch, preferred)
-    if (ahead > 0) return { branch: preferred, reuse: true, commits: ahead, branches }
+  const candidates = [...new Set([previousBranch, preferred].filter(Boolean))]
+  for (const candidate of candidates) {
+    if (!branches.includes(candidate)) continue
+    const ahead = await git.countCommitsOver(config.repoPath, config.baseBranch, candidate)
+    if (ahead > 0) return { branch: candidate, reuse: true, commits: ahead, branches }
   }
   return { branch: branchNameFor({ ...ticket, type }, branches), reuse: false, commits: 0, branches }
 }

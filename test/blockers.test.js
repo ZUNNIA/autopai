@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { archiveBlockers, listBlockers } from '../src/lib/blockers.js'
+import { archiveBlockers, blockerMessage, listBlockers } from '../src/lib/blockers.js'
 
 test('archives recorded blockers before a retry', async () => {
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-blockers-'))
@@ -22,6 +22,26 @@ test('archives recorded blockers before a retry', async () => {
   assert.equal(await fs.readFile(archived[0].to, 'utf8'), JSON.stringify({ reason: 'first' }))
   await assert.rejects(() => fs.access(first))
   await assert.rejects(() => fs.access(second))
+})
+
+test('does not add ADR guidance to a CI blocker', () => {
+  const message = blockerMessage([{
+    file: 'ci-log-unavailable.json',
+    reason: 'CI logs are unavailable.',
+    suggestedAction: 'Inspect the failing GitHub Actions job and restore access.'
+  }])
+  assert.match(message, /CI logs are unavailable/)
+  assert.match(message, /Inspect the failing GitHub Actions job/)
+  assert.doesNotMatch(message, /autopai-adr/)
+})
+
+test('keeps the ADR suggestion supplied by an architecture blocker', () => {
+  const message = blockerMessage([{
+    file: 'generation-contract.json',
+    reason: 'The ticket needs an approved architecture decision.',
+    suggestedAction: 'run /autopai-adr'
+  }])
+  assert.match(message, /run \/autopai-adr/)
 })
 
 test('ignores missing blockers and an empty list', async () => {
