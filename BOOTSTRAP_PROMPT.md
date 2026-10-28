@@ -139,6 +139,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/backlog.md`
 - `src/prompts/feature-brief.md`
 - `src/prompts/identified.md`
+- `src/prompts/qa-fix.md`
 - `src/prompts/ready-for-dev.md`
 - `src/prompts/ready-for-refactor.md`
 - `src/prompts/release.md`
@@ -169,6 +170,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/prepare-review.test.js`
 - `test/promotion.test.js`
 - `test/prompts.test.js`
+- `test/qa-fix.test.js`
 - `test/resume.test.js`
 - `test/runner.test.js`
 - `test/runners.test.js`

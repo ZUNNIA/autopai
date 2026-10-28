@@ -12,6 +12,7 @@ import { blockedDependents, collectManualVerification, filterFindingFiles, filte
 import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '../lib/filters.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
+import { currentGate } from '../lib/pauses.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { ensureDir, slugify } from '../lib/util.js'
 
@@ -225,6 +226,55 @@ export async function runDev({ config, stateStore, options, log }) {
     if (qaFile) await log?.(`Manual verification checklist at ${qaFile}.`)
   }
   return { feature, tickets: result.tickets, failures: result.failures, manualVerification: qaFile }
+}
+
+/**
+ * Turns a failed manual QA review into local fix tickets for the current
+ * feature, then starts the normal dev loop. It never approves the QA gate and
+ * never creates a new brief or backlog.
+ */
+export async function runQaFix({ config, stateStore, options, log }) {
+  const failure = String(options.message ?? '').trim()
+  if (!failure || failure === 'true') throw new Error('Usage: autopai qa-fix --repo <path> --message <failure>')
+
+  const state = await stateStore.load()
+  if (!state) throw new Error('No AutopAI state found for this repository.')
+  if (currentGate(state) !== 'qa') throw new Error('There is no QA gate to fix. Run status first.')
+  const feature = state.feature ?? await resolveFeature({ config, options, state, dirs: [config.ticketDirs.readyForDev] })
+  const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
+  const qaFile = path.join(config.repoPath, config.ticketDirs.qa, `${feature}.md`)
+  await ensureDir(readyDir)
+
+  const before = new Set((await listTickets(readyDir)).map(ticket => ticket.file))
+  const artifacts = new Artifacts(config, state.runId)
+  await artifacts.init()
+  const execution = await runSession({
+    config,
+    prompt: 'qa-fix',
+    agent: config.agents.planner,
+    payload: { feature, qaFile, outputDir: readyDir, failure },
+    title: `AutopAI qa-fix ${feature}`,
+    logFile: artifacts.path('planner-qa-fix.log'),
+    role: 'planner'
+  })
+  const plannerOutput = String(execution.stdout ?? '').trim()
+  if (execution.code !== 0) {
+    throw new Error(`The planner could not create a QA fix ticket.${plannerOutput ? `\n${plannerOutput}` : ''}`)
+  }
+
+  const created = (await listTickets(readyDir)).filter(ticket => !before.has(ticket.file))
+  if (created.length === 0) {
+    throw new Error(`No QA fix ticket was created.${plannerOutput ? `\n${plannerOutput}` : ''}`)
+  }
+
+  await log?.(`Created ${created.length} QA fix ticket(s) for ${feature}.`)
+  const result = await runDev({ config, stateStore, options: { ...options, feature }, log })
+  return {
+    feature,
+    fixTickets: created.map(ticket => ({ id: ticket.id, title: ticket.title, file: ticket.file })),
+    plannerOutput,
+    dev: result
+  }
 }
 
 export async function runRefactor({ config, stateStore, options, log }) {

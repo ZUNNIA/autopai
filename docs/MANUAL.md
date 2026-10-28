@@ -150,7 +150,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
-**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes; it is not a slash command. `/autopai-adr` records or updates a decision only; it runs `autopai status` after writing, reports the current phase, gate, blockers, and failures, and never approves a gate or starts a phase. `/autopai-init` is the other exception: it does not call the operational CLI; the operator agent reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes and `autopai qa-fix --message <failure>` for a failed QA review; they are not slash commands. `/autopai-adr` records or updates a decision only; it runs `autopai status` after writing, reports the current phase, gate, blockers, and failures, and never approves a gate or starts a phase. `/autopai-init` is the other exception: it does not call the operational CLI; the operator agent reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
 
 The operator does not force the selected command. If the request belongs to another phase (for example, "resolve the technical debt" under release), it stops and names the correct command; it never bumps a version for a non-release request.
 
@@ -249,6 +249,8 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 6. Move the ticket file to `tickets/done/<feature>/` and record the scope in the state.
 
 **Completion.** The phase ends at `dev-complete` when every ticket merged. The manual QA checklist is at `tickets/qa/<feature>.md`. The next step is the `qa` gate: review the checklist and run `autopai resume --approve qa` (or `/autopai-identify`) to audit the new pull requests. A generic `resume` stays at the gate.
+
+If a QA item fails, do not approve the gate. The operator runs `autopai qa-fix --repo . --message "<failure>"`. It uses the planner to write fix tickets under `tickets/ready-for-dev/<feature>/`, then starts dev again. The same gates, CI policy, and merge rules apply. When dev completes, the QA checklist is regenerated and the run returns to the `qa` gate. The command never creates a new brief or backlog and never approves QA.
 
 ### 4.5 identify
 
@@ -359,7 +361,7 @@ The branch name comes from the ticket type and the file name without its numeric
 
 - Review `backlog.md` at the `backlog` gate before running `approve`. Edit it freely; the planner reads it at that moment.
 - Review the ready-for-dev tickets at the `plan` gate before running `dev`.
-- Review `tickets/qa/<feature>.md` at the `qa` gate before running identify.
+- Review `tickets/qa/<feature>.md` at the `qa` gate before running identify. If it fails, report the item; the operator uses `autopai qa-fix` to create fix tickets and restart dev.
 - If a ticket fails, review `state.failures` and the preserved branch. Run `resume` to retry, or `resume --fix` to attempt a repair. Do not start a duplicate branch manually.
 - Edit `depends_on`, `priority`, `classification`, or `type` front matter to change execution order, debt filters, or branch type.
 - Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/` with the required front matter.

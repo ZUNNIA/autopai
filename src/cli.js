@@ -6,7 +6,7 @@ import { auditConfig, formatConfigReport } from './lib/config-audit.js'
 import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runIdentify } from './phases/identify.js'
-import { runApprove, runDev, runPrepare, runPromote, runRefactor, runRelease } from './phases/pipeline.js'
+import { runApprove, runDev, runPrepare, runPromote, runQaFix, runRefactor, runRelease } from './phases/pipeline.js'
 import { Artifacts } from './lib/artifacts.js'
 import { continueSession } from './lib/session.js'
 import { nextPhase } from './lib/resume.js'
@@ -48,6 +48,7 @@ async function main() {
     else if (command === 'release') result = await runRelease(ctx)
     else if (command === 'run') result = await runSequence(ctx)
     else if (command === 'revise') result = await runRevise(ctx)
+    else if (command === 'qa-fix') result = await runQaFix(ctx)
     else throw new Error(`Unknown command: ${command}`)
     printResult(result)
     return result
@@ -296,6 +297,7 @@ Usage:
   autopai dev --repo <path> [--feature <slug>]
   autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
   autopai release --repo <path> --version <x.y.z>
+  autopai qa-fix --repo <path> --message <failure>
   autopai revise --repo <path> --message <change>
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
@@ -320,6 +322,9 @@ approve generates the ready-for-dev tickets and stops; dev implements them.
 
 revise continues the retained backlog session with a review message. It never
 loads the original prompt, creates a new session, or approves the backlog.
+
+qa-fix turns a failed manual QA review into fix tickets for the current feature
+and starts dev again. It never approves the qa gate.
 
 Human gates pause the assisted loop after prepare, approve, dev, identify,
 promote, or refactor. pauseAfter defaults to backlog, plan, and qa. resume at a

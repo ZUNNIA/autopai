@@ -5,6 +5,8 @@ agent: autopai
 
 Before composing the command, run `autopai status --repo .` and read its `gate`. If `gate` is null, do not pass `--approve`; report the phase, failures, and blockers instead. A failed ticket or a blocker is not a human gate: use a plain `autopai resume` retry after the blocker is resolved.
 
+If the user reports a failed manual QA item while the gate is `qa`, do not use `resume` or `--approve qa`; use `autopai qa-fix --message "<failure>"` to create fix tickets and restart dev.
+
 Run with the bash tool and a timeout of at least 14400000 ms:
 
 `autopai resume --repo . $ARGUMENTS`
@@ -15,7 +17,7 @@ Compose the arguments from the request:
 
 - "approve the backlog and continue" → `--approve backlog`. After the ready-for-dev generation succeeds, the orchestrator deletes the retained brief and backlog sessions; if it fails, keep them for review.
 - "approve the plan" or "approve ready-for-dev" → `--approve plan`.
-- "approve QA" → `--approve qa`.
+- "approve QA" → `--approve qa` only when the QA passed. If the user reports a QA failure, do not approve; the operator uses `autopai qa-fix --message "<failure>"` to create fix tickets and restart dev.
 - "approve the findings" → `--approve findings`.
 - "approve the refactor tickets" → `--approve promotion`.
 - "approve the refactor" → `--approve refactor`.
