@@ -96,6 +96,8 @@ function normalizeList(value, normalize, label, allowed) {
   if (value === undefined || value === null || value === false) return []
   if (value === true) throw new Error(`A ${label} filter needs a value. Use: ${allowed.join(', ')}.`)
 
+  if (Array.isArray(value) && value.length === 0) return []
+
   const values = (Array.isArray(value) ? value : [value])
     .flatMap(item => String(item).split(','))
     .map(item => item.trim())

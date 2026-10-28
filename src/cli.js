@@ -270,6 +270,7 @@ function printStatus(state, config) {
     scopes: state.scopes?.length ?? 0,
     completedPhases: state.completedPhases,
     failures: state.failures ?? [],
+    blockers: state.blockers ?? [],
     filters: normalizeFilters(state.filters ?? {}),
     sessions: (state.sessions ?? []).map(session => ({
       kind: session.kind,

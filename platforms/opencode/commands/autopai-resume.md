@@ -3,11 +3,13 @@ description: Continue the last AutopAI run until the next human gate
 agent: autopai
 ---
 
+Before composing the command, run `autopai status --repo .` and read its `gate`. If `gate` is null, do not pass `--approve`; report the phase, failures, and blockers instead. A failed ticket or a blocker is not a human gate: use a plain `autopai resume` retry after the blocker is resolved.
+
 Run with the bash tool and a timeout of at least 14400000 ms:
 
 `autopai resume --repo . $ARGUMENTS`
 
-If the run is paused at a human gate, report the gate, the artifacts to review, and the exact approval command. A generic "continue" is **not** approval: never pass `--approve` unless the user explicitly approves that gate by name. If the user says only "continue", report the gate and ask.
+If the run is paused at a human gate, report the gate, the artifacts to review, and the exact approval command. A generic "continue" is **not** approval: never pass `--approve` unless the user explicitly approves that gate by name and the status reports it. If the user says only "continue", report the gate and ask.
 
 Compose the arguments from the request:
 

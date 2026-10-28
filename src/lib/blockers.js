@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { walkFiles } from './util.js'
+import { ensureDir, walkFiles } from './util.js'
 
 /**
  * Reads the executor blockers written under the state directory. The executor
@@ -20,6 +20,32 @@ export async function listBlockers(config) {
     blockers.push({ ...payload, file })
   }
   return blockers
+}
+
+/**
+ * Moves the blockers recorded by a previous failed attempt out of the active
+ * input directory before an explicit dev or refactor retry. A new blocker from
+ * the retry remains active and still stops the run.
+ */
+export async function archiveBlockers({ blockers, artifactsDir }) {
+  const archived = []
+  if (!Array.isArray(blockers) || blockers.length === 0) return archived
+
+  const targetDir = path.join(artifactsDir, 'resolved-blockers')
+  await ensureDir(targetDir)
+  for (const [index, blocker] of blockers.entries()) {
+    const file = typeof blocker === 'string' ? blocker : blocker?.file
+    if (!file) continue
+    const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+    const target = path.join(targetDir, `${stamp}-${index}-${path.basename(file)}`)
+    try {
+      await fs.rename(file, target)
+      archived.push({ from: file, to: target })
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw new Error(`Could not archive blocker ${file}: ${error.message}`)
+    }
+  }
+  return archived
 }
 
 export function blockerMessage(blockers) {

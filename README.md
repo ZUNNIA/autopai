@@ -77,6 +77,8 @@ The same workflow is available through slash commands or natural language. The o
 
 A pause is not an approval. `autopai resume` at a gate stops and prints the exact approval command. `autopai resume --approve <gate>` passes that gate and continues to the next one; `--auto` skips every human pause. The automatic gates (local commands, CI, and policy) always run.
 
+Before approving, the operator runs `autopai status` and reads the reported `gate`. It passes `--approve` only when the user approves that exact gate and the status reports it. A failed ticket or a blocker is not a gate; a plain resume retries after the blocker is resolved. `/autopai-adr` records a decision only: it checks the status after writing and never approves a gate or starts a phase.
+
 The brief and backlog sessions stay open after `prepare`. Review them or ask the operator for changes; the operator continues the retained backlog session with `autopai revise` and never re-runs `prepare` or reloads a core prompt. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
 
 Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
@@ -88,6 +90,7 @@ A failed ticket is not a human gate. Local gates are retried once. If the ticket
 - `autopai resume` reuses the failed ticket branch and retries the gates.
 - `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
 - `/autopai-status` shows the failed tickets and branches.
+- An explicit dev or refactor resume archives the blockers recorded by the previous attempt under the run artifacts. A new blocker still stops the run.
 
 The automatic gates are never bypassed, and a red branch is never pushed. A branch with commits is reused instead of creating a duplicate.
 

@@ -79,7 +79,7 @@ flowchart LR
 
 **Gates.** The checks a branch must pass before anything reaches the remote. Local gates run restore, build, test, and coverage. CI gates wait for the configured check names after the pull request exists. These automatic gates always run.
 
-**Human gate.** A configured stop after a phase: `backlog`, `plan`, `qa`, `findings`, `promotion`, or `refactor`. `pauseAfter` selects the stops; the default is `backlog`, `plan`, and `qa`. A pause is not an approval: `resume` without `--approve <gate>` stays at the gate, and `--auto` is the explicit full-auto override.
+**Human gate.** A configured stop after a phase: `backlog`, `plan`, `qa`, `findings`, `promotion`, or `refactor`. `pauseAfter` selects the stops; the default is `backlog`, `plan`, and `qa`. A pause is not an approval: `resume` without `--approve <gate>` stays at the gate, and `--auto` is the explicit full-auto override. Before approving, run `status`; pass `--approve` only when the reported gate matches the gate the user approved. A failed ticket or blocker is not a gate.
 
 **State.** `state.json` under the state directory. It stores the run mode, phase, feature, branch, SHAs, pull request number, merge commit, scopes, attempts, sessions, and blockers. Writes are atomic and a lock file prevents concurrent runs.
 
@@ -116,7 +116,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Commits.** The executor stages only the files it changed and commits with `<type>: <subject>`, no scope parentheses, and no ticket, ADR, or issue references.
 
-**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume.
+**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active.
 
 ### 3.2 Planner (`planner`)
 
@@ -150,7 +150,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
 
-**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes; it is not a slash command. `/autopai-adr` and `/autopai-init` are the exceptions: they do not call the operational CLI; the operator agent authors the decision record or reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes; it is not a slash command. `/autopai-adr` records or updates a decision only; it runs `autopai status` after writing, reports the current phase, gate, blockers, and failures, and never approves a gate or starts a phase. `/autopai-init` is the other exception: it does not call the operational CLI; the operator agent reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
 
 The operator does not force the selected command. If the request belongs to another phase (for example, "resolve the technical debt" under release), it stops and names the correct command; it never bumps a version for a non-release request.
 
@@ -314,7 +314,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 
 **resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes an interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. At a gate in `pauseAfter` it stops and prints the exact approval command. A generic `resume` is **not** approval: `--approve <gate>` passes that exact gate and continues to the next gate, and approving one gate does not approve the next. `--auto` skips every human gate; `--pause-after` overrides the list. It advances local non-gated phases (`identify` to `promote`, `promote` to `refactor`) and stops at a completed refactor, adopt, or release. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
 
-A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs before recording the failure.
+A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs before recording the failure. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
 
 ## 5. Tickets
 
