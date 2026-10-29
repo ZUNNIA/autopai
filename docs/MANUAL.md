@@ -250,7 +250,7 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 
 **Completion.** The phase ends at `dev-complete` when every ticket merged. The manual QA checklist is at `tickets/qa/<feature>.md`. The next step is the `qa` gate: review the checklist and run `autopai resume --approve qa` (or `/autopai-identify`) to audit the new pull requests. A generic `resume` stays at the gate.
 
-If a QA item fails, do not approve the gate. The operator runs `autopai qa-fix --repo . --message "<failure>"`. It uses the planner to write fix tickets under `tickets/ready-for-dev/<feature>/`, then starts dev again. The same gates, CI policy, and merge rules apply. When dev completes, the QA checklist is regenerated and the run returns to the `qa` gate. The command never creates a new brief or backlog and never approves QA.
+If a QA item fails, do not approve the gate. The operator runs `autopai qa-fix --repo . --message "<failure>"`. It uses the planner to write fix tickets under `tickets/ready-for-dev/<feature>/`, then starts dev again. The same gates, CI policy, and merge rules apply. When dev completes, the QA checklist is regenerated and the run returns to the `qa` gate. The command never creates a new brief or backlog and never approves QA. A provider-capacity failure is retried once after the suggested delay; other planner failures include the real error and the `planner-qa-fix.log` path.
 
 ### 4.5 identify
 

@@ -120,6 +120,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/prompts.js`
 - `src/lib/resume.js`
 - `src/lib/runner.js`
+- `src/lib/session-retry.js`
 - `src/lib/session.js`
 - `src/lib/state.js`
 - `src/lib/tickets.js`
@@ -174,6 +175,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/resume.test.js`
 - `test/runner.test.js`
 - `test/runners.test.js`
+- `test/session-retry.test.js`
 - `test/state.test.js`
 - `test/tickets.test.js`
 - `test/title.test.js`

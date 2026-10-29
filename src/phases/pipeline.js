@@ -14,7 +14,8 @@ import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
 import { currentGate } from '../lib/pauses.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
-import { ensureDir, slugify } from '../lib/util.js'
+import { sessionRetryDelayMs, shouldRetrySession } from '../lib/session-retry.js'
+import { ensureDir, sleep, slugify, truncate } from '../lib/util.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
   const feature = resolvePrepareFeature(options)
@@ -248,23 +249,36 @@ export async function runQaFix({ config, stateStore, options, log }) {
   const before = new Set((await listTickets(readyDir)).map(ticket => ticket.file))
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
-  const execution = await runSession({
+  const logFile = artifacts.path('planner-qa-fix.log')
+  const runPlanner = () => runSession({
     config,
     prompt: 'qa-fix',
     agent: config.agents.planner,
     payload: { feature, qaFile, outputDir: readyDir, failure },
     title: `AutopAI qa-fix ${feature}`,
-    logFile: artifacts.path('planner-qa-fix.log'),
+    logFile,
     role: 'planner'
   })
+
+  let execution = await runPlanner()
+  if (shouldRetrySession(execution)) {
+    const delayMs = sessionRetryDelayMs(execution)
+    await log?.(`The planner hit transient provider capacity; retrying once in ${Math.ceil(delayMs / 1000)}s.`)
+    await sleep(delayMs)
+    execution = await runPlanner()
+  }
+
   const plannerOutput = String(execution.stdout ?? '').trim()
+  const failureOutput = [String(execution.stderr ?? '').trim(), plannerOutput]
+    .filter(Boolean)
+    .join('\n')
   if (execution.code !== 0) {
-    throw new Error(`The planner could not create a QA fix ticket.${plannerOutput ? `\n${plannerOutput}` : ''}`)
+    throw new Error(`The planner could not create a QA fix ticket.${failureOutput ? `\n${truncate(failureOutput, 6000)}` : ''}\nSee ${logFile}`)
   }
 
   const created = (await listTickets(readyDir)).filter(ticket => !before.has(ticket.file))
   if (created.length === 0) {
-    throw new Error(`No QA fix ticket was created.${plannerOutput ? `\n${plannerOutput}` : ''}`)
+    throw new Error(`No QA fix ticket was created.${plannerOutput ? `\n${truncate(plannerOutput, 6000)}` : ''}\nSee ${logFile}`)
   }
 
   await log?.(`Created ${created.length} QA fix ticket(s) for ${feature}.`)
