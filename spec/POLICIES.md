@@ -6,7 +6,7 @@
 - Commit subjects and pull request titles: `<type>: <subject>`. No scope parentheses.
 - Allowed types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`.
 - No ticket paths, ADR numbers, or issue references in branches, commits, pull requests, or merge commits.
-- Merge commit subject is the pull request title. The body describes the outcome and the CI result.
+- Merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - The default GitHub merge message is forbidden.
 
 ## Local artifacts

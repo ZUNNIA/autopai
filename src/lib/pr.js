@@ -240,7 +240,7 @@ export async function pushOpenWaitMerge({
     }
   }
 
-  const mergeBody = generateMergeBody({ branch, baseBranch, coverage })
+  const mergeBody = generateMergeBody({ prBody })
   await github.prMerge(config.repoPath, pr.number, { title, body: mergeBody })
   const merged = await github.prView(config.repoPath, pr.number)
   if (merged.state !== 'MERGED') {
