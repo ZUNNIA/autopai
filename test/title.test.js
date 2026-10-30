@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { clearAgentTitle, deriveTitle, readAgentTitle, resolveTitle, ticketTitle } from '../src/lib/title.js'
+import { clearAgentTitle, deriveTitle, generateMergeBody, readAgentTitle, resolveTitle, ticketTitle } from '../src/lib/title.js'
 
 test('derives the title from the branch and commit types', () => {
   assert.equal(
@@ -30,6 +30,27 @@ test('builds the pull request title from the old ticket name', () => {
     'refactor: ggml type table'
   )
   assert.equal(ticketTitle({ type: 'feat' }), 'chore: ticket')
+})
+
+test('builds a descriptive merge body from the pull request summary', () => {
+  const prBody = [
+    '## Summary',
+    '- Add the generation contract and matrix core',
+    '- Resolve provider capability rules',
+    '',
+    '## Tests',
+    'Build and tests passed locally. Coverage: 75.56%.'
+  ].join('\n')
+  const body = generateMergeBody({ prBody })
+  assert.equal(body, '- Add the generation contract and matrix core\n- Resolve provider capability rules')
+  assert.doesNotMatch(body, /Merges|CI passed|coverage|develop/i)
+})
+
+test('uses a neutral fallback when the pull request has no summary', () => {
+  assert.equal(
+    generateMergeBody({ prBody: '## Tests\nBuild and tests passed locally.' }),
+    'No change summary was recorded for this merge.'
+  )
 })
 
 test('clears a stale agent title idempotently', async () => {

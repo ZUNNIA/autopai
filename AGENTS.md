@@ -67,8 +67,8 @@ Document the complete workflow, intent, and business rules in these blocks — N
   - *Commit/Push:* "Fix applied. Commit and push?"
   - *Create PR:* "Create Pull Request?"
   - *Merge PR:* "All checks passed. Merge the PR?"
-- **Merge Commit Message (STRICT):** NEVER keep the GitHub default message (`Merge pull request #N from ...`). Merges MUST use the PR title as the merge commit subject and a descriptive English body ending with the project CI verification, e.g. `CI passed: build, tests and coverage.` Use:
-  `gh pr merge <N> --merge --subject "<PR title>" --body "Merges ... into the base branch. CI passed: <project checks>."`
+- **Merge Commit Message (STRICT):** NEVER keep the GitHub default message (`Merge pull request #N from ...`). Merges MUST use the PR title as the merge commit subject and a descriptive English body that summarizes the actual change from the PR summary or commit subjects. The body must not contain branch-into-base boilerplate, CI status, coverage, ticket, ADR, or issue references. Use:
+  `gh pr merge <N> --merge --subject "<PR title>" --body "<descriptive change summary>"`
 - **Branch & PR Naming:** Branches are `<type>/<kebab-case-description>`. Commit subjects and PR titles are `<type>: <description>`. No scope parentheses, no ticket identifiers, no ADR references, and no issue references such as `#123` in branches, commits, pull requests, or merge commits.
 - **Hard Constraints:**
   - NEVER merge a PR that has failing CI/CD checks.

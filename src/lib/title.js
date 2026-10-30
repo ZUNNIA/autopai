@@ -73,6 +73,15 @@ export function generatePrBody({ commits, coverage, dryRun = false }) {
   return lines.join('\n')
 }
 
-export function generateMergeBody({ branch, baseBranch, coverage }) {
-  return `Merges ${branch} into ${baseBranch}. CI passed: build, tests and coverage ${formatCoverage(coverage)}.`
+export function generateMergeBody({ prBody }) {
+  const lines = String(prBody ?? '').split(/\r?\n/)
+  const start = lines.findIndex(line => /^##\s+Summary\s*$/i.test(line.trim()))
+  if (start < 0) return 'No change summary was recorded for this merge.'
+
+  const summary = []
+  for (const line of lines.slice(start + 1)) {
+    if (/^##\s+/.test(line.trim())) break
+    if (line.trim()) summary.push(line.trimEnd())
+  }
+  return summary.join('\n').trim() || 'No change summary was recorded for this merge.'
 }

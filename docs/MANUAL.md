@@ -638,7 +638,7 @@ On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, 
 
 - A merge happens only after every required check passes.
 - A conflicting pull request stops the run. A pull request that is `BEHIND` gets its branch updated and the checks are awaited again.
-- The merge commit subject is the pull request title, and the body states the branch, the base, and the CI result, including coverage. The generated body never references tickets, ADRs, or issues.
+- The merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - After the merge, the orchestrator verifies the pull request state is `MERGED` and deletes the remote branch. It also prunes remote refs, fast-forwards the local base branch, returns to it, and deletes the merged local branch. Local divergences are reported and never overwritten.
 
 ## 10. Customization
