@@ -12,7 +12,9 @@ test('automatic CI repair diagnoses a named check when no log is available', asy
   assert.match(prompt, /write a JSON blocker/)
   assert.doesNotMatch(prompt, /## Open Questions/)
 
-  assert.match(pr, /noLogAttempts/)
+  assert.match(pr, /noLogReruns/)
+  assert.match(pr, /rerunFailedChecks/)
+  assert.match(pr, /Re-running the failed job/)
   assert.match(pr, /promptName = 'ci-fix'/)
   assert.match(pr, /Running one automatic diagnosis attempt/)
   assert.match(pr, /failedChecks/)
