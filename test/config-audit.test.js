@@ -27,6 +27,7 @@ const fullConfig = {
   sessionTimeoutMinutes: 90,
   checkPollSeconds: 30,
   checkTimeoutMinutes: 30,
+  billingCurrency: 'USD',
   pauseAfter: ['backlog', 'plan', 'qa'],
   prTitle: null,
   runtimeLogs: [],
@@ -68,6 +69,7 @@ test('reports missing defaults without failing', async () => {
   assert.equal(report.ok, true)
   assert.equal(report.status, 'outdated')
   assert.ok(report.missing.some(item => item.field === 'pauseAfter'))
+  assert.ok(report.missing.some(item => item.field === 'billingCurrency'))
   assert.ok(report.missing.some(item => item.field === 'ticketDirs'))
   assert.ok(report.missing.some(item => item.field === 'stateDir'))
   assert.ok(formatConfigReport(report).includes('MISSING pauseAfter'))
@@ -128,6 +130,7 @@ test('rejects invalid types, values, paths, and pause gates', async () => {
   const repo = await repoWith({
     ...fullConfig,
     coverageThreshold: 1.5,
+    billingCurrency: 'usd',
     pauseAfter: ['nope'],
     requiredChecks: 'Build',
     auditChunkFiles: 0,
@@ -140,6 +143,7 @@ test('rejects invalid types, values, paths, and pause gates', async () => {
   assert.equal(report.ok, false)
   const fields = report.errors.map(error => error.field)
   assert.ok(fields.includes('coverageThreshold'))
+  assert.ok(fields.includes('billingCurrency'))
   assert.ok(fields.includes('pauseAfter'))
   assert.ok(fields.includes('requiredChecks'))
   assert.ok(fields.includes('auditChunkFiles'))

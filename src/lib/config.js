@@ -46,6 +46,7 @@ export async function loadConfig(repoPath) {
   assert(Number.isInteger(config.auditChunkFiles) && config.auditChunkFiles > 0, 'auditChunkFiles must be a positive integer')
   assert(Number.isInteger(config.localGateRetries) && config.localGateRetries >= 0, 'localGateRetries must be a non-negative integer')
   assert(typeof config.continueOnFailure === 'boolean', 'continueOnFailure must be a boolean')
+  assert(typeof config.billingCurrency === 'string' && /^[A-Z]{3}$/.test(config.billingCurrency), 'billingCurrency must be a three-letter ISO 4217 code')
 
   return config
 }

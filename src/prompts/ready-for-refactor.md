@@ -34,6 +34,7 @@ feature: [feature-slug]
 type: refactor
 classification: [code-smell|unnecessary-complexity|lack-of-coverage|outdated-library|architecture|missing-documentation]
 priority: [urgent|important|minor]
+billing: [none|increase|unknown]
 depends_on: [id-or-empty-list]
 ---
 ```
@@ -93,3 +94,6 @@ Since the goal is not to break current functionality, detail how stability will 
 * **Discarded alternatives:** brief explanation of why this strategy was chosen over others.
 * **Accepted trade-offs:** temporary complexity assumed to solve the problem in the long term.
 * **Performance/Memory impact:** whether the new structure consumes more or fewer resources.
+
+## 7. Billing impact
+Set front-matter `billing` to `none`, `increase`, or `unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. Add this section only when billing is `increase` or `unknown`; it must include an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence. If billing does not increase, use `none` and omit this section. When billing is `increase` or `unknown`, include one line with the estimate and confidence in your final message.

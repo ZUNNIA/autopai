@@ -13,6 +13,7 @@ import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '..
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
 import { currentGate } from '../lib/pauses.js'
+import { validateBillingFiles } from '../lib/billing.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { sessionRetryDelayMs, shouldRetrySession } from '../lib/session-retry.js'
 import { ensureDir, sleep, slugify, truncate } from '../lib/util.js'
@@ -34,6 +35,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
       phase: 'awaiting_approval',
       sessions: recovered.sessions ?? [],
       plannerMessages: [],
+      billingReports: [],
       recovered: true
     }
   }
@@ -56,7 +58,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
       config,
       prompt: 'feature-brief',
       agent: config.agents.planner,
-      payload: { feature, description: String(options.description), briefPath },
+      payload: { feature, description: String(options.description), briefPath, billingCurrency: config.billingCurrency },
       title: `AutopAI brief ${feature}`,
       logFile: artifacts.path('planner-brief.log'),
       role: 'planner',
@@ -77,7 +79,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
     config,
     prompt: 'backlog',
     agent: config.agents.planner,
-    payload: { feature, briefPath, outputDir: backlogDir },
+    payload: { feature, briefPath, outputDir: backlogDir, billingCurrency: config.billingCurrency },
     title: `AutopAI backlog ${feature}`,
     logFile: artifacts.path('planner-backlog.log'),
     role: 'planner',
@@ -100,6 +102,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
   await stateStore.save(state)
 
   const backlogFiles = await listMarkdown(backlogDir)
+  const billingReports = await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
   await log?.(`Backlog ready for review at ${backlogDir}.`)
   return {
     feature,
@@ -107,7 +110,8 @@ export async function runPrepare({ config, stateStore, options, log }) {
     backlogFiles,
     phase: 'awaiting_approval',
     sessions: state.sessions ?? [],
-    plannerMessages
+    plannerMessages,
+    billingReports
   }
 }
 
@@ -127,12 +131,13 @@ export async function runApprove({ config, stateStore, options, log }) {
     config,
     prompt: 'ready-for-dev',
     agent: config.agents.planner,
-    payload: { feature, backlogDir, outputDir: readyDir },
+    payload: { feature, backlogDir, outputDir: readyDir, billingCurrency: config.billingCurrency },
     title: `AutopAI ready-for-dev ${feature}`,
     logFile: artifacts.path('planner-ready-for-dev.log'),
     role: 'planner'
   })
   if (generated.code !== 0) throw new Error('The planner could not generate ready-for-dev tickets.')
+  const billingReports = await validateBillingFiles(await listMarkdown(readyDir))
 
   const state = previous ?? await stateStore.create('approve', { feature })
   state.mode = 'approve'
@@ -152,7 +157,8 @@ export async function runApprove({ config, stateStore, options, log }) {
     feature,
     readyDir,
     sessionsDeleted: cleanup.deleted.map(session => session.title),
-    sessionsRetained: cleanup.retained
+    sessionsRetained: cleanup.retained,
+    billingReports
   }
 }
 
@@ -254,7 +260,7 @@ export async function runQaFix({ config, stateStore, options, log }) {
     config,
     prompt: 'qa-fix',
     agent: config.agents.planner,
-    payload: { feature, qaFile, outputDir: readyDir, failure },
+    payload: { feature, qaFile, outputDir: readyDir, failure, billingCurrency: config.billingCurrency },
     title: `AutopAI qa-fix ${feature}`,
     logFile,
     role: 'planner'
@@ -282,11 +288,13 @@ export async function runQaFix({ config, stateStore, options, log }) {
   }
 
   await log?.(`Created ${created.length} QA fix ticket(s) for ${feature}.`)
+  const billingReports = await validateBillingFiles(created.map(ticket => ticket.file))
   const result = await runDev({ config, stateStore, options: { ...options, feature }, log })
   return {
     feature,
     fixTickets: created.map(ticket => ({ id: ticket.id, title: ticket.title, file: ticket.file })),
     plannerOutput,
+    billingReports,
     dev: result
   }
 }
@@ -547,7 +555,7 @@ export async function runPromote({ config, stateStore, options, log }) {
     const message = `No Identified findings match ${describeFilters(filters)}.`
     await log?.(message)
     const outputDir = path.join(config.repoPath, config.ticketDirs.readyForRefactor)
-    return { feature, outputDir, chunks: [], tickets: 0, filters, message }
+    return { feature, outputDir, chunks: [], tickets: 0, filters, billingReports: [], message }
   }
 
   const pending = selectPromotionGroups(filteredGroups, { chunk: options.chunk, completedPhases: state.completedPhases })
@@ -562,17 +570,22 @@ export async function runPromote({ config, stateStore, options, log }) {
   await stateStore.save(state)
 
   const sessions = []
+  const billingReports = []
+  const before = new Set(await listMarkdown(outputDir))
   for (const group of pending) {
     const execution = await runSession({
       config,
       prompt: 'ready-for-refactor',
       agent: config.agents.planner,
-      payload: { feature, findings: group.findings, outputDir, chunk: group.name },
+      payload: { feature, findings: group.findings, outputDir, chunk: group.name, billingCurrency: config.billingCurrency },
       title: `AutopAI promote ${feature} ${group.name}`,
       logFile: artifacts.path(`planner-ready-for-refactor-${slugify(group.name)}.log`),
       role: 'planner'
     })
     if (execution.code !== 0) throw new Error(`The planner could not generate ready-for-refactor tickets for ${group.name}.`)
+    const written = (await listMarkdown(outputDir)).filter(file => !before.has(file))
+    for (const file of written) before.add(file)
+    billingReports.push(...await validateBillingFiles(written))
     state.completedPhases = [...new Set([...state.completedPhases, `promote:${group.name}`])]
     await stateStore.save(state)
     sessions.push({ chunk: group.name, findings: group.findings.length })
@@ -585,7 +598,7 @@ export async function runPromote({ config, stateStore, options, log }) {
   await stateStore.save(state)
   if (pending.length === 0) await log?.('Every promotion chunk was already completed.')
   await log?.(`Ready-for-refactor tickets at ${outputDir}.`)
-  return { feature, outputDir, chunks: sessions, tickets: tickets.length, filters }
+  return { feature, outputDir, chunks: sessions, tickets: tickets.length, filters, billingReports }
 }
 
 export async function runRelease({ config, stateStore, options, log }) {

@@ -99,6 +99,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Core libraries
 
 - `src/lib/artifacts.js`
+- `src/lib/billing.js`
 - `src/lib/blockers.js`
 - `src/lib/chunks.js`
 - `src/lib/codefiles.js`
@@ -153,6 +154,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 ### Tests
 
+- `test/billing-prompts.test.js`
+- `test/billing.test.js`
 - `test/blockers.test.js`
 - `test/chunks.test.js`
 - `test/ci-fix.test.js`

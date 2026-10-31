@@ -85,6 +85,8 @@ flowchart LR
 
 **Policy.** The rules that keep Git artifacts independent from local work items: branch naming, commit format, no scopes, no ticket or ADR references, no default merge message. The orchestrator enforces policy before every push and before every merge.
 
+**Billing impact.** Generated backlogs, Identified findings, ready-for-dev tickets, ready-for-refactor tickets, and QA fix tickets declare `billing: none|increase|unknown` (or `Billing impact: none|increase|unknown` for document artifacts). Only `increase` and `unknown` require a detailed `## Billing impact` section with an `Estimate`, one-time and recurring costs, drivers, assumptions, and confidence. Estimates cover product runtime and CI/testing costs in `billingCurrency`, default USD. `none` means no report. The operator shows billing in the chat only for `increase` or `unknown`.
+
 ## 3. The agents
 
 AutopAI runs four roles. The role names are stable; the agent names are configurable through the `agents` object in `autopai.json`. The default mapping is shown below. The executor, planner, and auditor are installed as hidden agents (`mode: all` with `hidden`), so the orchestrator can invoke them by name while only the operator agent (`autopai`) is selectable in the tool UI.
@@ -345,6 +347,7 @@ feature: feature-slug
 type: feat|fix|refactor|perf|test|docs|chore
 classification: code-smell|unnecessary-complexity|lack-of-coverage|outdated-library|architecture|missing-documentation
 priority: urgent|important|minor
+billing: none|increase|unknown
 depends_on: []
 ---
 ```
@@ -376,6 +379,7 @@ The branch name comes from the ticket type and the file name without its numeric
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `runner` | string | required | Session runner name. The bundled runner is `opencode`. |
+| `billingCurrency` | string | `USD` | Three-letter ISO 4217 currency used by generated billing estimates. |
 | `runnerOptions` | object | `{}` | Runner settings. The OpenCode runner reads `env` for extra environment variables and `keepSessions` to retain the tool sessions after each run. |
 | `protectedPaths` | string array | `.github/**`, `AGENTS.md`, `autopai.json` | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | `main` | Integration branch for feature pull requests. |
@@ -456,6 +460,7 @@ To change the gates, rerun `/autopai-init` with a natural-language request (for 
   "buildCommand": ["npm", "run", "build"],
   "testCommand": ["npm", "test", "--", "--coverage"],
   "coverageThreshold": 0.7,
+  "billingCurrency": "USD",
   "pauseAfter": ["backlog", "plan", "qa"],
   "localGateRetries": 1,
   "continueOnFailure": true,

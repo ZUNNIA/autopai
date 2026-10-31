@@ -10,6 +10,7 @@ import { pendingScopes } from '../lib/resume.js'
 import { listCodeFiles } from '../lib/codefiles.js'
 import { chunkCodeFiles } from '../lib/chunks.js'
 import { normalizeFilters } from '../lib/filters.js'
+import { validateBillingFiles } from '../lib/billing.js'
 import { filterFindingFiles } from '../lib/tickets.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
@@ -111,6 +112,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
   }
 
   const pending = pendingScopes(resolvedScopes, state.completedPhases)
+  const billingReports = []
   for (const resolved of pending) {
     const outputDir = path.join(config.repoPath, config.ticketDirs.identified, resolved.name)
     await ensureDir(outputDir)
@@ -122,6 +124,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
       evidenceFile,
       outputDir,
       filters,
+      billingCurrency: config.billingCurrency,
       instructions: 'Write one Identified ticket per debt under outputDir. Only document debts that match the filters. No source edits, no UX changes, no diagnostic report.'
     }
     const execution = await runSession({
@@ -137,6 +140,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
       throw new Error(`Auditor failed for scope ${resolved.name} with exit code ${execution.code}.`)
     }
     const written = await walkFiles(outputDir, file => file.endsWith('.md'))
+    billingReports.push(...await validateBillingFiles(written))
     resolved.tickets = await filterFindingFiles(written, filters)
     const excluded = written.length - resolved.tickets.length
     if (excluded > 0) await log?.(`Scope ${resolved.name}: ${excluded} findings excluded by the filter.`)
@@ -166,6 +170,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
     filters,
     scopes: resolvedScopes.map(scope => ({ name: scope.name, tickets: (scope.tickets ?? []).length, files: scope.changedFiles.length })),
     evidence: evidenceFile,
+    billingReports,
     localOnly: true
   }
 }

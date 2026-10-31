@@ -15,5 +15,6 @@ Tasks:
 - Never push, merge, rebase, or run `gh`. The orchestrator handles the pull request and the merge.
 - If the ticket requires an architecture decision, a change outside its scope, or a human choice, write a JSON blocker under the `needs-human` folder inside the payload `stateDir` with `reason`, `files`, `decision`, and `suggestedAction` (use `run /autopai-adr` when the decision is architectural), then stop. Never create or edit an ADR yourself.
 - Follow the repository `AGENTS.md`: no numbered comments, no restated-code comments.
+- If the ticket front matter marks `billing: increase` or `billing: unknown`, include the ticket's estimate and confidence in your final summary. Do not mention billing when it is `none`.
 
-End with a short summary: files changed, commit subjects, test results, and any blocker.
+End with a short summary: files changed, commit subjects, test results, any billing impact for increase or unknown, and any blocker.

@@ -28,7 +28,7 @@ Run prepare only when the user explicitly asks to generate, formalize or prepare
 
 `autopai run --repo . --from prepare --to prepare <composed arguments>`
 
-Report the CLI output verbatim, the backlog path, the retained brief and backlog session titles and ids, and any `plannerMessages` questions. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
+Report the CLI output verbatim, the backlog path, the retained brief and backlog session titles and ids, any `plannerMessages` questions, and any `billingReports` with billing `increase` or `unknown`. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
 
 For a change request while the backlog awaits review, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a prompt from `src/prompts` or creating a new session. Do not tell the user to paste the change, do not run prepare again, and do not edit tickets yourself. Report the planner output and any open questions. The orchestrator deletes the two sessions only after the backlog approval succeeds.
 
