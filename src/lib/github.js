@@ -71,6 +71,24 @@ export async function runFailedLog(repo, check) {
   return { ok: result.code === 0 && !missing, text }
 }
 
+export async function rerunFailedRun(repo, runId) {
+  const result = await gh(repo, ['run', 'rerun', String(runId), '--failed'], { allowFailure: true })
+  return {
+    ok: result.code === 0,
+    reason: result.code === 0 ? null : (result.stderr || result.stdout || 'gh run rerun failed').trim()
+  }
+}
+
+export async function runView(repo, runId) {
+  const result = await gh(repo, ['run', 'view', String(runId), '--json', 'status,conclusion,attempt'], { allowFailure: true })
+  if (result.code !== 0) return null
+  try {
+    return parseJson(result.stdout)
+  } catch {
+    return null
+  }
+}
+
 export function runIdFromUrl(url) {
   const match = String(url ?? '').match(/\/runs\/(\d+)/)
   return match ? match[1] : null

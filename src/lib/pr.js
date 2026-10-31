@@ -113,7 +113,7 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
     ticketId: executorPayload?.ticketId ?? null,
     ticketFile: executorPayload?.ticketFile ?? null,
     failedChecks: names,
-    reason: `CI failed but no failure log is available for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. The automatic diagnosis attempt did not resolve it.`,
+    reason: `CI failed but no failure log is available for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. Automatic re-runs and diagnosis did not resolve it.`,
     files: links,
     decision: 'A human must inspect the failed GitHub Actions job, restore log access, permissions, runner or billing, and re-run the job before resuming.',
     suggestedAction: 'Inspect the linked GitHub Actions job and restore CI access; then run autopai resume without --fix.'
@@ -122,6 +122,40 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
   state.blockers = [...(state.blockers ?? []), file]
   await stateStore.save(state)
   return { ...blocker, file }
+}
+
+async function rerunFailedChecks({ config, checks, log }) {
+  const failed = checks.filter(check => FAILED_STATES.has(check.state))
+  const runIds = [...new Set(failed.map(check => github.runIdFromUrl(check.link ?? '')).filter(Boolean))]
+  if (runIds.length === 0) {
+    await log?.('The failed checks do not expose a workflow run id; cannot re-run automatically.')
+    return false
+  }
+
+  const previous = new Map()
+  for (const runId of runIds) {
+    const view = await github.runView(config.repoPath, runId)
+    previous.set(runId, Number(view?.attempt ?? 0))
+  }
+
+  for (const runId of runIds) {
+    const result = await github.rerunFailedRun(config.repoPath, runId)
+    if (!result.ok) {
+      await log?.(`Could not re-run CI run ${runId}: ${result.reason}`)
+      return false
+    }
+  }
+
+  const deadline = Date.now() + Math.min(120000, config.checkTimeoutMinutes * 60000)
+  while (Date.now() < deadline) {
+    await sleep(Math.min(10, Math.max(1, config.checkPollSeconds)) * 1000)
+    const views = await Promise.all(runIds.map(runId => github.runView(config.repoPath, runId)))
+    const advanced = views.every((view, index) => view
+      && Number(view.attempt ?? 0) > (previous.get(runIds[index]) ?? 0))
+    if (advanced) return true
+  }
+  await log?.('The CI re-run did not start a new attempt within the wait window.')
+  return false
 }
 
 /**
@@ -174,18 +208,33 @@ export async function pushOpenWaitMerge({
   await log?.(`CI checks: ${checks.ok ? 'passed' : checks.reason}`)
 
   let attempt = 0
-  let noLogAttempts = 0
+  let noLogReruns = 0
+  let noLogDiagnosis = false
   while (!checks.ok && attempt < config.maxAttempts) {
-    attempt += 1
-    state.attempts = attempt
-    const failure = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
+    const failure = await collectFailureLogs({
+      config,
+      artifacts,
+      checks: checks.checks,
+      attempt: attempt + noLogReruns + 1
+    })
     const failedChecks = checks.checks.filter(check => FAILED_STATES.has(check.state))
     let promptName = executorPrompt
     let failureLogs = failure.text
 
+    if (!failure.usable && noLogReruns < 2) {
+      noLogReruns += 1
+      const names = failedChecks.map(check => check.name).filter(Boolean)
+      await log?.(`CI failed without a usable log for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. Re-running the failed job (${noLogReruns}/2).`)
+      const rerun = await rerunFailedChecks({ config, checks: checks.checks, log })
+      if (rerun) {
+        checks = await waitForChecks({ config, artifacts, prNumber: pr.number })
+        await log?.(`CI checks after automatic re-run: ${checks.ok ? 'passed' : checks.reason}`)
+        continue
+      }
+    }
+
     if (!failure.usable) {
-      noLogAttempts += 1
-      if (noLogAttempts > 1) {
+      if (noLogDiagnosis) {
         const blocker = await writeCiLogBlocker({
           config,
           state,
@@ -195,14 +244,17 @@ export async function pushOpenWaitMerge({
         })
         throw new Error(blockerMessage([blocker]))
       }
+      noLogDiagnosis = true
       promptName = 'ci-fix'
       const names = failedChecks.map(check => check.name).filter(Boolean)
-      failureLogs = `${failure.text}\n\nNo failure log is available. Reproduce ${names.length > 0 ? names.join(', ') : 'the failed check'} locally and run the relevant repository test command before changing code.`
-      await log?.(`CI failed without a usable log for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. Running one automatic diagnosis attempt.`)
+      failureLogs = `${failure.text}\n\nNo failure log is available after automatic re-runs. Reproduce ${names.length > 0 ? names.join(', ') : 'the failed check'} locally and run the relevant repository test command before changing code.`
+      await log?.(`CI failed without a usable log after automatic re-runs for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. Running one automatic diagnosis attempt.`)
     } else {
-      await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
+      await log?.(`CI failed. Executor fix attempt ${attempt + 1}/${config.maxAttempts}.`)
     }
 
+    attempt += 1
+    state.attempts = attempt
     const execution = await runSession({
       config,
       prompt: promptName,
