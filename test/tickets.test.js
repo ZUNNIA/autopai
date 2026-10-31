@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { listTickets, orderTickets, branchNameFor, blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, resolveTicketBranch, selectTickets, ticketDoneDir } from '../src/lib/tickets.js'
+import { listTickets, orderTickets, parseTicket, branchNameFor, blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, resolveTicketBranch, selectTickets, ticketDoneDir } from '../src/lib/tickets.js'
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -77,10 +77,21 @@ test('filters finding files by classification and priority', async () => {
   assert.deepEqual(selected, [keep])
 })
 
-test('builds a unique branch name without ticket identifiers', () => {
-  const ticket = { type: 'feat', slug: 'model-params-panel' }
-  assert.equal(branchNameFor(ticket, []), 'feat/model-params-panel')
-  assert.equal(branchNameFor(ticket, ['feat/model-params-panel']), 'feat/model-params-panel-2')
+test('builds a semantic branch name without ticket identifiers', () => {
+  const ticket = { type: 'feat', slug: 'pr-329-03-model-params-panel', branchSlug: 'model-params-panel' }
+  assert.equal(branchNameFor(ticket), 'feat/model-params-panel')
+})
+
+test('strips the source PR and ordinal from the ticket branch slug', () => {
+  const ticket = parseTicket([
+    '---',
+    'id: pr329-qwen-max-token-policy',
+    'type: refactor',
+    '---',
+    '# Resolve the Qwen maximum-token field'
+  ].join('\n'), path.join('tickets', 'ready-for-refactor', 'pr-329-03-qwen-max-token-version-table.md'))
+  assert.equal(ticket.slug, 'pr-329-03-qwen-max-token-version-table')
+  assert.equal(ticket.branchSlug, 'qwen-max-token-version-table')
 })
 
 test('filters the refactor queue by front-matter feature', () => {
@@ -164,6 +175,13 @@ test('reuses a ticket branch that already has commits over the base', async () =
   const fresh = await resolveTicketBranch({ config, ticket: { slug: 'other-ticket' }, type: 'refactor' })
   assert.equal(fresh.branch, 'refactor/other-ticket')
   assert.equal(fresh.reuse, false)
+
+  git(repo, ['switch', 'main'])
+  git(repo, ['switch', '-c', 'refactor/clean-ticket'])
+  const clean = await resolveTicketBranch({ config, ticket: { slug: 'clean-ticket' }, type: 'refactor' })
+  assert.equal(clean.branch, 'refactor/clean-ticket')
+  assert.equal(clean.reuse, true)
+  assert.equal(clean.commits, 0)
 })
 
 test('rejects a filter that excludes a pending dependency', () => {

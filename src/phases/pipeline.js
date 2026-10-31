@@ -393,7 +393,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       if (resolved.reuse) {
         const switched = await git.switchBranchSafe(config.repoPath, branch)
         if (!switched) throw new Error(`Could not switch to the existing ticket branch ${branch}.`)
-        await log?.(`Reusing branch ${branch} for ${ticket.id}.`)
+        await log?.(`Reusing ${resolved.commits > 0 ? 'branch' : 'clean branch'} ${branch} for ${ticket.id}.`)
       } else {
         await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
         await log?.(`Ticket ${ticket.id}: branch ${branch}.`)
@@ -404,6 +404,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
         ticketId: ticket.id,
         ticketFile: ticket.file,
         title: ticket.title,
+        commitSubject: ticketTitle(ticket),
         type: ticket.type,
         priority: ticket.priority,
         branch,
@@ -416,7 +417,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
         instructions
       }
 
-      if (!resolved.reuse) {
+      if (!resolved.reuse || resolved.commits === 0) {
         stage = 'executor'
         const execution = await runSession({
           config,

@@ -38,17 +38,18 @@ export async function resolveTitle({ config, branch, commits }) {
 export function deriveTitle(branch, commits) {
   const type = highestType(commits)
   const slug = branch.includes('/') ? branch.split('/').slice(1).join('/') : branch
-  return `${type}: ${slugify(slug).replace(/-/g, ' ')}`
+  const clean = slug.replace(/^pr[-_]?\d+(?:[-_]\d+)?[-_]/, '')
+  return `${type}: ${slugify(clean).replace(/-/g, ' ')}`
 }
 
 /**
- * Builds the pull request title from the ticket name instead of the branch
- * slug. Branch slugs carry audit chunk prefixes such as `pr-296-01`; the ticket
- * id is the stable, human-readable name.
+ * Builds the branch-independent commit and pull request title from the short
+ * ticket slug. The source PR and finding ordinal are local metadata and never
+ * appear in Git artifacts.
  */
 export function ticketTitle(ticket) {
   const type = String(ticket?.type ?? 'chore').trim() || 'chore'
-  const name = String(ticket?.id ?? ticket?.slug ?? '').trim().replace(/-/g, ' ')
+  const name = String(ticket?.branchSlug ?? ticket?.slug ?? ticket?.id ?? '').trim().replace(/-/g, ' ')
   return name ? `${type}: ${name}` : 'chore: ticket'
 }
 
@@ -61,10 +62,15 @@ function highestType(commits) {
 }
 
 export function generatePrBody({ commits, coverage, dryRun = false }) {
-  const summary = (commits ?? []).map(commit => `- ${stripTypePrefix(commit.subject)}`)
+  const summary = (commits ?? [])
+    .map(commit => stripTypePrefix(commit.subject).trim())
+    .filter(Boolean)
+    .map(sentence => sentence.replace(/^[a-z]/, letter => letter.toUpperCase()))
+    .map(sentence => /[.!?]$/.test(sentence) ? sentence : `${sentence}.`)
+    .join(' ')
   const lines = [
     '## Summary',
-    ...(summary.length > 0 ? summary : ['- No commit summary available.']),
+    summary || 'No commit summary available.',
     '',
     '## Tests',
     `Build and tests passed locally. Coverage: ${formatCoverage(coverage)}.`

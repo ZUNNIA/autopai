@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   validateBranchName,
   validateCommitMessage,
+  validatePrBody,
   validatePrTitle,
   scanAddedLines
 } from '../src/lib/policy.js'
@@ -34,6 +35,12 @@ test('rejects ticket and ADR references in commit messages', () => {
 test('rejects scoped PR titles', () => {
   const violations = validatePrTitle('docs(audit): record findings')
   assert.ok(violations.some(item => item.code === 'pr-title-scope'))
+})
+
+test('rejects bullet and numbered lists in pull request bodies', () => {
+  assert.ok(validatePrBody('## Summary\n- First change\n- Second change').some(item => item.code === 'pr-body-list'))
+  assert.ok(validatePrBody('## Summary\n1. First change\n2. Second change').some(item => item.code === 'pr-body-list'))
+  assert.equal(validatePrBody('## Summary\nFirst change. Second change.').length, 0)
 })
 
 test('scans added code for ticket and ADR references', () => {
