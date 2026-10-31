@@ -25,6 +25,7 @@ id: [unique-short-id]
 feature: [feature-slug]
 type: [feat|fix|refactor|perf|test|docs|chore]
 priority: [urgent|important|minor]
+billing: [none|increase|unknown]
 depends_on: [id-or-empty-list]
 ---
 ```
@@ -72,3 +73,6 @@ Important details for implementation:
 
 ## 6. Manual Verification
 Exact manual steps a human must run for behavior that automated tests and the smoke command cannot cover. Include preconditions, steps, and expected results. Write "None" when the ticket is fully covered by automated tests.
+
+## 7. Billing impact
+Set front-matter `billing` to `none`, `increase`, or `unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. Add this section only when billing is `increase` or `unknown`; it must include an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence. If billing does not increase, use `none` and omit this section. When billing is `increase` or `unknown`, include one line with the estimate and confidence in your final message.

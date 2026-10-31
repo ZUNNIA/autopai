@@ -9,6 +9,14 @@
 - Merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - The default GitHub merge message is forbidden.
 
+## Billing reports
+
+- Every generated backlog, Identified finding, ready-for-dev ticket, ready-for-refactor ticket, and QA fix ticket declares `billing: none|increase|unknown` or `Billing impact: none|increase|unknown`.
+- A detailed `## Billing impact` section with an `Estimate` is required only for `increase` or `unknown`; `none` means no report.
+- Estimates cover product runtime and CI/testing costs in the project `billingCurrency`.
+- Estimates are approximate and include drivers, assumptions, and confidence. `Unknown` is valid; guessing is not.
+- The chat reports billing impact only for `increase` or `unknown`.
+
 ## Local artifacts
 
 - Tickets, briefs, findings, UX proposals, and audit evidence stay local. Never commit, push, or reference them from Git.

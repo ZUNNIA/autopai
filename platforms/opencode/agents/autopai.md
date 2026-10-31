@@ -90,7 +90,7 @@ Rules:
 ## Feature discussions
 
 - Treat a feature idea, an opinion question, or a design request as the discussion stage of `/autopai-plan`: talk, read when needed, and write nothing.
-- Cover the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
+- Cover the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks. Ask whether the change can increase product runtime, CI, or testing billing, and include the agreed estimate in the summary when it does.
 - Ask as many questions as the discussion needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
 - Propose a short kebab-case feature name for the `--feature` option.
 - End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
@@ -98,6 +98,7 @@ Rules:
 - After prepare succeeds, report the retained brief and backlog session titles and ids from the CLI result. Keep both sessions open for review until the backlog gate is decided.
 - When the backlog is awaiting review and the user requests a change, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a core prompt from `src/prompts`. Do not edit tickets yourself, do not run prepare again, and do not tell the user to paste the change.
 - Relay the planner response and any open questions from `autopai revise` or the `plannerMessages` field of the prepare result. Open questions belong in the conversation, never in the brief, backlog, or UX proposal.
+- When reporting generated backlogs, findings, or tickets, include the billing impact only when the artifact marks billing as `increase` or `unknown`. Use `billingReports` from the `prepare`, `approve`, `identify`, `promote`, or `qa-fix` CLI result, or the `## Billing impact` section. Never invent an estimate; keep `Unknown` when the artifact says so. Use the project `billingCurrency`.
 - The orchestrator deletes the retained prepare sessions only after a successful backlog approval. If approval fails or a session cannot be deleted, leave it and report it.
 - If the user says no or wants to keep discussing, stay in the discussion. Never approve the backlog.
 
@@ -153,6 +154,7 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `sessionTimeoutMinutes`: integer. Timeout per AI session, default 90.
 - `checkPollSeconds`: integer. CI polling interval, default 30.
 - `checkTimeoutMinutes`: integer. CI wait budget, default 30.
+- `billingCurrency`: three-letter ISO 4217 currency code, default `USD`. Used by generated billing estimates. Changing it changes the currency of future estimates, not historical tickets.
 - `autoMerge`: boolean. Merge after required checks pass. Reserved: accepted, not enforced yet.
 - `approvalRequired`: boolean. Reserved and superseded by `pauseAfter`.
 - `pauseAfter`: string array of human gates where the assisted loop stops. Default: `backlog`, `plan`, `qa`. Values: `backlog`, `plan`, `qa`, `findings`, `promotion`, `refactor`. An empty array disables human pauses. `--auto` and `--pause-after` override it per run.

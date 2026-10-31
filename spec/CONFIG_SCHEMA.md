@@ -25,6 +25,7 @@ The configuration file lives at the root of each target repository. It is create
 | `sessionTimeoutMinutes` | integer | Timeout per AI session. Default 90. |
 | `checkPollSeconds` | integer | CI polling interval. Default 30. |
 | `checkTimeoutMinutes` | integer | CI wait budget. Default 30. |
+| `billingCurrency` | string | Three-letter ISO 4217 currency code used by generated billing estimates. Default `USD`. |
 | `autoMerge` | boolean | Merge after required checks pass. Reserved: the implementation always merges after the required checks pass. |
 | `approvalRequired` | boolean | Reserved and superseded by `pauseAfter`. |
 | `pauseAfter` | string array | Human gates where the assisted loop stops. Default `["backlog", "plan", "qa"]`; an empty array disables human pauses. |

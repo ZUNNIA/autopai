@@ -26,6 +26,8 @@ For each debt, create one independent Markdown file in English under the output 
 
 ### Document Structure
 
+Billing impact: [none|increase|unknown]
+
 ## 0. Classification
 Select and briefly justify the type of debt:
 * [ ] 🧩 **Code Smell:** duplication, giant methods, confusing names, god classes.
@@ -76,6 +78,9 @@ What parts of the application consume or depend on the defective code.
 ## 4. References
 Related issues, previous pull requests, and resources. Never reference a ticket file or an ADR number from code snippets.
 
+## 5. Billing impact
+Set the top-of-document `Billing impact:` line to `none`, `increase`, or `unknown`. When it is `increase` or `unknown`, add a `## Billing impact` section with an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence, using the payload `billingCurrency`. Cover product runtime and CI/testing costs. When it does not increase, use `none` and omit the section.
+
 ## GOLDEN RULES (NON-NEGOTIABLE)
 1. **ZERO SOLUTIONS:** never propose refactors, new architectures, or complete solutions. Only the finding is documented.
 2. **ATOMICITY:** one file equals one specific problem. Multiple debts in the same file become multiple files.
@@ -84,4 +89,4 @@ Related issues, previous pull requests, and resources. Never reference a ticket 
 5. **NO DIAGNOSTIC REPORT:** do not create a separate diagnostics artifact. The evidence is an input.
 6. **LOCAL ONLY:** these tickets are local artifacts. Do not commit, push, or reference them from Git.
 
-End with a short summary: scope, files written, debts found per priority, and any filter that matched nothing.
+End with a short summary: scope, files written, debts found per priority, any filter that matched nothing, and a billing line only for findings marked `increase` or `unknown`.

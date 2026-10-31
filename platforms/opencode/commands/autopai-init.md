@@ -60,7 +60,7 @@ Understand the intent; the phrases below are examples, not a required grammar.
 - "Stop at every step" sets all six gates; this only adds the missing gates, so it is safe.
 - "Never stop" or "run everything" sets `[]`; this removes gates, so confirm before writing.
 - Adding a gate is safe. Removing or replacing gates is destructive; show the proposed list and ask for confirmation before writing, even when the request uses "only" or "replace".
-- Other schema fields are allowed: branches, commands, checks, coverage, runtime logs, protected paths, runner, runnerOptions, agents, models, ticketDirs, and stateDir. The config audit lists the known fields; an unknown key is an error. Show the current and proposed values and ask for confirmation before a destructive change.
+- Other schema fields are allowed: branches, commands, checks, coverage, runtime logs, protected paths, runner, runnerOptions, agents, models, ticketDirs, stateDir, and billingCurrency. The config audit lists the known fields; an unknown key is an error. Show the current and proposed values and ask for confirmation before a destructive change.
 - If the request or the repository is ambiguous, ask the questions needed. Never guess a configuration value.
 
 Do not edit source, tests, CI, ADRs, or `AGENTS.md`. Do not create tickets, branches, commits, or pull requests.

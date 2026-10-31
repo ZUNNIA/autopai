@@ -29,6 +29,7 @@ test('loads defaults and resolves the state directory', async () => {
   assert.deepEqual(config.pauseAfter, ['backlog', 'plan', 'qa'])
   assert.equal(config.localGateRetries, 1)
   assert.equal(config.continueOnFailure, true)
+  assert.equal(config.billingCurrency, 'USD')
   assert.ok(config.protectedPaths.includes('.github/**'))
   assert.ok(config.protectedPaths.includes('autopai.json'))
 })

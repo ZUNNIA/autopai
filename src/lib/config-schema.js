@@ -61,6 +61,7 @@ export const DEFAULTS = {
   sessionTimeoutMinutes: 90,
   checkPollSeconds: 30,
   checkTimeoutMinutes: 30,
+  billingCurrency: 'USD',
   autoMerge: true,
   approvalRequired: true,
   pauseAfter: [...DEFAULT_PAUSE_AFTER],

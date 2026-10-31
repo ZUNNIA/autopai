@@ -145,6 +145,13 @@ function auditField(report, key, value) {
     return
   }
 
+  if (key === 'billingCurrency') {
+    if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value)) {
+      addError(report, 'invalid-value', key, 'billingCurrency must be a three-letter ISO 4217 code.')
+    }
+    return
+  }
+
   if (INTEGER_FIELDS[key]) {
     const rule = INTEGER_FIELDS[key]
     if (!Number.isInteger(value) || value < rule.min) {

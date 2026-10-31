@@ -76,6 +76,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
   - Never commit, push, or reference tickets, ADRs, briefs, Identified findings, or audit evidence from Git artifacts.
 
 ## 8. Engineering Judgment (Long-Term First)
+- **Billing impact:** If a change can increase product runtime, CI, or testing billing, report an approximate estimate in the corresponding ticket and in the chat. Use the project `billingCurrency`, include drivers, assumptions, and confidence, and use `Unknown` instead of guessing. Do not add a billing report when billing does not increase.
 - **Always choose the long-term option**: prefer the most maintainable and scalable solution over the quickest one, even when it costs more work now.
 - **Design for growth**: assume more data, more users, more features, and more contributors; avoid shortcuts that create rework or lock the architecture in.
 - **No throwaway code**: never ship hacks, dead code, or patterns that contradict the existing architecture; if a shortcut is unavoidable, state the debt and the proper follow-up.
