@@ -116,7 +116,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Commits.** The executor stages only the files it changed and commits with `<type>: <subject>`, no scope parentheses, and no ticket, ADR, or issue references.
 
-**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active. If CI fails without a usable failure log, the orchestrator writes a CI-access blocker with the job links and does not ask the executor to fix a failure it cannot see.
+**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active. If CI fails without a usable failure log, the orchestrator runs one automatic diagnosis attempt with the failed check names and links. The executor reproduces the check locally and fixes the branch. If that attempt does not resolve the failure, the run writes a CI blocker naming the checks and linking the job.
 
 ### 3.2 Planner (`planner`)
 
@@ -316,7 +316,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 
 **resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes an interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. At a gate in `pauseAfter` it stops and prints the exact approval command. A generic `resume` is **not** approval: `--approve <gate>` passes that exact gate and continues to the next gate, and approving one gate does not approve the next. `--auto` skips every human gate; `--pause-after` overrides the list. It advances local non-gated phases (`identify` to `promote`, `promote` to `refactor`) and stops at a completed refactor, adopt, or release. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
 
-A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. A branch with commits is reused even when its name has a suffix, so retries do not create endless `-4` branches. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs before recording the failure. If CI fails and no failure log is available, the run stops before any executor fix and writes a CI-access blocker with the check links. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
+A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. A branch with commits is reused even when its name has a suffix, so retries do not create endless `-4` branches. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs before recording the failure. If CI fails and no failure log is available, one automatic diagnosis attempt reproduces the named check locally and fixes the branch; if the check still fails without a log, the run writes a CI blocker with the check names and links. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
 
 ## 5. Tickets
 
@@ -632,7 +632,7 @@ The reported checks are stored as `checks-latest.json` artifacts on every poll.
 
 ### 9.6 Fix loop
 
-On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. When the attempt budget is exhausted, the run stops with an error.
+On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. If no failure log is available, it makes one automatic diagnosis attempt using the failed check names and links; the executor reproduces the check locally before changing code. When the attempt budget is exhausted, or the no-log diagnosis still fails, the run stops with a blocker that names the failed checks.
 
 ### 9.7 Merge rules
 
@@ -752,7 +752,7 @@ The audit runs against the pull requests of the last run, promotes the findings,
 autopai status --repo .
 ```
 
-If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fix attempts before stopping. If the run stops, fix the reported blocker and continue with `autopai resume --repo .`.
+If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fix attempts before stopping. If no failure log is available, it still makes one automatic diagnosis attempt with the failed check names and links. If the run stops, fix the reported blocker and continue with `autopai resume --repo .`.
 
 ### 12.3 Walkthrough: identify, refactor, release
 

@@ -138,6 +138,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/autopai-dev.md`
 - `src/prompts/autopai-finish.md`
 - `src/prompts/backlog.md`
+- `src/prompts/ci-fix.md`
 - `src/prompts/feature-brief.md`
 - `src/prompts/identified.md`
 - `src/prompts/qa-fix.md`
@@ -154,6 +155,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 - `test/blockers.test.js`
 - `test/chunks.test.js`
+- `test/ci-fix.test.js`
 - `test/cli.test.js`
 - `test/codefiles.test.js`
 - `test/config-audit.test.js`
