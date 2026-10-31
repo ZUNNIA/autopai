@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { clearAgentTitle, deriveTitle, generateMergeBody, readAgentTitle, resolveTitle, ticketTitle } from '../src/lib/title.js'
+import { clearAgentTitle, deriveTitle, generateMergeBody, generatePrBody, readAgentTitle, resolveTitle, ticketTitle } from '../src/lib/title.js'
 
 test('derives the title from the branch and commit types', () => {
   assert.equal(
@@ -12,7 +12,7 @@ test('derives the title from the branch and commit types', () => {
   )
   assert.equal(
     deriveTitle('refactor/pr-297-05-exhaustive-kv-cache-mappings', [{ subject: 'refactor: make KV cache type mappings exhaustive' }]),
-    'refactor: pr 297 05 exhaustive kv cache mappings'
+    'refactor: exhaustive kv cache mappings'
   )
   assert.equal(
     deriveTitle('fix/panel', [{ subject: 'fix: panel' }, { subject: 'feat: new panel' }]),
@@ -20,30 +20,44 @@ test('derives the title from the branch and commit types', () => {
   )
 })
 
-test('builds the pull request title from the old ticket name', () => {
+test('builds the commit and pull request title from the short ticket slug', () => {
   assert.equal(
-    ticketTitle({ id: 'local-engine-options-grouping', type: 'refactor' }),
+    ticketTitle({ branchSlug: 'local-engine-options-grouping', id: 'pr329-local-engine-options-grouping', type: 'refactor' }),
     'refactor: local engine options grouping'
   )
   assert.equal(
-    ticketTitle({ id: 'ggml-type-table', type: 'refactor' }),
-    'refactor: ggml type table'
+    ticketTitle({ branchSlug: 'qwen-max-token-version-table', type: 'refactor' }),
+    'refactor: qwen max token version table'
   )
+  assert.equal(ticketTitle({ id: 'ggml-type-table', type: 'refactor' }), 'refactor: ggml type table')
   assert.equal(ticketTitle({ type: 'feat' }), 'chore: ticket')
 })
 
-test('builds a descriptive merge body from the pull request summary', () => {
+test('builds a descriptive prose merge body from the pull request summary', () => {
   const prBody = [
     '## Summary',
-    '- Add the generation contract and matrix core',
-    '- Resolve provider capability rules',
+    'Add the generation contract and matrix core. Resolve provider capability rules.',
     '',
     '## Tests',
     'Build and tests passed locally. Coverage: 75.56%.'
   ].join('\n')
   const body = generateMergeBody({ prBody })
-  assert.equal(body, '- Add the generation contract and matrix core\n- Resolve provider capability rules')
+  assert.equal(body, 'Add the generation contract and matrix core. Resolve provider capability rules.')
   assert.doesNotMatch(body, /Merges|CI passed|coverage|develop/i)
+  assert.doesNotMatch(body, /^\s*(?:[-*+]|\d+[.)])\s+/m)
+})
+
+test('generates a prose pull request body without bullet or numbered lists', () => {
+  const body = generatePrBody({
+    commits: [
+      { subject: 'refactor: resolve qwen max token fields' },
+      { subject: 'test: cover the model version table' }
+    ],
+    coverage: { rate: 0.81, covered: 81, valid: 100 }
+  })
+  assert.match(body, /## Summary\nResolve qwen max token fields\. Cover the model version table\./)
+  assert.match(body, /Coverage: 81\.00%/)
+  assert.doesNotMatch(body, /^\s*(?:[-*+]|\d+[.)])\s+/m)
 })
 
 test('uses a neutral fallback when the pull request has no summary', () => {
@@ -78,6 +92,6 @@ test('resolveTitle uses a valid agent title and falls back to the branch', async
   await clearAgentTitle(config)
   assert.equal(
     await resolveTitle({ config, branch: 'refactor/pr-297-05-x', commits }),
-    'refactor: pr 297 05 x'
+    'refactor: x'
   )
 })

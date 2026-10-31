@@ -21,6 +21,7 @@ export function parseTicket(text, file) {
   const meta = match ? parseFrontMatter(match[1]) : {}
   const base = path.basename(file, '.md')
   const slug = slugify(base.replace(/^\d+[-_]?/, ''))
+  const branchSlug = sourceFreeSlug(base) || slug
   const id = String(meta.id ?? base)
   const type = String(meta.type ?? 'feat')
   const priority = normalizePriority(meta.priority) ?? parsePriority(text) ?? 'important'
@@ -30,6 +31,7 @@ export function parseTicket(text, file) {
     id,
     file,
     slug,
+    branchSlug,
     type,
     priority: PRIORITY_ORDER[priority] == null ? 'important' : priority,
     classification,
@@ -78,6 +80,17 @@ function normalizeList(value) {
 function firstHeading(text) {
   const match = String(text).match(/^#\s+(.+)$/m)
   return match ? match[1].trim() : null
+}
+
+/**
+ * Removes the audit source and finding ordinal from a ticket file name. Branch
+ * and commit names must describe the change, never the PR or local ticket that
+ * produced it.
+ */
+function sourceFreeSlug(value) {
+  return slugify(value)
+    .replace(/^pr[-_]?\d+(?:[-_]\d+)?[-_]/, '')
+    .replace(/^\d+[-_]/, '')
 }
 
 /**
@@ -226,30 +239,29 @@ export function ticketDoneDir(config, ticket, fallbackFeature) {
   return path.join(config.repoPath, config.ticketDirs.done, feature)
 }
 
-export function branchNameFor(ticket, existingBranches = []) {
-  const base = `${ticket.type}/${ticket.slug}`
-  if (!existingBranches.includes(base)) return base
-  let index = 2
-  while (existingBranches.includes(`${base}-${index}`)) index += 1
-  return `${base}-${index}`
+export function branchNameFor(ticket) {
+  return `${ticket.type}/${ticket.branchSlug ?? ticket.slug}`
 }
 
 /**
  * Chooses the branch for a ticket. A deterministic branch that already has
  * commits over the base is a previous attempt at the same ticket; reuse it
- * instead of creating a duplicate branch. A clean branch keeps the collision
- * suffix behavior.
+ * instead of creating a duplicate branch. A clean branch is reused and the
+ * executor runs again, so branch collisions never add numeric suffixes.
  */
 export async function resolveTicketBranch({ config, ticket, type, previousBranch = null }) {
   const branches = await git.listLocalBranches(config.repoPath)
-  const preferred = `${type}/${ticket.slug}`
+  const preferred = `${type}/${ticket.branchSlug ?? ticket.slug}`
   const candidates = [...new Set([previousBranch, preferred].filter(Boolean))]
+  const existing = []
   for (const candidate of candidates) {
     if (!branches.includes(candidate)) continue
     const ahead = await git.countCommitsOver(config.repoPath, config.baseBranch, candidate)
     if (ahead > 0) return { branch: candidate, reuse: true, commits: ahead, branches }
+    existing.push(candidate)
   }
-  return { branch: branchNameFor({ ...ticket, type }, branches), reuse: false, commits: 0, branches }
+  if (existing.length > 0) return { branch: existing[0], reuse: true, commits: 0, branches }
+  return { branch: branchNameFor({ ...ticket, type }), reuse: false, commits: 0, branches }
 }
 
 /**

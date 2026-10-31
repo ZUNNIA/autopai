@@ -16,9 +16,10 @@ Tasks:
 - Add or update tests for the fix. Keep the user-visible behavior unless the ticket documents a defect.
 - Run the repository restore, build, tests, and the failing local check before committing.
 - Stage only the files you changed. Never run `git add -A` or `git add .`.
-- Commit with `<type>: <subject>`, no scope, and no ticket, ADR, or issue references.
+- Commit with the exact `commitSubject` from the payload, or `<type>: <subject>` when it is absent, with no scope and no ticket, ADR, or issue references.
+- You may write a commit body of one or more prose paragraphs, but never use bullet points, numbered lists, or list markers. Omit the body when it only restates the subject.
 - Never push, merge, rebase, or run `gh`. The orchestrator owns those operations.
 - Do not create tickets, briefs, backlogs, or ADRs.
 - Do not write open questions into files. State missing information in your final message.
 
-End with a short summary: what failed, what changed, the commit subject, the local check result, and any blocker.
+End with a short prose summary of what failed, what changed, the commit subject, the local check result, and any blocker. Do not use bullet points, numbered lists, or list markers in that summary.

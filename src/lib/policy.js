@@ -11,6 +11,7 @@ const ADR_CODE_RE = /\bADR-\d+\b/i
 const TICKET_MESSAGE_RE = /\btickets[\\/]|TICKET-\d+|ticket\s*#\d+/i
 const ADR_MESSAGE_RE = /\bADR-\d+\b/i
 const ISSUE_REF_RE = /(^|\s)#\d+\b/
+const LIST_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+/m
 
 /**
  * Validates a branch name against the configured convention and rejects
@@ -103,6 +104,9 @@ export function validatePrBody(body) {
   }
   if (ISSUE_REF_RE.test(text)) {
     violations.push({ code: 'pr-body-issue-ref', message: 'PR body contains an issue-like reference.' })
+  }
+  if (LIST_LINE_RE.test(text)) {
+    violations.push({ code: 'pr-body-list', message: 'PR body must use prose; bullet and numbered lists are forbidden.' })
   }
   return violations
 }

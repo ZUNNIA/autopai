@@ -89,7 +89,7 @@ Add or remove gates in `autopai.json`, or ask the operator in natural language a
 
 A failed ticket is not a human gate. Local gates are retried once. If the ticket still fails, its branch stays available, the failure is recorded, and the loop continues with independent tickets while skipping dependents. The phase stays incomplete.
 
-- `autopai resume` reuses the failed ticket branch and retries the gates. A branch with commits is reused even when its name has a suffix, so a retry does not create `-4` versions of the same work.
+- `autopai resume` reuses the failed ticket branch and retries the gates. A branch with commits is reused, and a clean branch with the same semantic name is reused for a fresh executor run, so retries do not add numeric suffixes.
 - `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
 - `/autopai-status` shows the failed tickets and branches.
 - An explicit dev or refactor resume archives the blockers recorded by the previous attempt under the run artifacts. A new blocker still stops the run.
@@ -241,7 +241,8 @@ The commands accept natural language (`/autopai-identify audit the last 2 merged
 ## Policies
 
 - Tickets, briefs, findings, and evidence are local. Git artifacts never reference them.
-- Branch names are `<type>/<kebab-case-slug>`. Commit subjects and pull request titles are `<type>: <subject>` with no scope parentheses.
+- Branch names are `<type>/<kebab-case-slug>`. Commit subjects and pull request titles are `<type>: <subject>` with no scope parentheses. The slug is the short semantic ticket name without a source PR number or finding ordinal.
+- Commit, pull request, and merge bodies use prose; bullet points, numbered lists, and list markers are forbidden.
 - No ADR numbers or issue references in code, branches, commits, pull requests, or merges.
 - The executor may commit but never push, merge, rebase, or force-push. The orchestrator owns those operations and merges only after the required checks pass.
 - Tests may be changed freely. The CI build, test suite, and coverage threshold are the quality gates.
