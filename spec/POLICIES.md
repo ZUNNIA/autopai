@@ -17,6 +17,13 @@
 - Estimates are approximate and include drivers, assumptions, and confidence. `Unknown` is valid; guessing is not.
 - The chat reports billing impact only for `increase` or `unknown`.
 
+## CI failures
+
+- GitHub Actions billing, spending-limit, runner, permission, or not-started annotations are infrastructure failures. They are never fixed with source changes.
+- The orchestrator writes an infrastructure blocker with the exact failed check and annotation before any re-run or executor diagnosis.
+- Every non-ignored check must pass. An empty `requiredChecks` does not disable CI; only an exact `ignoredChecks` entry excludes a check.
+- Ignoring a real check removes a merge protection. Use the exact job name reported by `gh pr checks`, confirm the waiver explicitly, and remove it after the temporary period.
+
 ## Local artifacts
 
 - Tickets, briefs, findings, UX proposals, and audit evidence stay local. Never commit, push, or reference them from Git.

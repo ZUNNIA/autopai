@@ -9,8 +9,8 @@ The configuration file lives at the root of each target repository. It is create
 | `protectedPaths` | string array | Repository-relative globs the executor must never modify. Defaults to `.github/**`, `AGENTS.md`, and `autopai.json`. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
-| `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. |
-| `ignoredChecks` | string array | Checks that may be skipped or non-blocking, such as packaging jobs. |
+| `requiredChecks` | string array | CI job names that must pass before merge, exactly as `gh pr checks` reports them. Empty does not disable CI: every non-ignored check must still pass. |
+| `ignoredChecks` | string array | Exact check names excluded from the merge gate, such as packaging jobs. Adding a real check removes a protection; confirm it explicitly. |
 | `restoreCommand` | string array or null | Dependency restore command. |
 | `buildCommand` | string array or null | Build command. |
 | `testCommand` | string array or null | Test command. It must produce the coverage report expected by `coverageThreshold`. |
