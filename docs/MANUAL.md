@@ -118,7 +118,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Commits.** The executor stages only the files it changed and commits with `<type>: <subject>`, no scope parentheses, and no ticket, ADR, or issue references.
 
-**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active. If CI fails without a usable failure log, the orchestrator re-runs the failed job up to twice. If the failure remains, it runs one automatic diagnosis attempt with the failed check names and links. The executor reproduces the check locally and fixes the branch. If diagnosis still does not resolve the failure, the run writes a CI blocker naming the checks and linking the job.
+**Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active. If CI fails without a usable failure log, the orchestrator checks the check annotations first. Billing, spending-limit, runner, permission, and not-started annotations produce an infrastructure blocker immediately, without re-runs or a source diagnosis. Otherwise, it re-runs the failed job up to twice, then runs one automatic diagnosis attempt with the failed check names and links. If diagnosis still does not resolve the failure, the run writes a CI blocker naming the checks and linking the job.
 
 ### 3.2 Planner (`planner`)
 
@@ -384,8 +384,8 @@ The branch name comes from the ticket type and the file name without its numeric
 | `protectedPaths` | string array | `.github/**`, `AGENTS.md`, `autopai.json` | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | `main` | Integration branch for feature pull requests. |
 | `releaseBranch` | string | `main` | Production branch for release pull requests. |
-| `requiredChecks` | string array | `[]` | CI check names that must pass before merge, exactly as `gh pr checks` reports them. |
-| `ignoredChecks` | string array | `[]` | Checks that may fail or stay pending without blocking the merge. |
+| `requiredChecks` | string array | `[]` | CI check names that must be present and pass before merge, exactly as `gh pr checks` reports them. Empty does not disable CI: every non-ignored check must still pass. |
+| `ignoredChecks` | string array | `[]` | Exact check names excluded from the merge gate. Adding a real check removes a protection; confirm it explicitly and remove a temporary waiver. |
 | `restoreCommand` | string array or null | `null` | Dependency restore command, as an argument array. |
 | `buildCommand` | string array or null | `null` | Build command, as an argument array. |
 | `testCommand` | string array or null | `null` | Test command, as an argument array. |
@@ -637,7 +637,7 @@ The reported checks are stored as `checks-latest.json` artifacts on every poll.
 
 ### 9.6 Fix loop
 
-On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. If no failure log is available, it re-runs the failed job up to twice; if the failure remains, it makes one automatic diagnosis attempt using the failed check names and links; the executor reproduces the check locally before changing code. When the attempt budget is exhausted, or the no-log diagnosis still fails, the run stops with a blocker that names the failed checks.
+On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. If no failure log is available, it reads the check annotations. A billing or spending-limit annotation writes `<timestamp>-ci-billing-unavailable.json`; a runner, permission, or not-started annotation writes `<timestamp>-ci-infrastructure-unavailable.json`. Both stop immediately with the exact checks and annotations, without re-runs or source changes. Otherwise, it re-runs the failed job up to twice; if the failure remains, it makes one automatic diagnosis attempt using the failed check names and links; the executor reproduces the check locally before changing code. When the attempt budget is exhausted, or the no-log diagnosis still fails, the run stops with a blocker that names the failed checks.
 
 ### 9.7 Merge rules
 
@@ -757,7 +757,7 @@ The audit runs against the pull requests of the last run, promotes the findings,
 autopai status --repo .
 ```
 
-If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fix attempts before stopping. If no failure log is available, it first re-runs the failed job up to twice, then makes one automatic diagnosis attempt with the failed check names and links. If the run stops, fix the reported blocker and continue with `autopai resume --repo .`.
+If CI fails, the orchestrator automatically runs up to `maxAttempts` executor fix attempts before stopping. If no failure log is available, it first checks the annotations: billing, spending-limit, runner, permission, and not-started failures stop as infrastructure blockers without re-runs. Otherwise, it re-runs the failed job up to twice, then makes one automatic diagnosis attempt with the failed check names and links. If the run stops, fix the reported blocker and continue with `autopai resume --repo .`.
 
 ### 12.3 Walkthrough: identify, refactor, release
 
@@ -842,6 +842,8 @@ A dev ticket needs a new pattern the repository has not decided yet.
 **`Required checks were not reported: <names>.`** Within 120 seconds of the first poll, `gh pr checks` did not report every name in `requiredChecks`. Confirm the exact names with `gh pr checks <number>` and copy them verbatim.
 
 **`CI did not pass after <n> attempts.`** The fix budget is exhausted. Read the `ci-failure-<n>.log` artifacts, fix locally, push, and resume.
+
+**`<timestamp>-ci-billing-unavailable.json` or `<timestamp>-ci-infrastructure-unavailable.json`.** GitHub Actions did not start the job. The blocker contains the exact check and the GitHub annotation. Fix billing/spending or provide a runner; do not change source. Ignoring a real check is a separate, explicit protection removal. `requiredChecks: []` is not a bypass: every non-ignored check must pass, and only an exact `ignoredChecks` entry excludes one.
 
 **`Executor failed with exit code <n>.`** Read the corresponding `executor-*.log` artifact. Common causes are missing build tools, a command timeout, or a blocker written under `needs-human/`.
 

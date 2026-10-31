@@ -7,6 +7,8 @@ Before composing the command, run `autopai status --repo .` and read its `gate`.
 
 If the user reports a failed manual QA item while the gate is `qa`, do not use `resume` or `--approve qa`; use `autopai qa-fix --message "<failure>"` to create fix tickets and restart dev.
 
+If `status` reports `ci-billing-unavailable` or `ci-infrastructure-unavailable`, report the exact `failedChecks` and annotation. Do not run `--fix` or propose a source change. The options are fixing GitHub Actions billing or the runner, or explicitly ignoring the exact failing check; `requiredChecks: []` is not a CI bypass.
+
 Run with the bash tool and a timeout of at least 14400000 ms:
 
 `autopai resume --repo . $ARGUMENTS`

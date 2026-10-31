@@ -1,4 +1,7 @@
 import { runCommand } from './runner.js'
+import { checkRunIdFromLink } from './ci-failure.js'
+
+const repoNames = new Map()
 
 async function gh(repo, args, options = {}) {
   const result = await runCommand('gh', args, { cwd: repo, logFile: options.logFile, timeoutMs: options.timeoutMs ?? 120000 })
@@ -31,6 +34,14 @@ export async function prView(repo, number) {
 export async function prChecks(repo, number) {
   const result = await gh(repo, ['pr', 'checks', String(number), '--json', 'name,state,bucket,link'], { allowFailure: true })
   return { ok: result.code === 0, checks: parseJson(result.stdout, []) }
+}
+
+async function repoSlug(repo) {
+  if (repoNames.has(repo)) return repoNames.get(repo)
+  const result = await gh(repo, ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'], { allowFailure: true })
+  const slug = result.code === 0 ? result.stdout.trim() : ''
+  if (slug) repoNames.set(repo, slug)
+  return slug
 }
 
 export async function prDiff(repo, number) {
@@ -69,6 +80,22 @@ export async function runFailedLog(repo, check) {
   const text = (result.stdout || result.stderr).trim()
   const missing = !text || /^log not found\b|^no log available\b/i.test(text)
   return { ok: result.code === 0 && !missing, text }
+}
+
+export async function checkAnnotations(repo, check) {
+  const checkId = checkRunIdFromLink(check?.link ?? '')
+  if (!checkId) return { ok: false, annotations: [], reason: 'The check link has no job id.' }
+  const slug = await repoSlug(repo)
+  if (!slug) return { ok: false, annotations: [], reason: 'Could not resolve the repository name.' }
+  const result = await gh(repo, ['api', `repos/${slug}/check-runs/${checkId}/annotations?per_page=100`], { allowFailure: true })
+  if (result.code !== 0) {
+    return { ok: false, annotations: [], reason: (result.stderr || result.stdout || 'gh api check-runs annotations failed').trim() }
+  }
+  try {
+    return { ok: true, annotations: parseJson(result.stdout, []) }
+  } catch {
+    return { ok: false, annotations: [], reason: 'Could not parse check annotations.' }
+  }
 }
 
 export async function rerunFailedRun(repo, runId) {

@@ -131,6 +131,14 @@ If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, upd
 
 Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`.
 
+## CI failures and checks
+
+- Read the JSON blocker under `needs-human` before summarizing a stopped run. When it is `ci-billing-unavailable` or `ci-infrastructure-unavailable`, report its exact `failedChecks` and annotation. The job did not start, so do not propose source changes, do not re-run CI, and do not invoke a diagnosis session.
+- The only options for an infrastructure failure are: resolve the GitHub Actions billing or spending limit, provide a working or self-hosted runner, or explicitly ignore the exact failing check. Do not present a source fix as an option.
+- Never suggest ignoring a check that is already in `ignoredChecks`, and never present `requiredChecks: []` as a way to bypass CI. Every non-ignored check must pass; only `ignoredChecks` excludes a check.
+- Use the exact check names reported by `gh pr checks`. A workflow name can differ from its job name; never substitute one for the other.
+- Adding a real check to `ignoredChecks` removes a merge protection. Do it only after explicit confirmation, and tell the user to remove it after the temporary waiver.
+
 ## autopai.json schema
 
 - `runner`: string. Required. Session runner name. The installation provides the bundled `opencode` runner; other runners are added under `src/runners/`.
@@ -138,8 +146,8 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - `protectedPaths`: string array. Repository-relative globs the executor must never modify. Default: `.github/**`, `AGENTS.md`, `autopai.json`. Add the client configuration files of the tool in use when needed.
 - `baseBranch`: string. Integration branch for feature pull requests.
 - `releaseBranch`: string. Production branch for release pull requests.
-- `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`.
-- `ignoredChecks`: string array. Checks that may be skipped or non-blocking, such as packaging jobs.
+- `requiredChecks`: string array. CI job names that must pass before merge. Use the exact names reported by `gh pr checks`. An empty array does not disable CI: every non-ignored check must still pass.
+- `ignoredChecks`: string array. Exact check names excluded from the merge gate, such as packaging jobs. Adding a real check here removes a protection; confirm it explicitly and remove a temporary waiver after the merge.
 - `restoreCommand`: string array or null. Example shape: `["dotnet", "restore", "Solution.sln"]`.
 - `buildCommand`: string array or null.
 - `testCommand`: string array or null. It must produce the coverage report expected by `coverageThreshold`.

@@ -8,6 +8,7 @@ import { scanBranch, scanRepositoryFiles, formatViolations, validatePrBody } fro
 import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
 import { generateMergeBody } from './title.js'
+import { classifyCheckAnnotations, formatCheckAnnotations, isInfrastructureKind } from './ci-failure.js'
 import { ensureDir, sleep, truncate } from './util.js'
 
 const FAILED_STATES = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
@@ -87,18 +88,38 @@ export async function waitForChecks({ config, artifacts, prNumber }) {
   return { ok: false, checks: lastChecks, failed: [], reason: 'Timed out waiting for CI checks.' }
 }
 
-export async function collectFailureLogs({ config, artifacts, checks, attempt }) {
+export async function collectFailureLogs({ config, artifacts, checks, attempt, githubClient = github }) {
   const failed = checks.filter(check => FAILED_STATES.has(check.state))
   const sections = []
+  const annotations = []
   let usable = false
   for (const check of failed) {
-    const log = await github.runFailedLog(config.repoPath, check)
+    const log = await githubClient.runFailedLog(config.repoPath, check)
     if (log.ok) usable = true
-    sections.push(`### ${check.name} (${check.state})\n${log.text || check.link || 'No log available.'}`)
+    const annotation = typeof githubClient.checkAnnotations === 'function'
+      ? await githubClient.checkAnnotations(config.repoPath, check)
+      : { ok: false, annotations: [], reason: 'Annotations are not available.' }
+    const classification = classifyCheckAnnotations(annotation.annotations)
+    const annotationText = formatCheckAnnotations(annotation.annotations)
+    annotations.push({
+      check: check.name,
+      link: check.link ?? null,
+      classification,
+      annotations: annotation.annotations,
+      error: annotation.ok ? null : annotation.reason ?? null
+    })
+    const annotationSection = annotationText ? `\nAnnotations:\n${annotationText}` : ''
+    sections.push(`### ${check.name} (${check.state})\n${log.text || check.link || 'No log available.'}${annotationSection}`)
   }
   const text = sections.join('\n\n')
   await artifacts.write(`ci-failure-${attempt}.log`, text)
-  return { text: truncate(text, 20000), usable, checks }
+  return {
+    text: truncate(text, 20000),
+    usable,
+    checks,
+    annotations,
+    infrastructure: annotations.filter(entry => isInfrastructureKind(entry.classification.kind))
+  }
 }
 
 async function writeCiLogBlocker({ config, state, stateStore, executorPayload, checks }) {
@@ -117,6 +138,40 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
     files: links,
     decision: 'A human must inspect the failed GitHub Actions job, restore log access, permissions, runner or billing, and re-run the job before resuming.',
     suggestedAction: 'Inspect the linked GitHub Actions job and restore CI access; then run autopai resume without --fix.'
+  }
+  await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
+  state.blockers = [...(state.blockers ?? []), file]
+  await stateStore.save(state)
+  return { ...blocker, file }
+}
+
+async function writeCiInfrastructureBlocker({ config, state, stateStore, executorPayload, checks, annotations }) {
+  const failed = checks.filter(check => FAILED_STATES.has(check.state))
+  const links = failed.map(check => check.link).filter(Boolean)
+  const names = failed.map(check => check.name).filter(Boolean)
+  const billing = annotations.find(entry => entry.classification.kind === 'billing')
+  const kind = billing ? 'billing' : 'infrastructure'
+  const details = annotations
+    .map(entry => `${entry.check}: ${entry.classification.message ?? 'GitHub Actions could not start the job.'}`)
+    .join(' ')
+  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+  const dir = path.join(config.stateDir, 'needs-human')
+  await ensureDir(dir)
+  const file = path.join(dir, `${stamp}-ci-${kind}-unavailable.json`)
+  const blocker = {
+    ticketId: executorPayload?.ticketId ?? null,
+    ticketFile: executorPayload?.ticketFile ?? null,
+    failedChecks: names,
+    reason: `GitHub Actions did not run ${names.length > 0 ? names.join(', ') : 'the failed checks'}. ${details} The job produced no failure log, so no repository change can fix this.`,
+    files: links,
+    annotations: annotations.map(entry => ({
+      check: entry.check,
+      link: entry.link,
+      kind: entry.classification.kind,
+      message: entry.classification.message
+    })),
+    decision: 'A human must resolve the GitHub Actions infrastructure failure. Do not change repository source for this failure.',
+    suggestedAction: `Resolve the GitHub Actions billing/spending limit or provide a working runner, then run autopai resume without --fix. To proceed without CI, add only the exact failing check name to ignoredChecks with explicit approval and remove it after the merge.`
   }
   await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
   state.blockers = [...(state.blockers ?? []), file]
@@ -220,6 +275,19 @@ export async function pushOpenWaitMerge({
     const failedChecks = checks.checks.filter(check => FAILED_STATES.has(check.state))
     let promptName = executorPrompt
     let failureLogs = failure.text
+
+    if (failure.infrastructure.length > 0) {
+      const blocker = await writeCiInfrastructureBlocker({
+        config,
+        state,
+        stateStore,
+        executorPayload,
+        checks: failure.checks,
+        annotations: failure.infrastructure
+      })
+      await log?.(`CI was blocked by GitHub Actions infrastructure: ${blocker.reason}`)
+      throw new Error(blockerMessage([blocker]))
+    }
 
     if (!failure.usable && noLogReruns < 2) {
       noLogReruns += 1

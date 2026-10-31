@@ -93,7 +93,8 @@ A failed ticket is not a human gate. Local gates are retried once. If the ticket
 - `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
 - `/autopai-status` shows the failed tickets and branches.
 - An explicit dev or refactor resume archives the blockers recorded by the previous attempt under the run artifacts. A new blocker still stops the run.
-- If CI fails and no failure log is available, the orchestrator re-runs the failed job up to twice. If that does not clear the failure, it runs one automatic diagnosis attempt with the failed check names and links. The executor reproduces the check locally and fixes the branch. If diagnosis still does not resolve the failure, the run stops with a CI blocker that names the checks and links the job.
+- If CI fails and no failure log is available, the orchestrator checks the check annotations first. A billing, spending-limit, runner, permission, or not-started annotation stops the run with an exact infrastructure blocker; it is never treated as a source bug. Otherwise, it re-runs the failed job up to twice, then runs one automatic diagnosis attempt with the failed check names and links. If diagnosis still does not resolve the failure, the run stops with a CI blocker that names the checks and links the job.
+- Every non-ignored check must pass. An empty `requiredChecks` does not disable CI; only an exact `ignoredChecks` entry excludes a check. Adding a real check to `ignoredChecks` removes a merge protection and must be explicit and temporary.
 
 The automatic gates are never bypassed, and a red branch is never pushed. A branch with commits is reused instead of creating a duplicate.
 
