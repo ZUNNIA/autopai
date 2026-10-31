@@ -83,7 +83,7 @@ flowchart LR
 
 **State.** `state.json` under the state directory. It stores the run mode, phase, feature, branch, SHAs, pull request number, merge commit, scopes, attempts, sessions, and blockers. Writes are atomic and a lock file prevents concurrent runs.
 
-**Policy.** The rules that keep Git artifacts independent from local work items: short semantic branch and commit names without source PR numbers or finding ordinals, commit format, no scopes, no ticket or ADR references, prose-only bodies without bullet or numbered lists, and no default merge message. The orchestrator enforces policy before every push and before every merge.
+**Policy.** The rules that keep Git artifacts independent from local work items: short semantic branch and commit names without source PR numbers or finding ordinals, commit format, no scopes, no ticket or ADR references, bodies without bullet or numbered lists, and no default merge message. The orchestrator enforces policy before every push and before every merge.
 
 **Billing impact.** Generated backlogs, Identified findings, ready-for-dev tickets, ready-for-refactor tickets, and QA fix tickets declare `billing: none|increase|unknown` (or `Billing impact: none|increase|unknown` for document artifacts). Only `increase` and `unknown` require a detailed `## Billing impact` section with an `Estimate`, one-time and recurring costs, drivers, assumptions, and confidence. Estimates cover product runtime and CI/testing costs in `billingCurrency`, default USD. `none` means no report. The operator shows billing in the chat only for `increase` or `unknown`.
 
@@ -116,7 +116,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Permissions (bundled platform).** The executor may edit any file except protected paths, run any command except `git push`, `git merge`, `git rebase`, `git reset --hard`, `gh`, and destructive delete commands. It cannot ask questions, run tasks, or touch files outside the repository.
 
-**Commits.** The executor stages only the files it changed and commits with the exact `commitSubject` from the payload, no scope parentheses, and no source PR number, ticket, ADR, or issue references. The subject comes from the short semantic ticket slug. A commit body may contain prose paragraphs of any useful length, but never bullet points, numbered lists, or list markers.
+**Commits.** The executor stages only the files it changed and commits with the exact `commitSubject` from the payload, no scope parentheses, and no source PR number, ticket, ADR, or issue references. The subject comes from the short semantic ticket slug. A commit body may contain any useful detail and length, but never bullet points, numbered lists, or list markers. It must add information beyond the subject and never repeat or paraphrase it. The orchestrator removes a body that merely restates the subject from the latest local commit.
 
 **Blocking.** The executor never asks a question. When a ticket needs a human decision, an ADR, or a change outside its scope, it writes a JSON blocker under `<stateDir>/needs-human/` and stops. The orchestrator reports the run as blocked; you resolve it and resume. An explicit dev or refactor resume moves the blockers recorded by the previous attempt into the run artifacts, so a resolved blocker does not block again; a new blocker remains active. If CI fails without a usable failure log, the orchestrator checks the check annotations first. Billing, spending-limit, runner, permission, and not-started annotations produce an infrastructure blocker immediately, without re-runs or a source diagnosis. Otherwise, it re-runs the failed job up to twice, then runs one automatic diagnosis attempt with the failed check names and links. If diagnosis still does not resolve the failure, the run writes a CI blocker naming the checks and linking the job.
 
@@ -613,7 +613,7 @@ The executor can edit source and tests and can commit. It cannot push, fetch new
 Before any push and before any merge, the orchestrator validates:
 
 - **Branch name.** `<type>/<kebab-case-slug>` with allowed types. The slug is the short semantic ticket name without the source PR number or finding ordinal. No numeric segments that look like ticket identifiers, no `ticket` or `#` references, no ADR references.
-- **Commit subjects and bodies.** `<type>: <subject>` from the short semantic ticket slug, no scope parentheses, no source PR number, no ticket paths, no `TICKET-123`, no `ADR-000`, no `#123` issue references, no GitHub default merge subject. A body may use prose paragraphs of any useful length; bullet points, numbered lists, and list markers are forbidden.
+- **Commit subjects and bodies.** `<type>: <subject>` from the short semantic ticket slug, no scope parentheses, no source PR number, no ticket paths, no `TICKET-123`, no `ADR-000`, no `#123` issue references, no GitHub default merge subject. A body may contain any useful detail and length; bullet points, numbered lists, and list markers are forbidden, and the body must add information beyond the subject.
 - **Added code lines.** No ticket paths, no ADR references. Issue-style `#123` is only checked in commit and pull request text because color literals such as `#0AFFFFFF` are valid in styles.
 - **Repository files.** Changed code files are scanned again in full, so references that predate the branch are caught when the branch touches the file.
 - **Pull request title and body.** Same subject rules, no references of any kind, and no bullet or numbered lists.
@@ -643,7 +643,7 @@ On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, 
 
 - A merge happens only after every required check passes.
 - A conflicting pull request stops the run. A pull request that is `BEHIND` gets its branch updated and the checks are awaited again.
-- The merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects in prose. It never contains bullet or numbered lists, branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
+- The merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains bullet or numbered lists, branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - After the merge, the orchestrator verifies the pull request state is `MERGED` and deletes the remote branch. It also prunes remote refs, fast-forwards the local base branch, returns to it, and deletes the merged local branch. Local divergences are reported and never overwritten.
 
 ## 10. Customization

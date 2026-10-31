@@ -1,4 +1,5 @@
 import { runCommand } from './runner.js'
+import { normalizeCommitMessage } from './commit-message.js'
 
 async function git(repo, args, options = {}) {
   const result = await runCommand('git', args, { cwd: repo, logFile: options.logFile, timeoutMs: options.timeoutMs ?? 120000 })
@@ -89,6 +90,31 @@ export async function logCommits(repo, range) {
       const [sha, subject, body = ''] = item.split('\x1f')
       return { sha, subject, body, message: `${subject}\n${body}`.trim() }
     })
+}
+
+export async function headCommitMessage(repo) {
+  const result = await git(repo, ['log', '-1', '--format=%B'], { allowFailure: true })
+  return result.code === 0 ? result.stdout.trimEnd() : null
+}
+
+/**
+ * Rewrites only the latest commit when its body merely restates the subject.
+ * The branch is local at this point; older commits and published history are
+ * left untouched.
+ */
+export async function normalizeHeadCommitMessage({ repoPath, log }) {
+  const status = await statusTrackedPorcelain(repoPath)
+  if (status) return { changed: false, reason: 'The working tree has tracked changes.' }
+  const remotes = await git(repoPath, ['branch', '-r', '--contains', 'HEAD'], { allowFailure: true })
+  if (remotes.code === 0 && remotes.stdout.trim()) return { changed: false, reason: 'The commit is already published.' }
+  const message = await headCommitMessage(repoPath)
+  if (!message) return { changed: false }
+  const normalized = normalizeCommitMessage(message)
+  if (!normalized.changed) return { changed: false }
+  await git(repoPath, ['commit', '--amend', '-m', normalized.message])
+  const subject = normalized.message.split(/\r?\n/)[0]
+  await log?.(`Removed a duplicate commit body from "${subject}".`)
+  return { changed: true, subject }
 }
 
 export async function switchBranch(repo, branch) {

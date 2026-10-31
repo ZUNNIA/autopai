@@ -17,7 +17,7 @@ Tasks:
 - Run the repository restore, build, tests, and the failing local check before committing.
 - Stage only the files you changed. Never run `git add -A` or `git add .`.
 - Commit with the exact `commitSubject` from the payload, or `<type>: <subject>` when it is absent, with no scope and no ticket, ADR, or issue references.
-- You may write a commit body of one or more prose paragraphs, but never use bullet points, numbered lists, or list markers. Omit the body when it only restates the subject.
+- You may write a commit body of any useful length. It must add information that is not already in the subject, such as the reason, behavior, or tradeoff. Never repeat, restate, or paraphrase the subject, and never use bullet points, numbered lists, or list markers. Omit the body when it adds nothing.
 - Never push, merge, rebase, or run `gh`. The orchestrator owns those operations.
 - Do not create tickets, briefs, backlogs, or ADRs.
 - Do not write open questions into files. State missing information in your final message.

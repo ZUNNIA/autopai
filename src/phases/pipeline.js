@@ -394,6 +394,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
         const switched = await git.switchBranchSafe(config.repoPath, branch)
         if (!switched) throw new Error(`Could not switch to the existing ticket branch ${branch}.`)
         await log?.(`Reusing ${resolved.commits > 0 ? 'branch' : 'clean branch'} ${branch} for ${ticket.id}.`)
+        await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
       } else {
         await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
         await log?.(`Ticket ${ticket.id}: branch ${branch}.`)
@@ -435,6 +436,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
           throw new Error(blockerMessage(blockers))
         }
         if (execution.code !== 0) throw new Error(`Executor failed for ${mode} ticket ${ticket.id}.`)
+        await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
       }
 
       stage = 'commits'
@@ -446,7 +448,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       let gates = await runGates({ config, artifacts, prefix: `${mode}-${ticket.slug}`, retries: config.localGateRetries })
       if (!gates.ok && options.fix === true) {
         await log?.(`Local gates failed for ${ticket.id}; running the fix attempt.`)
-        gates = await fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode })
+        gates = await fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode, log })
       }
       if (!gates.ok) throw new Error(`Ticket ${ticket.id} failed local gates: ${gateFailureText(gates)}`)
 
@@ -497,7 +499,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
   return { feature, tickets: results, failures }
 }
 
-async function fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode }) {
+async function fixLocalGates({ config, stateStore, state, artifacts, ticket, branch, payload, gates, mode, log }) {
   const range = `origin/${config.baseBranch}...${branch}`
   const patchPath = await artifacts.write(`ticket-${slugify(ticket.slug)}.patch`, await git.diff(config.repoPath, range))
   const changedFiles = await git.diffNames(config.repoPath, range)
@@ -524,6 +526,7 @@ async function fixLocalGates({ config, stateStore, state, artifacts, ticket, bra
     throw new Error(blockerMessage(blockers))
   }
   if (execution.code !== 0) throw new Error(`Executor failed while fixing local gates for ticket ${ticket.id}.`)
+  await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
   return runGates({ config, artifacts, prefix: `fix-${mode}-${ticket.slug}`, retries: 0 })
 }
 
@@ -634,6 +637,7 @@ export async function runRelease({ config, stateStore, options, log }) {
     role: 'executor'
   })
   if (execution.code !== 0) throw new Error('The executor could not prepare the release.')
+  await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
   const range = `origin/${config.baseBranch}...${branch}`
   const commits = await git.logCommits(config.repoPath, range)

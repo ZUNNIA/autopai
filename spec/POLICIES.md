@@ -7,7 +7,8 @@
 - Commit subjects and pull request titles: `<type>: <subject>`. No scope parentheses.
 - Allowed types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`.
 - No source PR numbers, ticket paths, ADR numbers, or issue references in branches, commits, pull requests, or merge commits.
-- Commit, pull request, and merge bodies are prose. Bullet points, numbered lists, and list markers are forbidden.
+- Commit, pull request, and merge bodies may contain any useful detail. Bullet points, numbered lists, and list markers are forbidden.
+- A commit body must add information beyond the subject. It never repeats, restates, or paraphrases the subject.
 - Merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - The default GitHub merge message is forbidden.
 
