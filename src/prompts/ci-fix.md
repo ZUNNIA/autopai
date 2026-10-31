@@ -1,0 +1,23 @@
+# Fix a CI failure
+
+The orchestrator invoked you with this JSON payload:
+
+{{PAYLOAD}}
+
+Tasks:
+
+- Parse the payload. `failedChecks` contains the check names and links, and `failureLogs` may be unavailable.
+- Read the ticket file and every ADR relevant to the files you will touch.
+- Work only on the current branch. Fix only the reported CI failure and stay inside the ticket scope.
+- When `failureLogs` contains usable output, use it as the primary evidence.
+- When no failure log is available, use the named check and its link. Reproduce the check locally with the repository commands. For a package-specific suite, run the local command for that package before editing.
+- Do not guess. If the failure cannot be reproduced or needs a human decision, write a JSON blocker under `needs-human` with the reason, files, decision and suggested action; then stop.
+- Add or update tests for the fix. Keep the user-visible behavior unless the ticket documents a defect.
+- Run the repository restore, build, tests, and the failing local check before committing.
+- Stage only the files you changed. Never run `git add -A` or `git add .`.
+- Commit with `<type>: <subject>`, no scope, and no ticket, ADR, or issue references.
+- Never push, merge, rebase, or run `gh`. The orchestrator owns those operations.
+- Do not create tickets, briefs, backlogs, or ADRs.
+- Do not write open questions into files. State missing information in your final message.
+
+End with a short summary: what failed, what changed, the commit subject, the local check result, and any blocker.

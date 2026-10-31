@@ -108,10 +108,12 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
   const dir = path.join(config.stateDir, 'needs-human')
   await ensureDir(dir)
   const file = path.join(dir, `${stamp}-ci-log-unavailable.json`)
+  const names = failed.map(check => check.name).filter(Boolean)
   const blocker = {
     ticketId: executorPayload?.ticketId ?? null,
     ticketFile: executorPayload?.ticketFile ?? null,
-    reason: 'CI failed but no failure log is available. The orchestrator cannot tell the executor what to fix.',
+    failedChecks: names,
+    reason: `CI failed but no failure log is available for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. The automatic diagnosis attempt did not resolve it.`,
     files: links,
     decision: 'A human must inspect the failed GitHub Actions job, restore log access, permissions, runner or billing, and re-run the job before resuming.',
     suggestedAction: 'Inspect the linked GitHub Actions job and restore CI access; then run autopai resume without --fix.'
@@ -172,32 +174,45 @@ export async function pushOpenWaitMerge({
   await log?.(`CI checks: ${checks.ok ? 'passed' : checks.reason}`)
 
   let attempt = 0
+  let noLogAttempts = 0
   while (!checks.ok && attempt < config.maxAttempts) {
     attempt += 1
     state.attempts = attempt
     const failure = await collectFailureLogs({ config, artifacts, checks: checks.checks, attempt })
+    const failedChecks = checks.checks.filter(check => FAILED_STATES.has(check.state))
+    let promptName = executorPrompt
+    let failureLogs = failure.text
+
     if (!failure.usable) {
-      const blocker = await writeCiLogBlocker({
-        config,
-        state,
-        stateStore,
-        executorPayload,
-        checks: failure.checks
-      })
-      throw new Error(blockerMessage([blocker]))
+      noLogAttempts += 1
+      if (noLogAttempts > 1) {
+        const blocker = await writeCiLogBlocker({
+          config,
+          state,
+          stateStore,
+          executorPayload,
+          checks: failure.checks
+        })
+        throw new Error(blockerMessage([blocker]))
+      }
+      promptName = 'ci-fix'
+      const names = failedChecks.map(check => check.name).filter(Boolean)
+      failureLogs = `${failure.text}\n\nNo failure log is available. Reproduce ${names.length > 0 ? names.join(', ') : 'the failed check'} locally and run the relevant repository test command before changing code.`
+      await log?.(`CI failed without a usable log for ${names.length > 0 ? names.join(', ') : 'the failed checks'}. Running one automatic diagnosis attempt.`)
+    } else {
+      await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
     }
-    const failureLogs = failure.text
-    await log?.(`CI failed. Executor fix attempt ${attempt}/${config.maxAttempts}.`)
 
     const execution = await runSession({
       config,
-      prompt: executorPrompt,
+      prompt: promptName,
       agent: config.agents.executor,
       payload: {
         ...executorPayload,
         attempt,
         failureLogs,
-        failedChecks: checks.checks.filter(check => FAILED_STATES.has(check.state))
+        failedChecks,
+        noLog: !failure.usable
       },
       title: `AutopAI fix ${branch} attempt ${attempt}`,
       logFile: artifacts.path(`executor-fix-${attempt}.log`),
