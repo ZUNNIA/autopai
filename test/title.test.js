@@ -23,11 +23,11 @@ test('derives the title from the branch and commit types', () => {
 test('builds the commit and pull request title from the short ticket slug', () => {
   assert.equal(
     ticketTitle({ branchSlug: 'local-engine-options-grouping', id: 'pr329-local-engine-options-grouping', type: 'refactor' }),
-    'refactor: local engine options grouping'
+    'refactor: local engine options'
   )
   assert.equal(
     ticketTitle({ branchSlug: 'qwen-max-token-version-table', type: 'refactor' }),
-    'refactor: qwen max token version table'
+    'refactor: qwen max token version'
   )
   assert.equal(ticketTitle({ id: 'ggml-type-table', type: 'refactor' }), 'refactor: ggml type table')
   assert.equal(ticketTitle({ type: 'feat' }), 'chore: ticket')
@@ -41,10 +41,34 @@ test('builds a descriptive prose merge body from the pull request summary', () =
     '## Tests',
     'Build and tests passed locally. Coverage: 75.56%.'
   ].join('\n')
-  const body = generateMergeBody({ prBody })
+  const body = generateMergeBody({ prBody, title: 'refactor: generation contract' })
   assert.equal(body, 'Add the generation contract and matrix core. Resolve provider capability rules.')
   assert.doesNotMatch(body, /Merges|CI passed|coverage|develop/i)
   assert.doesNotMatch(body, /^\s*(?:[-*+]|\d+[.)])\s+/m)
+})
+
+test('omits the merge body when it only repeats the pull request title', () => {
+  const prBody = [
+    '## Summary',
+    'Gen panel refresh scheduler.',
+    '',
+    '## Validation',
+    'Build and tests passed locally.'
+  ].join('\n')
+  assert.equal(generateMergeBody({ prBody, title: 'refactor: gen panel refresh scheduler' }), '')
+})
+
+test('uses a meaningful commit body in the pull request summary', () => {
+  const body = generatePrBody({
+    commits: [{
+      subject: 'refactor: gen panel refresh scheduler',
+      body: 'The panel now delegates refresh triggers to a scheduler. The view model no longer references the Avalonia dispatcher.'
+    }],
+    coverage: { rate: 0.77, covered: 77, valid: 100 }
+  })
+  assert.match(body, /## Summary\nThe panel now delegates refresh triggers to a scheduler\. The view model no longer references the Avalonia dispatcher\./)
+  assert.doesNotMatch(body, /Gen panel refresh scheduler\./)
+  assert.match(body, /## Validation/)
 })
 
 test('generates a prose pull request body without bullet or numbered lists', () => {

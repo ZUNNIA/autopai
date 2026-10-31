@@ -82,6 +82,12 @@ test('builds a semantic branch name without ticket identifiers', () => {
   assert.equal(branchNameFor(ticket), 'feat/model-params-panel')
 })
 
+test('caps the branch at 32 characters by whole words', () => {
+  const ticket = { type: 'refactor', branchSlug: 'gen-panel-refresh-scheduler' }
+  assert.equal(branchNameFor(ticket), 'refactor/gen-panel-refresh')
+  assert.ok(branchNameFor(ticket).length <= 32)
+})
+
 test('strips the source PR and ordinal from the ticket branch slug', () => {
   const ticket = parseTicket([
     '---',

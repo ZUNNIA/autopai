@@ -12,7 +12,7 @@ Tasks:
 - Run the repository restore, build, and tests. When the payload provides `restoreCommand`, `buildCommand`, or `testCommand`, use those exact commands. Run `smokeCommand` after the tests when the payload provides it. Fix what your change breaks.
 - Stage only the files you changed. Never run `git add -A` or `git add .`.
 - Commit with the exact `commitSubject` from the payload, no scope, no ticket, ADR, or issue references. Split into more than one commit only when the ticket demands it.
-- You may add a commit body of any useful length. It must add information that is not already in the subject, such as the reason, behavior, or tradeoff. Never repeat, restate, or paraphrase the subject, and never use bullet points, numbered lists, or list markers. Omit the body when it adds nothing.
+- Every commit must include a body of two to four sentences. The body must add information that is not already in the subject, such as the reason, behavior, and impact. Never repeat, restate, or paraphrase the subject, and never use bullet points, numbered lists, or list markers.
 - Never push, merge, rebase, or run `gh`. The orchestrator handles the pull request and the merge.
 - If the ticket requires an architecture decision, a change outside its scope, or a human choice, write a JSON blocker under the `needs-human` folder inside the payload `stateDir` with `reason`, `files`, `decision`, and `suggestedAction` (use `run /autopai-adr` when the decision is architectural), then stop. Never create or edit an ADR yourself.
 - Follow the repository `AGENTS.md`: no numbered comments, no restated-code comments.

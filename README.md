@@ -241,8 +241,8 @@ The commands accept natural language (`/autopai-identify audit the last 2 merged
 ## Policies
 
 - Tickets, briefs, findings, and evidence are local. Git artifacts never reference them.
-- Branch names are `<type>/<kebab-case-slug>`. Commit subjects and pull request titles are `<type>: <subject>` with no scope parentheses. The slug is the short semantic ticket name without a source PR number or finding ordinal.
-- Commit, pull request, and merge bodies may contain any useful detail; bullet points, numbered lists, and list markers are forbidden. A commit body must add information beyond the subject.
+- Branch names are `<type>/<kebab-case-slug>`. Commit subjects and pull request titles are `<type>: <subject>` with no scope parentheses. The slug is the short semantic ticket name without a source PR number or finding ordinal, and the complete branch is capped at 32 characters.
+- Commit bodies contain two to four sentences that add information beyond the subject. Pull request and merge bodies may contain any useful detail. Bullet points, numbered lists, and list markers are forbidden in all message bodies.
 - No ADR numbers or issue references in code, branches, commits, pull requests, or merges.
 - The executor may commit but never push, merge, rebase, or force-push. The orchestrator owns those operations and merges only after the required checks pass.
 - Tests may be changed freely. The CI build, test suite, and coverage threshold are the quality gates.

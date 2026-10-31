@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { slugify, stripTypePrefix } from './util.js'
+import { shortenBranchSlug, slugify } from './util.js'
+import { commitSummary, comparable } from './commit-message.js'
 import { validatePrTitle } from './policy.js'
 import { formatCoverage } from './coverage.js'
 
@@ -49,8 +50,9 @@ export function deriveTitle(branch, commits) {
  */
 export function ticketTitle(ticket) {
   const type = String(ticket?.type ?? 'chore').trim() || 'chore'
-  const name = String(ticket?.branchSlug ?? ticket?.slug ?? ticket?.id ?? '').trim().replace(/-/g, ' ')
-  return name ? `${type}: ${name}` : 'chore: ticket'
+  const slug = shortenBranchSlug(type, ticket?.branchSlug ?? ticket?.slug ?? ticket?.id ?? '')
+  const name = String(slug).trim().replace(/-/g, ' ')
+  return name && name !== 'ticket' ? `${type}: ${name}` : 'chore: ticket'
 }
 
 function highestType(commits) {
@@ -63,8 +65,9 @@ function highestType(commits) {
 
 export function generatePrBody({ commits, coverage, dryRun = false }) {
   const summary = (commits ?? [])
-    .map(commit => stripTypePrefix(commit.subject).trim())
+    .map(commitSummary)
     .filter(Boolean)
+    .map(sentence => sentence.replace(/\s+/g, ' ').trim())
     .map(sentence => sentence.replace(/^[a-z]/, letter => letter.toUpperCase()))
     .map(sentence => /[.!?]$/.test(sentence) ? sentence : `${sentence}.`)
     .join(' ')
@@ -72,14 +75,14 @@ export function generatePrBody({ commits, coverage, dryRun = false }) {
     '## Summary',
     summary || 'No commit summary available.',
     '',
-    '## Tests',
+    '## Validation',
     `Build and tests passed locally. Coverage: ${formatCoverage(coverage)}.`
   ]
   if (dryRun) lines.push('', '## Note', 'Dry run: no remote changes were made.')
   return lines.join('\n')
 }
 
-export function generateMergeBody({ prBody }) {
+export function generateMergeBody({ prBody, title = '' }) {
   const lines = String(prBody ?? '').split(/\r?\n/)
   const start = lines.findIndex(line => /^##\s+Summary\s*$/i.test(line.trim()))
   if (start < 0) return 'No change summary was recorded for this merge.'
@@ -89,5 +92,8 @@ export function generateMergeBody({ prBody }) {
     if (/^##\s+/.test(line.trim())) break
     if (line.trim()) summary.push(line.trimEnd())
   }
-  return summary.join('\n').trim() || 'No change summary was recorded for this merge.'
+  const body = summary.join('\n').trim()
+  if (!body) return 'No change summary was recorded for this merge.'
+  if (title && comparable(body) === comparable(title)) return ''
+  return body
 }
