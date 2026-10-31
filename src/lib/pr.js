@@ -238,7 +238,7 @@ export async function pushOpenWaitMerge({
     return { prNumber: alreadyMerged.number, mergeCommit: view.mergeCommit?.oid ?? null, title: alreadyMerged.title, checks: [] }
   }
 
-  const validation = await validateHead({ config, artifacts, baseBranch, branch, executorPayload })
+  const validation = await validateHead({ config, artifacts, baseBranch, branch, executorPayload, log })
   if (validation.fixed) {
     const validationGates = await runGates({ config, artifacts, prefix: 'policy-fix', retries: config.localGateRetries })
     if (!validationGates.ok) {
@@ -347,8 +347,9 @@ export async function pushOpenWaitMerge({
     if (execution.code !== 0) {
       throw new Error(`Executor failed while fixing CI (exit ${execution.code}). See ${artifacts.path(`executor-fix-${attempt}.log`)}.`)
     }
+    await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
-    await validateHead({ config, artifacts, baseBranch, branch, executorPayload })
+    await validateHead({ config, artifacts, baseBranch, branch, executorPayload, log })
     const gates = await runGates({ config, artifacts, prefix: `fix-${attempt}`, retries: config.localGateRetries })
     if (!gates.ok) {
       throw new Error(`Local gates failed after executor fix: ${gateFailureText(gates)}`)
@@ -411,7 +412,7 @@ async function cleanupAfterMerge({ config, branch, baseBranch, log }) {
 /**
  * Revalidates branch, commits, and added code against the Git artifact policy.
  */
-export async function validateHead({ config, artifacts, baseBranch, branch, executorPayload }) {
+export async function validateHead({ config, artifacts, baseBranch, branch, executorPayload, log }) {
   const range = `origin/${baseBranch}...${branch}`
   const commits = await git.logCommits(config.repoPath, range)
   const diff = await git.diff(config.repoPath, range)
@@ -444,6 +445,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
     if (execution.code !== 0) {
       throw new Error(`Policy violations could not be fixed automatically:\n${message}`)
     }
+    await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
     const recheckCommits = await git.logCommits(config.repoPath, range)
     const recheckDiff = await git.diff(config.repoPath, range)
     const recheck = scanBranch({ branch, commits: recheckCommits, diff: recheckDiff })

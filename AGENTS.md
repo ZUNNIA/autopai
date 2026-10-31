@@ -70,7 +70,7 @@ Document the complete workflow, intent, and business rules in these blocks — N
 - **Merge Commit Message (STRICT):** NEVER keep the GitHub default message (`Merge pull request #N from ...`). Merges MUST use the PR title as the merge commit subject and a descriptive English body that summarizes the actual change from the PR summary or commit subjects. The body must not contain branch-into-base boilerplate, CI status, coverage, ticket, ADR, or issue references. Use:
   `gh pr merge <N> --merge --subject "<PR title>" --body "<descriptive change summary>"`
 - **Branch & PR Naming:** Branches are `<type>/<kebab-case-description>`. Commit subjects and PR titles are `<type>: <description>`. The description is a short semantic slug from the ticket name; never include the source PR number, a finding ordinal, or another local ticket number. No scope parentheses, no ticket identifiers, no ADR references, and no issue references such as `#123` in branches, commits, pull requests, or merge commits.
-- **Message format:** Commit, pull request, and merge bodies may use prose paragraphs of any useful length. Never use bullet points, numbered lists, or list markers in those bodies.
+- **Message format:** Commit, pull request, and merge bodies may contain any useful detail and length. Never use bullet points, numbered lists, or list markers in those bodies. A commit body must add information beyond the subject and never repeat or paraphrase it.
 - **Hard Constraints:**
   - NEVER merge a PR that has failing CI/CD checks.
   - NEVER create new branches without explicit permission outside the AutopAI flow.

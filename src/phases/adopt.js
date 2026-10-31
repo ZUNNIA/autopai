@@ -133,6 +133,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   if (execution.code !== 0) {
     throw new Error(`Executor failed with exit code ${execution.code}. See ${artifacts.path('executor-finish.log')}.`)
   }
+  await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
   const updatedCommits = await git.logCommits(config.repoPath, range)
   const updatedDiff = await git.diff(config.repoPath, range)

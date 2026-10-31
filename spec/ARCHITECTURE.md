@@ -62,6 +62,6 @@ The orchestrator validates branch names, commit subjects, added code, repository
 
 - Branch: `<type>/<kebab-case-slug>`, derived from the short semantic ticket name without the source PR or finding ordinal.
 - Commit and pull request title: `<type>: <subject>` with no scope parentheses, source PR number, or finding ordinal.
-- Commit, pull request, and merge bodies are prose; bullet points, numbered lists, and list markers are forbidden.
+- Commit, pull request, and merge bodies may contain any useful detail; bullet points, numbered lists, and list markers are forbidden. A commit body must add information beyond the subject.
 - No ticket paths, ADR numbers, or issue references in code, commits, branches, pull requests, or merges.
 - Issue-style references are checked in commit and pull request text only, because color literals such as `#0AFFFFFF` are valid in styles.

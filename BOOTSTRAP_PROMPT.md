@@ -104,6 +104,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/chunks.js`
 - `src/lib/ci-failure.js`
 - `src/lib/codefiles.js`
+- `src/lib/commit-message.js`
 - `src/lib/config-audit.js`
 - `src/lib/config-schema.js`
 - `src/lib/config.js`
@@ -163,6 +164,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/ci-fix.test.js`
 - `test/cli.test.js`
 - `test/codefiles.test.js`
+- `test/commit-message.test.js`
 - `test/config-audit.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
