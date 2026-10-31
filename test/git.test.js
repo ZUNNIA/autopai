@@ -29,15 +29,12 @@ test('statusTrackedPorcelain ignores untracked files and reports tracked changes
 test('normalizes a duplicate commit body on the latest commit', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-git-message-'))
   git(repo, ['init', '--quiet'])
+  git(repo, ['config', 'user.email', 'test@example.com'])
+  git(repo, ['config', 'user.name', 'AutopAI Test'])
+  git(repo, ['config', 'commit.gpgsign', 'false'])
   await fs.writeFile(path.join(repo, 'tracked.txt'), 'one\n', 'utf8')
   git(repo, ['add', 'tracked.txt'])
-  git(repo, [
-    '-c', 'user.email=test@example.com',
-    '-c', 'user.name=AutopAI Test',
-    '-c', 'commit.gpgsign=false',
-    'commit', '--quiet', '-m', 'refactor: gen panel context section',
-    '-m', 'Gen panel context section.'
-  ])
+  git(repo, ['commit', '--quiet', '-m', 'refactor: gen panel context section', '-m', 'Gen panel context section.'])
 
   const result = await normalizeHeadCommitMessage({ repoPath: repo })
   assert.equal(result.changed, true)
