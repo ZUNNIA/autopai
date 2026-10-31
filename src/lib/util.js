@@ -13,6 +13,8 @@ export function expandEnv(value) {
   return value.replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '')
 }
 
+export const MAX_BRANCH_LENGTH = 32
+
 export function slugify(value) {
   return String(value)
     .toLowerCase()
@@ -21,6 +23,24 @@ export function slugify(value) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80)
+}
+
+export function shortenSlug(value, maxLength) {
+  const slug = slugify(value)
+  if (slug.length <= maxLength) return slug
+  const words = slug.split('-')
+  let result = ''
+  for (const word of words) {
+    const next = result ? `${result}-${word}` : word
+    if (next.length > maxLength) break
+    result = next
+  }
+  return result || slug.slice(0, maxLength).replace(/-+$/g, '')
+}
+
+export function shortenBranchSlug(type, value) {
+  const maxLength = Math.max(1, MAX_BRANCH_LENGTH - String(type).length - 1)
+  return shortenSlug(value, maxLength) || 'ticket'
 }
 
 export async function ensureDir(dir) {

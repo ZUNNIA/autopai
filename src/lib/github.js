@@ -66,7 +66,9 @@ export async function prListMerged(repo, base, limit) {
 }
 
 export async function prMerge(repo, number, { title, body }) {
-  await gh(repo, ['pr', 'merge', String(number), '--merge', '--subject', title, '--body', body])
+  const args = ['pr', 'merge', String(number), '--merge', '--subject', title]
+  if (body) args.push('--body', body)
+  await gh(repo, args)
 }
 
 export async function prUpdateBranch(repo, number) {

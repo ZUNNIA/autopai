@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from './git.js'
-import { ensureDir, slugify, walkFiles } from './util.js'
+import { ensureDir, shortenBranchSlug, slugify, walkFiles } from './util.js'
 import { hasFilters, matchesFilters, normalizeClassification, normalizePriority, parseClassification, parsePriority } from './filters.js'
 
 const PRIORITY_ORDER = { urgent: 0, important: 1, minor: 2 }
@@ -240,7 +240,7 @@ export function ticketDoneDir(config, ticket, fallbackFeature) {
 }
 
 export function branchNameFor(ticket) {
-  return `${ticket.type}/${ticket.branchSlug ?? ticket.slug}`
+  return `${ticket.type}/${shortenBranchSlug(ticket.type, ticket.branchSlug ?? ticket.slug)}`
 }
 
 /**
@@ -251,7 +251,7 @@ export function branchNameFor(ticket) {
  */
 export async function resolveTicketBranch({ config, ticket, type, previousBranch = null }) {
   const branches = await git.listLocalBranches(config.repoPath)
-  const preferred = `${type}/${ticket.branchSlug ?? ticket.slug}`
+  const preferred = `${type}/${shortenBranchSlug(type, ticket.branchSlug ?? ticket.slug)}`
   const candidates = [...new Set([previousBranch, preferred].filter(Boolean))]
   const existing = []
   for (const candidate of candidates) {

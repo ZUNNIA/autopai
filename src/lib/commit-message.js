@@ -1,9 +1,25 @@
 import { stripTypePrefix } from './util.js'
 
-function comparable(value) {
+export function comparable(value) {
   return stripTypePrefix(String(value ?? ''))
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '')
+}
+
+export function hasListMarkers(value) {
+  return /^\s*(?:[-*+]|\d+[.)])\s+/m.test(String(value ?? ''))
+}
+
+/**
+ * Chooses the prose that describes a commit in the pull request and merge
+ * summaries. A meaningful body wins over the subject; a duplicate or list-like
+ * body falls back to the subject.
+ */
+export function commitSummary(commit) {
+  const subject = stripTypePrefix(commit?.subject ?? '').trim()
+  const body = String(commit?.body ?? '').trim()
+  if (!body || hasListMarkers(body)) return subject
+  return comparable(subject) === comparable(body) ? subject : body
 }
 
 /**
