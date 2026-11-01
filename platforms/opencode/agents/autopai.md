@@ -69,7 +69,7 @@ operational request into the exact CLI flags before running:
 - Never map a classification or priority to `--feature`. `--feature` is the ticket front-matter feature, usually `tech-debt` for all debt tickets.
 - A release version → `--version <x.y.z>`.
 - "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
-- "fix the failures and continue" or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per failed ticket before recording the failure and continuing.
+- "fix the failures and continue" or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per repairable gate failure; it does not repair branch checkout, blocked dependency, executor, policy, or merge failures.
 - Before any `--approve`, run `autopai status --repo .` and read its `gate`. Pass `--approve <gate>` only when the user explicitly approves that exact gate and the status reports the same gate. If `gate` is null, do not pass `--approve`; if there are failures or blockers, use a plain `autopai resume` retry or report the blocker.
 - "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name and the status reports it.
 - "QA failed", a failed QA checklist item, or "fix the QA" while status reports `gate: qa` → `autopai qa-fix --repo . --message "<failure>"`. It creates fix tickets for the current feature and starts dev. Do not pass `--approve qa` and do not start a new feature or brief.
@@ -130,6 +130,13 @@ Use the bash tool with a timeout of at least 14400000 ms:
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
 Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`.
+
+## Branch and dependency failures
+
+- A failure with `stage: branch` is not repaired by `--fix`. Read its `kind`, `action`, and exact `error`. Report those fields, then tell the user to fix the checkout, worktree, lock, or tracked changes and run a plain `autopai resume`.
+- A failure with `stage: blocked` or `repairable: false` is not repaired by `--fix`. Resolve the named dependency or cause first.
+- Recommend `autopai resume --fix` only when at least one failure has `repairable: true`. Never describe `--fix` as a repair for branch checkout or dependency failures.
+- Do not stash, discard changes, remove worktrees, or force a checkout for the user.
 
 ## CI failures and checks
 

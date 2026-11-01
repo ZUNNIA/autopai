@@ -104,7 +104,7 @@ async function runSequence({ config, stateStore, options, log }) {
     const result = await runPhase(phase, { config, stateStore, options, log })
     results.push(result)
     if (result.failures?.length > 0) {
-      log(`${result.failures.length} ticket(s) failed in ${phase}. Fix them with autopai resume --fix or retry with autopai resume.`)
+      log(`${result.failures.length} ticket(s) failed in ${phase}. ${failureGuidance(result.failures)}`)
       return { from, to, results, failures: result.failures, failedPhase: phase }
     }
     const gate = gateAfterPhase(phase)
@@ -189,7 +189,7 @@ async function resumeRun({ config, stateStore, options, log }) {
       })
       results.push(result)
       if (result.failures?.length > 0) {
-        process.stdout.write(`Paused with ${result.failures.length} failed ticket(s). Run autopai resume --fix to fix them or autopai resume to retry.\n`)
+        process.stdout.write(`Paused with ${result.failures.length} failed ticket(s). ${failureGuidance(result.failures)}\n`)
         break
       }
       state = await stateStore.load()
@@ -252,6 +252,17 @@ async function runConfigCommand(repoPath, options) {
   const strict = options.strict === true
   if (!report.ok || (strict && (report.warnings.length > 0 || report.missing.length > 0))) process.exitCode = 1
   return report
+}
+
+function failureGuidance(failures = []) {
+  const repairable = failures.filter(failure => failure.repairable === true).length
+  const branch = failures.filter(failure => failure.stage === 'branch').length
+  const blocked = failures.filter(failure => failure.stage === 'blocked').length
+  const lines = ['Run autopai resume to retry.']
+  if (repairable > 0) lines.push(`Use autopai resume --fix for ${repairable} repairable gate failure(s).`)
+  if (branch > 0) lines.push(`${branch} branch failure(s) require a clean checkout or worktree; --fix does not repair them.`)
+  if (blocked > 0) lines.push(`${blocked} ticket(s) are blocked by a dependency; resolve the dependency first.`)
+  return lines.join(' ')
 }
 
 function printStatus(state, config) {
@@ -333,7 +344,8 @@ gate, or --auto to skip every human pause. --pause-after overrides the list for
 one run. Gates: backlog, plan, qa, findings, promotion, refactor.
 
 Local gate failures are retried once by default. --fix adds one executor fix
-attempt for a failed ticket before recording the failure.
+attempt only for repairable gate failures. Branch checkout, blocked dependency,
+executor, policy, and merge failures are not repaired by --fix.
 
 autopai config check audits autopai.json against the schema without writing:
 it reports missing defaults, unknown or deprecated fields, invalid types, paths,
