@@ -413,8 +413,9 @@ async function cleanupAfterMerge({ config, branch, baseBranch, log }) {
  * Revalidates branch, commits, and added code against the Git artifact policy.
  */
 export async function validateHead({ config, artifacts, baseBranch, branch, executorPayload, log }) {
+  const commitRange = `origin/${baseBranch}..${branch}`
   const range = `origin/${baseBranch}...${branch}`
-  const commits = await git.logCommits(config.repoPath, range)
+  const commits = await git.logCommits(config.repoPath, commitRange)
   const diff = await git.diff(config.repoPath, range)
   const files = await git.diffNames(config.repoPath, range)
   const forbidden = findForbidden(files, config.protectedPaths)
@@ -446,7 +447,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
       throw new Error(`Policy violations could not be fixed automatically:\n${message}`)
     }
     await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
-    const recheckCommits = await git.logCommits(config.repoPath, range)
+    const recheckCommits = await git.logCommits(config.repoPath, commitRange)
     const recheckDiff = await git.diff(config.repoPath, range)
     const recheck = scanBranch({ branch, commits: recheckCommits, diff: recheckDiff })
     recheck.push(...await scanRepositoryFiles(config.repoPath, await git.diffNames(config.repoPath, range)))

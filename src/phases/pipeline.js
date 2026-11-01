@@ -456,8 +456,9 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       }
 
       stage = 'commits'
+      const commitRange = `origin/${config.baseBranch}..${branch}`
       const range = `origin/${config.baseBranch}...${branch}`
-      let commits = await git.logCommits(config.repoPath, range)
+      let commits = await git.logCommits(config.repoPath, commitRange)
       if (commits.length === 0) throw new Error(`Ticket ${ticket.id} produced no commits on ${branch}.`)
 
       stage = 'gates'
@@ -469,7 +470,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       if (!gates.ok) throw new Error(`Ticket ${ticket.id} failed local gates: ${gateFailureText(gates)}`)
 
       stage = 'policy'
-      commits = await git.logCommits(config.repoPath, range)
+      commits = await git.logCommits(config.repoPath, commitRange)
       if (commits.length === 0) throw new Error(`Ticket ${ticket.id} produced no commits on ${branch}.`)
       const violations = scanBranch({ branch, commits, diff: await git.diff(config.repoPath, range) })
       if (violations.length > 0) throw new Error(`Ticket ${ticket.id} violates policy:\n${formatViolations(violations)}`)
@@ -663,7 +664,7 @@ export async function runRelease({ config, stateStore, options, log }) {
   if (execution.code !== 0) throw new Error('The executor could not prepare the release.')
   await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
-  const range = `origin/${config.baseBranch}...${branch}`
+  const range = `origin/${config.baseBranch}..${branch}`
   const commits = await git.logCommits(config.repoPath, range)
   const gates = await runGates({ config, artifacts, prefix: `release-v${version}`, retries: config.localGateRetries })
   if (!gates.ok) throw new Error(`Release gates failed: ${gateFailureText(gates)}`)

@@ -4,7 +4,12 @@ import { checkRunIdFromLink } from './ci-failure.js'
 const repoNames = new Map()
 
 async function gh(repo, args, options = {}) {
-  const result = await runCommand('gh', args, { cwd: repo, logFile: options.logFile, timeoutMs: options.timeoutMs ?? 120000 })
+  const result = await runCommand('gh', args, {
+    cwd: repo,
+    logFile: options.logFile,
+    timeoutMs: options.timeoutMs ?? 120000,
+    stdin: options.stdin
+  })
   if (result.code !== 0 && !options.allowFailure) {
     throw new Error(`gh ${args.join(' ')} failed: ${result.stderr || result.stdout}`)
   }
@@ -18,9 +23,9 @@ function parseJson(text, fallback = null) {
 }
 
 export async function prCreate(repo, { base, head, title, body, draft = false }) {
-  const args = ['pr', 'create', '--base', base, '--head', head, '--title', title, '--body', body]
+  const args = ['pr', 'create', '--base', base, '--head', head, '--title', title, '--body-file', '-']
   if (draft) args.push('--draft')
-  const result = await gh(repo, args)
+  const result = await gh(repo, args, { stdin: body })
   const url = result.stdout.trim().split(/\r?\n/).find(line => line.startsWith('http')) ?? ''
   const number = Number((url.match(/\/(\d+)$/) ?? [])[1] ?? 0)
   return { url, number }
@@ -67,8 +72,12 @@ export async function prListMerged(repo, base, limit) {
 
 export async function prMerge(repo, number, { title, body }) {
   const args = ['pr', 'merge', String(number), '--merge', '--subject', title]
-  if (body) args.push('--body', body)
-  await gh(repo, args)
+  const options = {}
+  if (body) {
+    args.push('--body-file', '-')
+    options.stdin = body
+  }
+  await gh(repo, args, options)
 }
 
 export async function prUpdateBranch(repo, number) {

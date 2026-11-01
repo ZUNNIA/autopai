@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { classifySwitchError, normalizeHeadCommitMessage, statusTrackedPorcelain, switchTicketBranch } from '../src/lib/git.js'
+import { classifySwitchError, logCommits, normalizeHeadCommitMessage, statusTrackedPorcelain, switchTicketBranch } from '../src/lib/git.js'
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -24,6 +24,30 @@ test('statusTrackedPorcelain ignores untracked files and reports tracked changes
 
   await fs.writeFile(path.join(repo, 'tracked.txt'), 'two\n', 'utf8')
   assert.equal((await statusTrackedPorcelain(repo)).trim(), 'M tracked.txt')
+})
+
+test('reads only branch commits from a two-dot range when the base moved ahead', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-commit-range-'))
+  git(repo, ['init', '-b', 'main', '--quiet'])
+  git(repo, ['config', 'user.email', 'test@example.com'])
+  git(repo, ['config', 'user.name', 'AutopAI Test'])
+  await fs.writeFile(path.join(repo, 'seed.txt'), 'seed\n', 'utf8')
+  git(repo, ['add', 'seed.txt'])
+  git(repo, ['commit', '--quiet', '-m', 'chore: seed'])
+  git(repo, ['switch', '-c', 'refactor/topic'])
+  await fs.writeFile(path.join(repo, 'topic.txt'), 'topic\n', 'utf8')
+  git(repo, ['add', 'topic.txt'])
+  git(repo, ['commit', '--quiet', '-m', 'refactor: topic change', '-m', 'A detailed body that belongs only to the topic branch.'])
+  git(repo, ['switch', 'main'])
+  await fs.writeFile(path.join(repo, 'base.txt'), 'base\n', 'utf8')
+  git(repo, ['add', 'base.txt'])
+  git(repo, ['commit', '--quiet', '-m', 'chore: advance the base branch'])
+
+  const commits = await logCommits(repo, 'main..refactor/topic')
+  const symmetric = await logCommits(repo, 'main...refactor/topic')
+  assert.equal(commits.length, 1)
+  assert.equal(commits[0].subject, 'refactor: topic change')
+  assert.ok(symmetric.length > commits.length)
 })
 
 test('classifies common branch switch failures', () => {
