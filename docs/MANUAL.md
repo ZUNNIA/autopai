@@ -318,7 +318,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 
 **resume.** `autopai resume` reloads `state.json` and continues where the run stopped. It resumes an interrupted phase with the stored branch, base, and feature, and it skips completed work: identify reuses its recorded scopes and finished auditors, promote skips completed chunks, and dev/refactor only see the tickets still pending. At a gate in `pauseAfter` it stops and prints the exact approval command. A generic `resume` is **not** approval: `--approve <gate>` passes that exact gate and continues to the next gate, and approving one gate does not approve the next. `--auto` skips every human gate; `--pause-after` overrides the list. It advances local non-gated phases (`identify` to `promote`, `promote` to `refactor`) and stops at a completed refactor, adopt, or release. Re-run is safe: the orchestrator reconciles with the real branch, pull request, and checks before continuing, and it reuses an already merged pull request instead of creating a new one.
 
-A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. A branch with commits is reused even when its name has a suffix, so retries do not create endless `-4` branches. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs before recording the failure. If CI fails and no failure log is available, the failed job is re-run up to twice; then one automatic diagnosis attempt reproduces the named check locally and fixes the branch; if the check still fails without a log, the run writes a CI blocker with the check names and links. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
+A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. A branch with commits is reused even when its name has a suffix, so retries do not create endless `-4` branches. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs only when the failure is marked `repairable: true`. Branch checkout and blocked dependency failures are not repaired by `--fix`. If CI fails and no failure log is available, the failed job is re-run up to twice; then one automatic diagnosis attempt reproduces the named check locally and fixes the branch; if the check still fails without a log, the run writes a CI blocker with the check names and links. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
 
 ## 5. Tickets
 
@@ -365,7 +365,7 @@ The branch name comes from the ticket type and the short semantic ticket slug, f
 - Review `backlog.md` at the `backlog` gate before running `approve`. Edit it freely; the planner reads it at that moment.
 - Review the ready-for-dev tickets at the `plan` gate before running `dev`.
 - Review `tickets/qa/<feature>.md` at the `qa` gate before running identify. If it fails, report the item; the operator uses `autopai qa-fix` to create fix tickets and restart dev.
-- If a ticket fails, review `state.failures` and the preserved branch. Run `resume` to retry, or `resume --fix` to attempt a repair. Do not start a duplicate branch manually.
+- If a ticket fails, review `state.failures` and the preserved branch. Run `resume` to retry. Use `resume --fix` only for a failure marked `repairable: true`; branch checkout and blocked dependency failures need their cause fixed first. Do not start a duplicate branch manually.
 - Edit `depends_on`, `priority`, `classification`, or `type` front matter to change execution order, debt filters, or branch type.
 - Promote findings automatically with the `promote` phase, which `/autopai-identify` chains after the audit. The auditor never promotes its own findings; the planner does. Manual promotion remains the fallback: copy a finding into `tickets/ready-for-refactor/` with the required front matter.
 - Add `findings`, `promotion`, or `refactor` to `pauseAfter` if you want to review the audit output, the ready-for-refactor tickets, or the refactor changes.
@@ -532,7 +532,7 @@ autopai abort --repo <path>
 
 **Human gate flags.** `--approve <gate>` passes one gate and continues to the next configured gate. `--auto` skips every human gate. `--pause-after <gates>` overrides `pauseAfter` for one run; the value is a comma-separated gate list or an empty string to disable every human pause. These flags never disable the automatic gates.
 
-**Failure flags.** `--fix` runs one executor repair attempt on a failed ticket branch with the local gate logs, then retries the gates. It never bypasses the automatic gates or approves a human gate.
+**Failure flags.** `--fix` runs one executor repair attempt only for repairable gate failures, using the local gate logs, then retries the gates. Branch checkout, blocked dependency, executor, policy, and merge failures are retried but not repaired by `--fix`. It never bypasses the automatic gates or approves a human gate.
 
 **Defaults.** `--feature` resolves from the previous run state or the latest ticket directory, and `--scope` defaults to the scopes of the last run. Explicit flags always win, and the resolver fails with a clear error instead of guessing when no candidate exists.
 
@@ -561,7 +561,7 @@ autopai abort --repo <path>
 }
 ```
 
-When no state exists, `status` prints `No AutopAI state found for this repository.` The `gate` is the current human checkpoint (`null` when the run is mid-phase), and `paused` tells whether that gate is in `pauseAfter`. `failures` lists the failed or blocked tickets with their branches and stages. `status` is always read-only.
+When no state exists, `status` prints `No AutopAI state found for this repository.` The `gate` is the current human checkpoint (`null` when the run is mid-phase), and `paused` tells whether that gate is in `pauseAfter`. `failures` lists the failed or blocked tickets with their branches and stages, and marks whether `--fix` can repair them with `repairable`. Branch failures also include `kind` and `action` from the checkout diagnosis. `status` is always read-only.
 
 ## 8. State, logs, and artifacts
 
@@ -849,7 +849,7 @@ A dev ticket needs a new pattern the repository has not decided yet.
 
 **Resume prints a message instead of running.** That is a human gate or a mode that does not resume automatically. At a gate, review the artifacts and approve that exact gate: `autopai resume --approve backlog`, `--approve plan`, `--approve qa`, `--approve findings`, `--approve promotion`, or `--approve refactor`. A generic `resume` never approves a gate. Completed refactors and adopted merges also stop; start the next step explicitly.
 
-**A ticket failed local gates.** The branch is preserved and the state records the failure; the loop continues with independent tickets by default. Run `autopai resume` to retry the failed branch, or `autopai resume --fix` to give the executor one repair attempt with the gate logs. Do not create a manual duplicate branch.
+**A ticket failed local gates.** The branch is preserved and the state records the failure; the loop continues with independent tickets by default. Run `autopai resume` to retry the failed branch, or `autopai resume --fix` to give the executor one repair attempt with the gate logs when the failure is marked `repairable: true`. A branch checkout failure is not a gate failure: fix the checkout, worktree, lock, or tracked changes first. Do not create a manual duplicate branch.
 
 **The operator started a release for a technical-debt request.** It should not. The release command now refuses a non-release request and points to `/autopai-refactor` or `/autopai-resume`; a release requires a version or an explicit release intent.
 

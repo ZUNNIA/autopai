@@ -374,7 +374,15 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
     const blocked = blockedDependents(tickets, [...failedIds, ...blockedIds])
     if (blocked.has(ticket.id)) {
       const blockedBy = ticket.dependsOn.filter(dependency => failedIds.has(dependency) || blockedIds.has(dependency))
-      const failure = { ticket: ticket.id, slug: ticket.slug, branch: null, stage: 'blocked', blockedBy, error: `A dependency failed: ${blockedBy.join(', ')}.` }
+      const failure = {
+        ticket: ticket.id,
+        slug: ticket.slug,
+        branch: null,
+        stage: 'blocked',
+        repairable: false,
+        blockedBy,
+        error: `A dependency failed: ${blockedBy.join(', ')}.`
+      }
       blockedIds.add(ticket.id)
       failures.push(failure)
       state.failures = failures
@@ -391,8 +399,16 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       const resolved = await resolveTicketBranch({ config, ticket, type: branchType(ticket), previousBranch })
       branch = resolved.branch
       if (resolved.reuse) {
-        const switched = await git.switchBranchSafe(config.repoPath, branch)
-        if (!switched) throw new Error(`Could not switch to the existing ticket branch ${branch}.`)
+        const switched = await git.switchTicketBranch(config.repoPath, branch)
+        if (!switched.ok) {
+          const error = new Error(`Could not switch to the existing ticket branch ${branch}: ${switched.error}`)
+          error.failure = {
+            kind: switched.kind ?? 'switch',
+            action: switched.action ?? 'Inspect the checkout manually.',
+            switchError: switched.error
+          }
+          throw error
+        }
         await log?.(`Reusing ${resolved.commits > 0 ? 'branch' : 'clean branch'} ${branch} for ${ticket.id}.`)
         await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
       } else {
@@ -483,7 +499,15 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
     } catch (error) {
       const failedStage = (state.blockers ?? []).length > 0 ? 'blocker' : stage
-      const failure = { ticket: ticket.id, slug: ticket.slug, branch, stage: failedStage, error: error.message }
+      const failure = {
+        ticket: ticket.id,
+        slug: ticket.slug,
+        branch,
+        stage: failedStage,
+        repairable: failedStage === 'gates',
+        error: error.message
+      }
+      if (error.failure) Object.assign(failure, error.failure)
       failures.push(failure)
       failedIds.add(ticket.id)
       state.failures = failures

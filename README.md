@@ -35,7 +35,7 @@ The same workflow is available through slash commands or natural language. The o
 
 - Assisted by default: review the backlog, the ready-for-dev plan, and the manual QA. Approve each gate explicitly.
 - Configurable gates: `pauseAfter` in `autopai.json` decides where the loop stops. Stop at every phase or only where you want.
-- One continuation command: `autopai resume`. Approve one gate with `--approve <gate>`; skip human pauses with `--auto`; repair failed tickets with `--fix`.
+- One continuation command: `autopai resume`. Approve one gate with `--approve <gate>`; skip human pauses with `--auto`; repair repairable gate failures with `--fix`.
 - Resilient loops: local gates are retried once, failed ticket branches are reused, independent tickets continue, and dependents are skipped.
 - CI-gated merges: a pull request merges only after the required checks pass.
 - Resumable phases: state lives in local files, and a crashed run resumes where it stopped.
@@ -90,7 +90,7 @@ Add or remove gates in `autopai.json`, or ask the operator in natural language a
 A failed ticket is not a human gate. Local gates are retried once. If the ticket still fails, its branch stays available, the failure is recorded, and the loop continues with independent tickets while skipping dependents. The phase stays incomplete.
 
 - `autopai resume` reuses the failed ticket branch and retries the gates. A branch with commits is reused, and a clean branch with the same semantic name is reused for a fresh executor run, so retries do not add numeric suffixes.
-- `autopai resume --fix` gives the executor one repair attempt with the gate logs before re-running the gates and continuing.
+- `autopai resume --fix` gives the executor one repair attempt with the gate logs only for repairable gate failures. Branch checkout and blocked dependency failures are retried but not repaired by `--fix`.
 - `/autopai-status` shows the failed tickets and branches.
 - An explicit dev or refactor resume archives the blockers recorded by the previous attempt under the run artifacts. A new blocker still stops the run.
 - If CI fails and no failure log is available, the orchestrator checks the check annotations first. A billing, spending-limit, runner, permission, or not-started annotation stops the run with an exact infrastructure blocker; it is never treated as a source bug. Otherwise, it re-runs the failed job up to twice, then runs one automatic diagnosis attempt with the failed check names and links. If diagnosis still does not resolve the failure, the run stops with a CI blocker that names the checks and links the job.
@@ -114,7 +114,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Audit filtered debt | `/autopai-identify "only urgent code smells"` | "identify only urgent code smells" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
 | Refactor filtered debt | `/autopai-refactor "only minor missing documentation"` | "resolve only minor missing documentation" |
-| Repair failed tickets | `/autopai-resume --fix` | "fix the failures and continue" |
+| Repair repairable gate failures | `/autopai-resume --fix` | "fix the gate failures and continue" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
@@ -210,7 +210,7 @@ The assisted loop:
 
 The phase commands (`/autopai-dev`, `/autopai-identify`, `/autopai-refactor`) remain available for manual control. Starting a phase explicitly approves the gate before it; the gates after it still apply.
 
-If a ticket fails, the run reports the failure and preserves its branch. Run `/autopai-resume` to retry or `/autopai-resume --fix` to attempt a repair; independent tickets have already continued.
+If a ticket fails, the run reports the failure and preserves its branch. Run `/autopai-resume` to retry. Use `/autopai-resume --fix` only when the failure is a repairable gate failure; branch checkout and blocked dependency failures need their cause fixed first. Independent tickets have already continued.
 
 The same loop from the CLI:
 
@@ -272,7 +272,7 @@ The core prompts, phases, state, policy, and merge logic do not change. Read `sp
 - `autopai` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\autopai.cmd`.
 - Two clones are linked: only one can own the `autopai` command. Run `npm link` in the clone you want to keep.
 - The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
-- A ticket failed local gates: run `/autopai-resume --fix` or `/autopai-resume`; do not create a duplicate branch. The failed branch is reused.
+- A ticket failed local gates: run `/autopai-resume --fix` for a repairable gate failure or `/autopai-resume` to retry; do not create a duplicate branch. The failed branch is reused. A branch checkout failure is not repaired by `--fix`: fix the checkout, worktree, lock, or tracked changes first.
 
 ## Development
 

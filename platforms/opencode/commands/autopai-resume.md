@@ -7,6 +7,8 @@ Before composing the command, run `autopai status --repo .` and read its `gate`.
 
 If the user reports a failed manual QA item while the gate is `qa`, do not use `resume` or `--approve qa`; use `autopai qa-fix --message "<failure>"` to create fix tickets and restart dev.
 
+If `status` reports branch failures or `repairable: false`, do not recommend `--fix`. Report the exact `kind`, `action`, and `error`; the user must fix the checkout, worktree, lock, or dependency first and then run a plain `autopai resume`. Use `--fix` only for failures marked `repairable: true`.
+
 If `status` reports `ci-billing-unavailable` or `ci-infrastructure-unavailable`, report the exact `failedChecks` and annotation. Do not run `--fix` or propose a source change. The options are fixing GitHub Actions billing or the runner, or explicitly ignoring the exact failing check; `requiredChecks: []` is not a CI bypass.
 
 Run with the bash tool and a timeout of at least 14400000 ms:
@@ -25,7 +27,7 @@ Compose the arguments from the request:
 - "approve the refactor" → `--approve refactor`.
 - "continue without stopping" or "run everything" → `--auto`, only after confirming.
 - "stop only at ..." → `--pause-after <gates>`.
-- "fix the failures and continue" or a request to repair failed tickets → `--fix`. The orchestrator reuses each failed ticket branch, retries the local gates, and runs one executor fix attempt before recording the failure and continuing.
+- "fix the failures and continue" or a request to repair failed tickets → `--fix`. The orchestrator reuses each failed ticket branch, retries the local gates, and runs one executor fix attempt only for repairable gate failures before recording the failure and continuing. Branch checkout and blocked dependency failures need a plain resume after fixing their cause.
 - "continue", "resume", or "keep going" → no flags. It resumes the interrupted phase, reuses existing ticket branches, and retries local gates once.
 - A debt filter from the identify, promotion, or failed refactor is stored in the run state. `resume` keeps it, so do not pass classification or priority again and do not silently widen the run to every pending ticket.
 

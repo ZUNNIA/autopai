@@ -1,5 +1,7 @@
+import path from 'node:path'
 import { runCommand } from './runner.js'
 import { normalizeCommitMessage } from './commit-message.js'
+import { sleep } from './util.js'
 
 async function git(repo, args, options = {}) {
   const result = await runCommand('git', args, { cwd: repo, logFile: options.logFile, timeoutMs: options.timeoutMs ?? 120000 })
@@ -121,9 +123,94 @@ export async function switchBranch(repo, branch) {
   await git(repo, ['switch', branch])
 }
 
+/**
+ * Classifies a failed checkout so the operator can tell a dirty tree, another
+ * worktree and a transient file lock apart from an unknown Git failure.
+ */
+export function classifySwitchError(message) {
+  const text = String(message ?? '').trim()
+  if (/local changes|would be overwritten|please commit your changes|please move or remove|overwritten by checkout/i.test(text)) {
+    return { kind: 'dirty', retryable: false, action: 'Commit, stash, or discard the tracked changes, then retry.' }
+  }
+  if (/already checked out|already used by worktree|is already checked out/i.test(text)) {
+    return { kind: 'worktree', retryable: false, action: 'Switch or remove the other worktree that owns this branch, then retry.' }
+  }
+  if (/index\.lock|unable to create .*lock|file exists|being used by another process|permission denied|resource temporarily unavailable|another git process/i.test(text)) {
+    return { kind: 'locked', retryable: true, action: 'Close the process holding the repository or file lock, then retry.' }
+  }
+  if (/invalid reference|not a valid branch|pathspec .* did not match|did not match any file/i.test(text)) {
+    return { kind: 'missing', retryable: false, action: 'Recreate the branch or correct the recorded branch name, then retry.' }
+  }
+  return { kind: 'unknown', retryable: false, action: 'Run git switch manually and report the exact error.' }
+}
+
+async function worktreeEntries(repo) {
+  const result = await git(repo, ['worktree', 'list', '--porcelain'], { allowFailure: true })
+  if (result.code !== 0) return []
+  const entries = []
+  let current = null
+  for (const line of result.stdout.split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      current = { path: line.slice('worktree '.length).trim(), branch: null }
+      entries.push(current)
+    } else if (current && line.startsWith('branch refs/heads/')) {
+      current.branch = line.slice('branch refs/heads/'.length).trim()
+    }
+  }
+  return entries
+}
+
+function samePath(left, right) {
+  const normalize = value => path.resolve(value).replace(/[\\/]+/g, '/').toLowerCase()
+  return normalize(left) === normalize(right)
+}
+
+/**
+ * Switches to a ticket branch with a clean-tree and worktree preflight. A
+ * transient lock is retried once; dirty trees and branches owned by another
+ * worktree are never modified automatically.
+ */
+export async function switchTicketBranch(repo, branch) {
+  const current = await currentBranch(repo)
+  if (current === branch) return { ok: true, branch }
+
+  const status = await statusTrackedPorcelain(repo)
+  if (status) {
+    return {
+      ok: false,
+      branch,
+      kind: 'dirty',
+      error: `The working tree has tracked changes:\n${status}`,
+      action: 'Commit, stash, or discard the tracked changes, then retry.'
+    }
+  }
+
+  const worktree = (await worktreeEntries(repo)).find(entry => entry.branch === branch && !samePath(entry.path, repo))
+  if (worktree) {
+    return {
+      ok: false,
+      branch,
+      kind: 'worktree',
+      error: `Branch ${branch} is already checked out at ${worktree.path}.`,
+      action: 'Switch or remove the other worktree that owns this branch, then retry.'
+    }
+  }
+
+  const attempt = async () => {
+    const result = await git(repo, ['switch', branch], { allowFailure: true })
+    if (result.code === 0) return { ok: true, branch }
+    const error = (result.stderr || result.stdout || `git switch ${branch} failed`).trim()
+    return { ok: false, branch, error, ...classifySwitchError(error) }
+  }
+
+  const first = await attempt()
+  if (first.ok || !first.retryable) return first
+  await sleep(1000)
+  return attempt()
+}
+
 export async function switchBranchSafe(repo, branch) {
-  const result = await git(repo, ['switch', branch], { allowFailure: true })
-  return result.code === 0
+  return (await switchTicketBranch(repo, branch)).ok
 }
 
 /**
