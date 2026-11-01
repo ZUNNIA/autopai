@@ -46,8 +46,9 @@ export async function runAdopt({ config, stateStore, options, log }) {
   const headSha = await git.revParse(config.repoPath, branch)
   if (baseSha === headSha) throw new Error(`Branch ${branch} has no commits over origin/${baseBranch}.`)
 
+  const commitRange = `origin/${baseBranch}..${branch}`
   const range = `origin/${baseBranch}...${branch}`
-  const commits = await git.logCommits(config.repoPath, range)
+  const commits = await git.logCommits(config.repoPath, commitRange)
   const diff = await git.diff(config.repoPath, range)
   const changedFiles = await git.diffNames(config.repoPath, range)
 
@@ -135,7 +136,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   }
   await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
-  const updatedCommits = await git.logCommits(config.repoPath, range)
+  const updatedCommits = await git.logCommits(config.repoPath, commitRange)
   const updatedDiff = await git.diff(config.repoPath, range)
   const updatedFiles = await git.diffNames(config.repoPath, range)
   violations = scanBranch({ branch, commits: updatedCommits, diff: updatedDiff })
