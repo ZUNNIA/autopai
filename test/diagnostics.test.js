@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseDiagnostics, parseSeverities, summarizeDiagnostics } from '../src/lib/diagnostics.js'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { parseDiagnostics, parseSeverities, runBuildDiagnostics, summarizeDiagnostics } from '../src/lib/diagnostics.js'
 
 test('parses file diagnostics and filters severity', () => {
   const text = [
@@ -23,4 +26,39 @@ test('accepts tool diagnostics and rejects unknown severities', () => {
   assert.equal(diagnostics.length, 1)
   assert.equal(diagnostics[0].tool, 'MSBUILD')
   assert.throws(() => parseSeverities('error,debug'), /Unknown diagnostic severity/)
+})
+const restoreWarning = String.raw`C:\repo\AsistenteVirtual.csproj : warning NU1902: vulnerable package [C:\repo\AsistenteVirtual.sln]`
+const buildError = String.raw`C:\repo\A.cs(2,3): error CS1002: ; expected [C:\repo\AsistenteVirtual.csproj]`
+
+test('parses NuGet restore project diagnostics', () => {
+  const diagnostics = parseDiagnostics(restoreWarning, ['warning'])
+  assert.equal(diagnostics.length, 1)
+  assert.equal(diagnostics[0].code, 'NU1902')
+  assert.equal(diagnostics[0].file, String.raw`C:\repo\AsistenteVirtual.csproj`)
+  assert.equal(diagnostics[0].project, String.raw`C:\repo\AsistenteVirtual.sln`)
+  assert.equal(diagnostics[0].line, null)
+})
+
+test('parses bare diagnostics without a file', () => {
+  const diagnostics = parseDiagnostics('warning NU1903: high severity package', ['warning'])
+  assert.equal(diagnostics.length, 1)
+  assert.equal(diagnostics[0].code, 'NU1903')
+  assert.equal(diagnostics[0].file, null)
+})
+
+test('combines restore and build diagnostics', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-diagnostics-'))
+  const result = await runBuildDiagnostics({
+    config: {
+      repoPath: repo,
+      restoreCommand: [process.execPath, '-e', `console.log(${JSON.stringify(restoreWarning)})`],
+      buildCommand: [process.execPath, '-e', `console.log(${JSON.stringify(buildError)})`],
+      commandTimeoutMinutes: 1
+    },
+    severities: ['error', 'warning']
+  })
+  assert.equal(result.exitCode, 0)
+  assert.equal(result.diagnostics.length, 2)
+  assert.deepEqual(result.summary, { error: 1, warning: 1, info: 0 })
+  assert.ok(result.diagnostics.some(item => item.code === 'NU1902'))
 })

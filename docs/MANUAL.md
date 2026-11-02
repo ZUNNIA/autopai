@@ -324,7 +324,7 @@ A failed ticket is not a human gate. The phase stays incomplete, `state.failures
 
 `autopai resolve-conflicts --repo . --pr <n>` is an explicit recovery command. It requires a clean tracked working tree, fetches the base, switches to the pull request branch, merges the base without committing, and runs one executor session over the conflicted files. The executor preserves both intents and writes a blocker when a modify/delete or product decision is ambiguous. It never commits, pushes, rebases, or merges. Review the result, run the gates, then commit and push manually before `autopai resume`.
 
-`autopai diagnostics --repo .` runs the configured build and reports compiler errors and warnings. `--severity info` explicitly includes info diagnostics. `--fix` creates the `chore/compiler-diagnostics` branch, asks one executor to repair the selected diagnostics, and adopts the branch through the normal gates and pull request flow. It does not silently include Info messages, and it does not bypass CI or merge rules.
+`autopai diagnostics --repo .` runs the configured restore and build and reports compiler and restore diagnostics, including NuGet audit warnings such as `NU1902` and `NU1903`. `--severity info` explicitly includes info diagnostics. `--fix` creates the `chore/compiler-diagnostics` branch, asks one executor to repair the selected diagnostics, and adopts the branch through the normal gates and pull request flow. The fix session may update package references when a restore diagnostic requires it. It does not silently include Info messages, and it does not bypass CI or merge rules.
 
 ## 5. Tickets
 
