@@ -4,7 +4,7 @@ import { parseCliArgs } from './lib/util.js'
 import { loadConfig } from './lib/config.js'
 import { auditConfig, formatConfigReport } from './lib/config-audit.js'
 import * as git from './lib/git.js'
-import { StateStore } from './lib/state.js'
+import { StateStore, mergeStateIssues, reconcileMergeState } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
 import { runResolveConflicts } from './phases/conflicts.js'
 import { runDiagnostics } from './phases/diagnostics.js'
@@ -160,14 +160,20 @@ async function resumeRun({ config, stateStore, options, log }) {
   }
 
   const effectivePause = approved ? pauseAfter.filter(gate => gate !== approved) : pauseAfter
-  let next = nextPhase(state, effectivePause)
-  if (next.action === 'none') {
-    process.stdout.write(`${next.reason}\n`)
-    return
-  }
 
   await stateStore.lock()
   try {
+    const reconciled = reconcileMergeState(state)
+    if (reconciled.changed) {
+      await stateStore.save(state)
+      await log?.('Reconciled missing merge metadata from the last merged scope.')
+    }
+    for (const issue of mergeStateIssues(state)) await log?.(`State warning: ${issue}`)
+    let next = nextPhase(state, effectivePause)
+    if (next.action === 'none') {
+      process.stdout.write(`${next.reason}\n`)
+      return
+    }
     const results = []
     while (next.action !== 'none') {
       log(describeAction(next))

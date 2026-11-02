@@ -17,6 +17,7 @@ import { validateBillingFiles } from '../lib/billing.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { sessionRetryDelayMs, shouldRetrySession } from '../lib/session-retry.js'
 import { ensureDir, sleep, slugify, truncate } from '../lib/util.js'
+import { recordMergeState } from '../lib/state.js'
 
 export async function runPrepare({ config, stateStore, options, log }) {
   const feature = resolvePrepareFeature(options)
@@ -494,7 +495,11 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
       })
 
       await moveTicket(ticket, doneDirFor(ticket))
-      state.scopes.push({ name: ticket.slug, branch, ticket: ticket.id, changedFiles, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit })
+      recordMergeState(state, {
+        prNumber: merge.prNumber,
+        mergeCommit: merge.mergeCommit,
+        scope: { name: ticket.slug, branch, ticket: ticket.id, changedFiles, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit }
+      })
       state.completedPhases = [...new Set([...state.completedPhases, `${mode}:${ticket.id}`])]
       await stateStore.save(state)
       results.push({ ticket: ticket.id, branch, prNumber: merge.prNumber, title })
@@ -690,6 +695,8 @@ export async function runRelease({ config, stateStore, options, log }) {
   await git.pushTag(config.repoPath, tag)
 
   state.phase = 'released'
+  state.prNumber = merge.prNumber
+  state.mergeCommit = merge.mergeCommit
   state.completedPhases = [...new Set([...state.completedPhases, 'release'])]
   await stateStore.save(state)
   return { version, tag, prNumber: merge.prNumber, mergeCommit: merge.mergeCommit }

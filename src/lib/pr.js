@@ -213,6 +213,23 @@ async function rerunFailedChecks({ config, checks, log }) {
   return false
 }
 
+async function readMergedView(repo, number) {
+  let view = await github.prView(repo, number)
+  if (view.state === 'MERGED' && view.mergeCommit?.oid) return view
+  await sleep(1000)
+  return github.prView(repo, number)
+}
+
+function requireMergedView(view, number) {
+  if (view.state !== 'MERGED') {
+    throw new Error(`Pull request #${number} was not merged (state ${view.state}).`)
+  }
+  if (!view.mergeCommit?.oid) {
+    throw new Error(`Pull request #${number} is merged but GitHub did not report a merge commit.`)
+  }
+  return view
+}
+
 function mergeConflictError({ branch, baseBranch, prNumber }) {
   const error = new Error(`Pull request #${prNumber} has merge conflicts with ${baseBranch}.`)
   error.failure = {
@@ -247,8 +264,8 @@ export async function pushOpenWaitMerge({
   const existing = await github.prListByHead(config.repoPath, branch)
   const alreadyMerged = existing.find(pr => pr.state === 'MERGED')
   if (alreadyMerged) {
-    const view = await github.prView(config.repoPath, alreadyMerged.number)
-    return { prNumber: alreadyMerged.number, mergeCommit: view.mergeCommit?.oid ?? null, title: alreadyMerged.title, checks: [] }
+    const view = requireMergedView(await readMergedView(config.repoPath, alreadyMerged.number), alreadyMerged.number)
+    return { prNumber: alreadyMerged.number, mergeCommit: view.mergeCommit.oid, title: alreadyMerged.title, checks: [] }
   }
 
   const validation = await validateHead({ config, artifacts, baseBranch, branch, executorPayload, log })
@@ -398,14 +415,11 @@ export async function pushOpenWaitMerge({
     }
     throw error
   }
-  const merged = await github.prView(config.repoPath, pr.number)
-  if (merged.state !== 'MERGED') {
-    throw new Error(`Pull request #${pr.number} was not merged (state ${merged.state}).`)
-  }
+  const merged = requireMergedView(await readMergedView(config.repoPath, pr.number), pr.number)
 
   await git.deleteRemoteBranch(config.repoPath, branch)
   await cleanupAfterMerge({ config, branch, baseBranch, log })
-  return { prNumber: pr.number, mergeCommit: merged.mergeCommit?.oid ?? null, title, checks: checks.checks }
+  return { prNumber: pr.number, mergeCommit: merged.mergeCommit.oid, title, checks: checks.checks }
 }
 
 /**

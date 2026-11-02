@@ -598,7 +598,7 @@ tickets/.autopai/
 
 **state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `filters`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`. `filters` holds the canonical `classifications` and `priorities` arrays of the current run. `sessions` holds the retained prepare review conversations with `kind`, `feature`, `title`, `id`, and `createdAt`; the orchestrator records them before it stops at the backlog gate and clears them after a successful approval.
 
-**Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit.
+**Reconciliation.** On resume, the orchestrator checks the real branch, commits, pull request state, and checks before continuing. An already merged pull request is reused, and the run records the existing merge commit. Resume also backfills a missing top-level `mergeCommit` and `prNumber` from the last merged scope; `status` reports a mismatch as `stateWarnings` without writing.
 
 **Blockers.** When the executor cannot continue, it writes a JSON file under `needs-human/` with the reason, the files involved, and what a human must decide. The orchestrator checks that folder after every executor session: when a blocker exists, the phase stops immediately with the blocker path and records it in the state, so partial work never reaches a pull request. Resolve the issue — architecture decisions go through `/autopai-adr` in the interactive coding tool — and run `autopai resume`.
 
