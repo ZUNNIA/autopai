@@ -7,6 +7,10 @@ import { runSession } from '../lib/session.js'
 import { listBlockers, blockerMessage } from '../lib/blockers.js'
 import { runAdopt } from './adopt.js'
 
+export function diagnosticsBranchName(now = Date.now()) {
+  return `chore/diagnostics-${Number(now).toString(36)}`
+}
+
 /**
  * Audits the build for compiler diagnostics. With --fix it creates a dedicated
  * branch, asks one executor to repair the selected diagnostics, and adopts that
@@ -32,7 +36,7 @@ export async function runDiagnostics({ config, stateStore, options, log }) {
   const dirty = await git.statusTrackedPorcelain(config.repoPath)
   if (dirty) throw new Error(`The working tree has tracked changes:\n${dirty}\nCommit, stash, or discard them before diagnostics --fix.`)
 
-  const branch = String(options.branch ?? 'chore/compiler-diagnostics').trim()
+  const branch = String(options.branch ?? diagnosticsBranchName()).trim()
   const baseBranch = config.baseBranch
   await git.fetch(config.repoPath)
   if (await git.branchExists(config.repoPath, branch)) {
@@ -69,6 +73,16 @@ export async function runDiagnostics({ config, stateStore, options, log }) {
   const commits = await git.logCommits(config.repoPath, `origin/${baseBranch}..${branch}`)
   if (commits.length === 0) throw new Error('The diagnostics fix session produced no commits.')
 
+  const verified = await runBuildDiagnostics({ config, artifacts, severities })
+  if (verified.diagnostics.length > 0) {
+    const details = verified.diagnostics.slice(0, 20).map(item => `${item.code}: ${item.message}`).join('\n')
+    const extra = verified.diagnostics.length > 20 ? `\n...and ${verified.diagnostics.length - 20} more.` : ''
+    throw new Error(`The diagnostics fix left ${verified.diagnostics.length} diagnostic(s):\n${details}${extra}`)
+  }
+  if (verified.exitCode !== 0) {
+    throw new Error(`The diagnostics recheck failed with exit ${verified.exitCode}.`)
+  }
+
   const tempStateDir = path.join(config.stateDir, 'diagnostics', String(Date.now()))
   const adoptConfig = { ...config, stateDir: tempStateDir }
   const adoptStore = new StateStore(adoptConfig)
@@ -89,6 +103,7 @@ export async function runDiagnostics({ config, stateStore, options, log }) {
     branch,
     prNumber: adopted.prNumber,
     mergeCommit: adopted.mergeCommit,
-    commits: adopted.commits
+    commits: adopted.commits,
+    remaining: verified.summary
   }
 }

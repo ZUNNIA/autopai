@@ -32,7 +32,7 @@ export async function prCreate(repo, { base, head, title, body, draft = false })
 }
 
 export async function prView(repo, number) {
-  const result = await gh(repo, ['pr', 'view', String(number), '--json', 'number,title,state,mergeable,mergeStateStatus,mergeCommit,headRefName,baseRefName,url,isDraft'])
+  const result = await gh(repo, ['pr', 'view', String(number), '--json', 'number,title,state,mergeable,mergeStateStatus,mergeCommit,headRefName,baseRefName,url,isDraft,headRefOid'])
   return parseJson(result.stdout)
 }
 

@@ -243,6 +243,10 @@ function mergeConflictError({ branch, baseBranch, prNumber }) {
   return error
 }
 
+export function mergedPrMatchesHead(view, branchHead) {
+  return Boolean(view?.headRefOid && branchHead && view.headRefOid === branchHead)
+}
+
 /**
  * Pushes the branch, opens or reuses a PR, waits for CI, asks the executor to
  * fix failures, and merges only after every required check passes.
@@ -265,6 +269,10 @@ export async function pushOpenWaitMerge({
   const alreadyMerged = existing.find(pr => pr.state === 'MERGED')
   if (alreadyMerged) {
     const view = requireMergedView(await readMergedView(config.repoPath, alreadyMerged.number), alreadyMerged.number)
+    const branchHead = await git.revParse(config.repoPath, branch)
+    if (!mergedPrMatchesHead(view, branchHead)) {
+      throw new Error(`Pull request #${alreadyMerged.number} was already merged at ${view.headRefOid ?? 'an unknown commit'}, but ${branch} now points to ${branchHead}. Push the work to a new branch instead of reusing a merged pull request.`)
+    }
     return { prNumber: alreadyMerged.number, mergeCommit: view.mergeCommit.oid, title: alreadyMerged.title, checks: [] }
   }
 
