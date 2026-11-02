@@ -67,3 +67,27 @@ test('status exposes retained review sessions', async () => {
   assert.equal(status.gate, 'backlog')
   assert.deepEqual(status.sessions.map(session => session.id), ['brief-1', 'backlog-1'])
 })
+
+test('status reports merge state warnings without writing', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-status-warnings-'))
+  const stateDir = path.join(repo, 'tickets', '.autopai')
+  await fs.mkdir(stateDir, { recursive: true })
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({ runner: 'opencode' }), 'utf8')
+  const stateFile = path.join(stateDir, 'state.json')
+  await fs.writeFile(stateFile, JSON.stringify({
+    mode: 'refactor',
+    phase: 'refactor-complete',
+    feature: 'settings',
+    prNumber: 469,
+    mergeCommit: null,
+    scopes: [{ prNumber: 469, mergeCommit: 'ad6aa8a' }],
+    completedPhases: ['refactor'],
+    blockers: []
+  }), 'utf8')
+
+  const output = execFileSync(process.execPath, [cli, 'status', '--repo', repo], { encoding: 'utf8' })
+  const status = JSON.parse(output)
+  assert.equal(status.stateWarnings.length, 1)
+  assert.match(status.stateWarnings[0], /mergeCommit is missing/)
+  assert.equal(JSON.parse(await fs.readFile(stateFile, 'utf8')).mergeCommit, null)
+})
