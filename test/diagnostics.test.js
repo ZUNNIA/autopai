@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { parseDiagnostics, parseSeverities, runBuildDiagnostics, summarizeDiagnostics } from '../src/lib/diagnostics.js'
+import { diagnosticsBranchName } from '../src/phases/diagnostics.js'
 
 test('parses file diagnostics and filters severity', () => {
   const text = [
@@ -61,4 +62,12 @@ test('combines restore and build diagnostics', async () => {
   assert.equal(result.diagnostics.length, 2)
   assert.deepEqual(result.summary, { error: 1, warning: 1, info: 0 })
   assert.ok(result.diagnostics.some(item => item.code === 'NU1902'))
+})
+
+test('uses a unique diagnostics branch name within the policy limit', () => {
+  const first = diagnosticsBranchName(1700000000000)
+  const second = diagnosticsBranchName(1700000000001)
+  assert.match(first, /^chore\/diagnostics-[0-9a-z]+$/)
+  assert.notEqual(first, second)
+  assert.ok(first.length <= 32)
 })
