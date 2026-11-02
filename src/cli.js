@@ -157,6 +157,7 @@ async function resumeRun({ config, stateStore, options, log }) {
     const gate = currentGate(state)
     if (!gate) throw new Error(`The run is not paused at a human gate; cannot approve ${approved}.`)
     if (gate !== approved) throw new Error(`The run is paused at the ${gateLabel(gate)} gate; cannot approve ${approved}.`)
+    if (!pauseAfter.includes(gate)) throw new Error(`The run is not paused at the ${gateLabel(gate)} gate; cannot approve ${approved}.`)
   }
 
   const effectivePause = approved ? pauseAfter.filter(gate => gate !== approved) : pauseAfter
@@ -286,6 +287,7 @@ async function printStatus(state, config) {
     return
   }
   const gate = currentGate(state)
+  const paused = gate ? config.pauseAfter.includes(gate) : false
   const summary = {
     runId: state.runId,
     mode: state.mode,
@@ -305,7 +307,8 @@ async function printStatus(state, config) {
       id: session.id ?? null
     })),
     gate,
-    paused: gate ? config.pauseAfter.includes(gate) : false,
+    paused,
+    canApprove: paused,
     pauseAfter: config.pauseAfter,
     worktree,
     stateWarnings: mergeStateIssues(state)

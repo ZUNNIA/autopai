@@ -3,7 +3,7 @@ description: Continue the last AutopAI run until the next human gate
 agent: autopai
 ---
 
-Before composing the command, run `autopai status --repo .` and read its `gate`. If `gate` is null, do not pass `--approve`; report the phase, failures, and blockers instead. A failed ticket or a blocker is not a human gate: use a plain `autopai resume` retry after the blocker is resolved.
+Before composing the command, run `autopai status --repo .` and read `gate`, `paused`, and `canApprove`. If `canApprove` is false or `gate` is null, do not pass `--approve`; report the phase, failures, and blockers instead. A completed refactor reports `gate: refactor` with `canApprove: false`. A failed ticket or a blocker is not a human gate: use a plain `autopai resume` retry after the blocker is resolved.
 
 If the user reports a failed manual QA item while the gate is `qa`, do not use `resume` or `--approve qa`; use `autopai qa-fix --message "<failure>"` to create fix tickets and restart dev.
 
@@ -15,7 +15,7 @@ Run with the bash tool and a timeout of at least 14400000 ms:
 
 `autopai resume --repo . $ARGUMENTS`
 
-If the run is paused at a human gate, report the gate, the artifacts to review, and the exact approval command. A generic "continue" is **not** approval: never pass `--approve` unless the user explicitly approves that gate by name and the status reports it. If the user says only "continue", report the gate and ask.
+If the run is paused at a human gate, report the gate, the artifacts to review, and the exact approval command. A generic "continue" is **not** approval: never pass `--approve` unless the user explicitly approves that gate by name and `canApprove` is true for that gate. If the user says only "continue", report the gate and ask. If the phase is complete, report completion and offer the next feature or release; do not suggest `--approve`.
 
 Compose the arguments from the request:
 
