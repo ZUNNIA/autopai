@@ -320,6 +320,12 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 
 A failed ticket is not a human gate. The phase stays incomplete, `state.failures` records the ticket and its branch, and resume reuses that branch instead of creating a duplicate. A branch with commits is reused even when its name has a suffix, so retries do not create endless `-4` branches. Local gates are retried once. With `continueOnFailure` true the loop continues with independent tickets and skips dependents; `resume --fix` adds one executor repair attempt with the gate logs only when the failure is marked `repairable: true`. Branch checkout and blocked dependency failures are not repaired by `--fix`. If CI fails and no failure log is available, the failed job is re-run up to twice; then one automatic diagnosis attempt reproduces the named check locally and fixes the branch; if the check still fails without a log, the run writes a CI blocker with the check names and links. A failed dev or refactor attempt archives its recorded blockers at the start of the explicit retry; a blocker written by the new attempt still stops the run. Before any `--approve`, `status` must report the same gate; otherwise the approval is refused.
 
+### 4.10 resolve-conflicts and diagnostics
+
+`autopai resolve-conflicts --repo . --pr <n>` is an explicit recovery command. It requires a clean tracked working tree, fetches the base, switches to the pull request branch, merges the base without committing, and runs one executor session over the conflicted files. The executor preserves both intents and writes a blocker when a modify/delete or product decision is ambiguous. It never commits, pushes, rebases, or merges. Review the result, run the gates, then commit and push manually before `autopai resume`.
+
+`autopai diagnostics --repo .` runs the configured build and reports compiler errors and warnings. `--severity info` explicitly includes info diagnostics. `--fix` creates the `chore/compiler-diagnostics` branch, asks one executor to repair the selected diagnostics, and adopts the branch through the normal gates and pull request flow. It does not silently include Info messages, and it does not bypass CI or merge rules.
+
 ## 5. Tickets
 
 All ticket directories are configurable through `ticketDirs` and default to:
@@ -532,7 +538,7 @@ autopai abort --repo <path>
 
 **Human gate flags.** `--approve <gate>` passes one gate and continues to the next configured gate. `--auto` skips every human gate. `--pause-after <gates>` overrides `pauseAfter` for one run; the value is a comma-separated gate list or an empty string to disable every human pause. These flags never disable the automatic gates.
 
-**Failure flags.** `--fix` runs one executor repair attempt only for repairable gate failures, using the local gate logs, then retries the gates. Branch checkout, blocked dependency, executor, policy, and merge failures are retried but not repaired by `--fix`. It never bypasses the automatic gates or approves a human gate.
+**Failure flags.** `--fix` runs one executor repair attempt only for repairable gate failures, using the local gate logs, then retries the gates. Branch checkout, blocked dependency, executor, policy, and merge failures are retried but not repaired by `--fix`; merge conflicts use `autopai resolve-conflicts` and compiler diagnostics use `autopai diagnostics`. It never bypasses the automatic gates or approves a human gate.
 
 **Defaults.** `--feature` resolves from the previous run state or the latest ticket directory, and `--scope` defaults to the scopes of the last run. Explicit flags always win, and the resolver fails with a clear error instead of guessing when no candidate exists.
 
@@ -561,7 +567,7 @@ autopai abort --repo <path>
 }
 ```
 
-When no state exists, `status` prints `No AutopAI state found for this repository.` The `gate` is the current human checkpoint (`null` when the run is mid-phase), and `paused` tells whether that gate is in `pauseAfter`. `failures` lists the failed or blocked tickets with their branches and stages, and marks whether `--fix` can repair them with `repairable`. Branch failures also include `kind` and `action` from the checkout diagnosis. `status` is always read-only.
+When no state exists, `status` prints `No AutopAI state found for this repository.` The `gate` is the current human checkpoint (`null` when the run is mid-phase), and `paused` tells whether that gate is in `pauseAfter`. `failures` lists the failed or blocked tickets with their branches and stages, and marks whether `--fix` can repair them with `repairable`. Branch failures also include `kind` and `action` from the checkout diagnosis. The `worktree` object is a live snapshot of the current branch, tracked changes, untracked files, and worktrees; it is authoritative when a stored failure is stale. `status` is always read-only.
 
 ## 8. State, logs, and artifacts
 

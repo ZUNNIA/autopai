@@ -73,6 +73,8 @@ operational request into the exact CLI flags before running:
 - Before any `--approve`, run `autopai status --repo .` and read its `gate`. Pass `--approve <gate>` only when the user explicitly approves that exact gate and the status reports the same gate. If `gate` is null, do not pass `--approve`; if there are failures or blockers, use a plain `autopai resume` retry or report the blocker.
 - "approve the backlog and continue" → `autopai resume --repo . --approve backlog`; "approve the plan" → `--approve plan`; "approve QA" → `--approve qa`; "approve the findings" → `--approve findings`; "approve the refactor tickets" → `--approve promotion`; "approve the refactor" → `--approve refactor`. Only when the user explicitly approves that gate by name and the status reports it.
 - "QA failed", a failed QA checklist item, or "fix the QA" while status reports `gate: qa` → `autopai qa-fix --repo . --message "<failure>"`. It creates fix tickets for the current feature and starts dev. Do not pass `--approve qa` and do not start a new feature or brief.
+- "resolve this merge conflict" for a named PR -> `autopai resolve-conflicts --repo . --pr <n>`. It merges the base and runs one executor resolution session without committing, pushing, or merging. Review the result with the user before any Git write.
+- "fix all compiler warnings" or "fix the compiler diagnostics" -> `autopai diagnostics --repo . --severity error,warning --fix`. Use `--severity info` only when the user explicitly asks for Info messages. The command creates a dedicated branch and adopts it through the normal PR flow.
 - "continue without stopping" or "run everything" → `--auto`, after confirming.
 - "resolve all the technical debt", "clear the refactor queue", or a request to refactor the pending tickets → the refactor phase, not a release. If the user restricts the debt, pass `--classification` and `--priority`; the orchestrator selects only matching pending tickets and reports zero if none match.
 - "identify only ..." restricts the audit and its promotion; "resolve only ..." restricts the pending refactor queue. Both use the same two flags.
@@ -129,7 +131,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`.
+Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
 
 ## Branch and dependency failures
 
@@ -137,6 +139,12 @@ Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor
 - A failure with `stage: blocked` or `repairable: false` is not repaired by `--fix`. Resolve the named dependency or cause first.
 - Recommend `autopai resume --fix` only when at least one failure has `repairable: true`. Never describe `--fix` as a repair for branch checkout or dependency failures.
 - Do not stash, discard changes, remove worktrees, or force a checkout for the user.
+
+## Merge conflicts
+
+- A failure with `kind: conflict` is a merge conflict, not a source bug. Report its PR, branch, base and exact action. Never recommend `--fix`.
+- Do not run checkout, merge, rebase, push or force-push for the user. Offer the explicit `autopai resolve-conflicts` command or the exact manual commands.
+- The live `worktree` object in `status` is authoritative. If a stored failure says `kind: dirty` but `worktree.trackedChanges` is empty, do not block a plain `resume`; the stored failure is stale.
 
 ## CI failures and checks
 

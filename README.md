@@ -115,6 +115,9 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
 | Refactor filtered debt | `/autopai-refactor "only minor missing documentation"` | "resolve only minor missing documentation" |
 | Repair repairable gate failures | `/autopai-resume --fix` | "fix the gate failures and continue" |
+| Resolve a PR conflict | `autopai resolve-conflicts --pr <n>` | "resolve the conflicts in this pull request" |
+| Audit compiler diagnostics | `autopai diagnostics` | "show compiler errors and warnings" |
+| Fix compiler diagnostics | `autopai diagnostics --severity error,warning --fix` | "fix the compiler warnings and errors" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
@@ -273,6 +276,8 @@ The core prompts, phases, state, policy, and merge logic do not change. Read `sp
 - Two clones are linked: only one can own the `autopai` command. Run `npm link` in the clone you want to keep.
 - The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
 - A ticket failed local gates: run `/autopai-resume --fix` for a repairable gate failure or `/autopai-resume` to retry; do not create a duplicate branch. The failed branch is reused. A branch checkout failure is not repaired by `--fix`: fix the checkout, worktree, lock, or tracked changes first.
+- A pull request has merge conflicts: run `autopai resolve-conflicts --pr <n>`, review the result, run the gates, then commit and push manually. Never use `--fix` for a merge conflict.
+- Compiler diagnostics: run `autopai diagnostics` to inspect errors and warnings, or `autopai diagnostics --fix` to repair them in a dedicated branch and pull request. Info diagnostics require `--severity info`.
 
 ## Development
 

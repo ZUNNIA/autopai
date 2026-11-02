@@ -213,6 +213,19 @@ async function rerunFailedChecks({ config, checks, log }) {
   return false
 }
 
+function mergeConflictError({ branch, baseBranch, prNumber }) {
+  const error = new Error(`Pull request #${prNumber} has merge conflicts with ${baseBranch}.`)
+  error.failure = {
+    kind: 'conflict',
+    repairable: false,
+    prNumber,
+    branch,
+    baseBranch,
+    action: `Run gh pr checkout ${prNumber}, then git fetch origin ${baseBranch} and git merge origin/${baseBranch}. Resolve the conflicts, run the gates, commit, push, and retry.`
+  }
+  return error
+}
+
 /**
  * Pushes the branch, opens or reuses a PR, waits for CI, asks the executor to
  * fix failures, and merges only after every required check passes.
@@ -365,8 +378,8 @@ export async function pushOpenWaitMerge({
   }
 
   const view = await github.prView(config.repoPath, pr.number)
-  if (view.mergeable === 'CONFLICTING') {
-    throw new Error(`Pull request #${pr.number} has merge conflicts.`)
+  if (view.mergeable === 'CONFLICTING' || view.mergeStateStatus === 'DIRTY') {
+    throw mergeConflictError({ branch, baseBranch, prNumber: pr.number })
   }
   if (view.mergeStateStatus === 'BEHIND') {
     await github.prUpdateBranch(config.repoPath, pr.number)
@@ -377,7 +390,14 @@ export async function pushOpenWaitMerge({
   }
 
   const mergeBody = generateMergeBody({ prBody, title })
-  await github.prMerge(config.repoPath, pr.number, { title, body: mergeBody })
+  try {
+    await github.prMerge(config.repoPath, pr.number, { title, body: mergeBody })
+  } catch (error) {
+    if (/not mergeable|merge commit cannot be cleanly created|conflict/i.test(error.message)) {
+      throw mergeConflictError({ branch, baseBranch, prNumber: pr.number })
+    }
+    throw error
+  }
   const merged = await github.prView(config.repoPath, pr.number)
   if (merged.state !== 'MERGED') {
     throw new Error(`Pull request #${pr.number} was not merged (state ${merged.state}).`)

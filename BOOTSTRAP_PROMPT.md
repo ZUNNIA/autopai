@@ -110,6 +110,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/config.js`
 - `src/lib/coverage.js`
 - `src/lib/defaults.js`
+- `src/lib/diagnostics.js`
 - `src/lib/filters.js`
 - `src/lib/forbidden.js`
 - `src/lib/gates.js`
@@ -133,6 +134,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Phases
 
 - `src/phases/adopt.js`
+- `src/phases/conflicts.js`
+- `src/phases/diagnostics.js`
 - `src/phases/identify.js`
 - `src/phases/pipeline.js`
 
@@ -142,12 +145,14 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/autopai-finish.md`
 - `src/prompts/backlog.md`
 - `src/prompts/ci-fix.md`
+- `src/prompts/diagnostics-fix.md`
 - `src/prompts/feature-brief.md`
 - `src/prompts/identified.md`
 - `src/prompts/qa-fix.md`
 - `src/prompts/ready-for-dev.md`
 - `src/prompts/ready-for-refactor.md`
 - `src/prompts/release.md`
+- `src/prompts/resolve-conflicts.md`
 
 ### Runners
 
@@ -169,6 +174,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`
+- `test/diagnostics.test.js`
 - `test/filters.test.js`
 - `test/forbidden.test.js`
 - `test/gates.test.js`

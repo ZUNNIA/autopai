@@ -119,6 +119,34 @@ export async function normalizeHeadCommitMessage({ repoPath, log }) {
   return { changed: true, subject }
 }
 
+/**
+ * Reports the live checkout without changing it. The stored run state can be
+ * stale after a manual cleanup, so status and the operator must read this
+ * snapshot before refusing a retry.
+ */
+export async function inspectWorktree(repo) {
+  const branchResult = await git(repo, ['branch', '--show-current'], { allowFailure: true })
+  const statusResult = await git(repo, ['status', '--porcelain'], { allowFailure: true })
+  const tracked = []
+  const untracked = []
+  if (statusResult.code === 0) {
+    for (const line of statusResult.stdout.split(/\r?\n/)) {
+      if (!line.trim()) continue
+      const entry = line.slice(3).trim().replace(/^"|"$/g, '')
+      if (line.startsWith('??')) untracked.push(entry)
+      else tracked.push(entry)
+    }
+  }
+  return {
+    available: branchResult.code === 0,
+    branch: branchResult.code === 0 ? branchResult.stdout.trim() : null,
+    dirty: tracked.length > 0,
+    trackedChanges: tracked,
+    untracked,
+    worktrees: (await worktreeEntries(repo)).map(entry => ({ path: entry.path, branch: entry.branch }))
+  }
+}
+
 export async function switchBranch(repo, branch) {
   await git(repo, ['switch', branch])
 }
@@ -170,6 +198,22 @@ function samePath(left, right) {
  * transient lock is retried once; dirty trees and branches owned by another
  * worktree are never modified automatically.
  */
+export async function mergeIntoCurrent(repo, ref) {
+  const result = await git(repo, ['merge', '--no-commit', '--no-ff', ref], { allowFailure: true })
+  return {
+    ok: result.code === 0,
+    code: result.code,
+    text: (result.stdout || result.stderr || '').trim()
+  }
+}
+
+export async function conflictedFiles(repo) {
+  const result = await git(repo, ['diff', '--name-only', '--diff-filter=U'], { allowFailure: true })
+  return result.code === 0
+    ? result.stdout.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+    : []
+}
+
 export async function switchTicketBranch(repo, branch) {
   const current = await currentBranch(repo)
   if (current === branch) return { ok: true, branch }
