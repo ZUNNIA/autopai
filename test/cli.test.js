@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { parseCliArgs } from '../src/lib/util.js'
 
 const cli = path.resolve('src/cli.js')
@@ -90,4 +90,42 @@ test('status reports merge state warnings without writing', async () => {
   assert.equal(status.stateWarnings.length, 1)
   assert.match(status.stateWarnings[0], /mergeCommit is missing/)
   assert.equal(JSON.parse(await fs.readFile(stateFile, 'utf8')).mergeCommit, null)
+})
+
+test('status exposes whether the current gate can be approved', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-status-approve-'))
+  const stateDir = path.join(repo, 'tickets', '.autopai')
+  await fs.mkdir(stateDir, { recursive: true })
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({ runner: 'opencode' }), 'utf8')
+  await fs.writeFile(path.join(stateDir, 'state.json'), JSON.stringify({
+    mode: 'refactor',
+    phase: 'refactor-complete',
+    feature: 'settings',
+    completedPhases: ['refactor'],
+    blockers: []
+  }), 'utf8')
+
+  const output = execFileSync(process.execPath, [cli, 'status', '--repo', repo], { encoding: 'utf8' })
+  const status = JSON.parse(output)
+  assert.equal(status.gate, 'refactor')
+  assert.equal(status.paused, false)
+  assert.equal(status.canApprove, false)
+})
+
+test('rejects approval when the gate is not paused', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-approve-reject-'))
+  const stateDir = path.join(repo, 'tickets', '.autopai')
+  await fs.mkdir(stateDir, { recursive: true })
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({ runner: 'opencode' }), 'utf8')
+  await fs.writeFile(path.join(stateDir, 'state.json'), JSON.stringify({
+    mode: 'refactor',
+    phase: 'refactor-complete',
+    feature: 'settings',
+    completedPhases: ['refactor'],
+    blockers: []
+  }), 'utf8')
+
+  const result = spawnSync(process.execPath, [cli, 'resume', '--repo', repo, '--approve', 'refactor'], { encoding: 'utf8' })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /not paused at the refactor gate/)
 })
