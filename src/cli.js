@@ -307,7 +307,8 @@ async function printStatus(state, config) {
     gate,
     paused: gate ? config.pauseAfter.includes(gate) : false,
     pauseAfter: config.pauseAfter,
-    worktree
+    worktree,
+    stateWarnings: mergeStateIssues(state)
   }
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
 }
