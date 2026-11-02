@@ -90,3 +90,53 @@ export function createRunId() {
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
   return `${stamp}-${process.pid}`
 }
+
+/**
+ * Returns consistency issues between the top-level merge fields and the merged
+ * ticket scopes. A completed dev or refactor run must mirror the last merged
+ * scope so consumers never see a completed run without its merge commit.
+ */
+export function mergeStateIssues(state) {
+  if (!state) return []
+  const mergedScopes = (state.scopes ?? []).filter(scope => scope?.mergeCommit)
+  const last = mergedScopes[mergedScopes.length - 1]
+  const issues = []
+  if (last && !state.mergeCommit) {
+    issues.push(`state.mergeCommit is missing; the last merged scope has ${last.mergeCommit}.`)
+  }
+  if (last && state.mergeCommit && state.mergeCommit !== last.mergeCommit) {
+    issues.push(`state.mergeCommit ${state.mergeCommit} differs from the last merged scope ${last.mergeCommit}.`)
+  }
+  if (last?.prNumber && !state.prNumber) {
+    issues.push(`state.prNumber is missing; the last merged scope has #${last.prNumber}.`)
+  }
+  return issues
+}
+
+/**
+ * Backfills missing merge metadata from the last merged scope. Existing values
+ * are never overwritten here; status reports a mismatch instead.
+ */
+export function reconcileMergeState(state) {
+  const issues = mergeStateIssues(state)
+  const mergedScopes = (state?.scopes ?? []).filter(scope => scope?.mergeCommit)
+  const last = mergedScopes[mergedScopes.length - 1]
+  let changed = false
+  if (last && !state.mergeCommit) {
+    state.mergeCommit = last.mergeCommit
+    changed = true
+  }
+  if (last?.prNumber && !state.prNumber) {
+    state.prNumber = last.prNumber
+    changed = true
+  }
+  return { changed, issues }
+}
+
+export function recordMergeState(state, { prNumber, mergeCommit, scope }) {
+  if (!mergeCommit) throw new Error('Cannot record a merge without a merge commit.')
+  state.prNumber = prNumber
+  state.mergeCommit = mergeCommit
+  if (scope) state.scopes = [...(state.scopes ?? []), scope]
+  return state
+}
