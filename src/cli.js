@@ -3,8 +3,11 @@ import path from 'node:path'
 import { parseCliArgs } from './lib/util.js'
 import { loadConfig } from './lib/config.js'
 import { auditConfig, formatConfigReport } from './lib/config-audit.js'
+import * as git from './lib/git.js'
 import { StateStore } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
+import { runResolveConflicts } from './phases/conflicts.js'
+import { runDiagnostics } from './phases/diagnostics.js'
 import { runIdentify } from './phases/identify.js'
 import { runApprove, runDev, runPrepare, runPromote, runQaFix, runRefactor, runRelease } from './phases/pipeline.js'
 import { Artifacts } from './lib/artifacts.js'
@@ -49,6 +52,8 @@ async function main() {
     else if (command === 'run') result = await runSequence(ctx)
     else if (command === 'revise') result = await runRevise(ctx)
     else if (command === 'qa-fix') result = await runQaFix(ctx)
+    else if (command === 'resolve-conflicts') result = await runResolveConflicts(ctx)
+    else if (command === 'diagnostics') result = await runDiagnostics(ctx)
     else throw new Error(`Unknown command: ${command}`)
     printResult(result)
     return result
@@ -258,16 +263,20 @@ function failureGuidance(failures = []) {
   const repairable = failures.filter(failure => failure.repairable === true).length
   const branch = failures.filter(failure => failure.stage === 'branch').length
   const blocked = failures.filter(failure => failure.stage === 'blocked').length
+  const conflicts = failures.filter(failure => failure.kind === 'conflict').length
   const lines = ['Run autopai resume to retry.']
   if (repairable > 0) lines.push(`Use autopai resume --fix for ${repairable} repairable gate failure(s).`)
   if (branch > 0) lines.push(`${branch} branch failure(s) require a clean checkout or worktree; --fix does not repair them.`)
+  if (conflicts > 0) lines.push(`${conflicts} merge conflict(s) require manual resolution; --fix does not resolve them.`)
   if (blocked > 0) lines.push(`${blocked} ticket(s) are blocked by a dependency; resolve the dependency first.`)
   return lines.join(' ')
 }
 
-function printStatus(state, config) {
+async function printStatus(state, config) {
+  const worktree = await git.inspectWorktree(config.repoPath)
   if (!state) {
     process.stdout.write('No AutopAI state found for this repository.\n')
+    process.stdout.write(`${JSON.stringify({ worktree }, null, 2)}\n`)
     return
   }
   const gate = currentGate(state)
@@ -291,7 +300,8 @@ function printStatus(state, config) {
     })),
     gate,
     paused: gate ? config.pauseAfter.includes(gate) : false,
-    pauseAfter: config.pauseAfter
+    pauseAfter: config.pauseAfter,
+    worktree
   }
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
 }
@@ -309,6 +319,8 @@ Usage:
   autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
   autopai release --repo <path> --version <x.y.z>
   autopai qa-fix --repo <path> --message <failure>
+  autopai resolve-conflicts --repo <path> [--pr <number>]
+  autopai diagnostics --repo <path> [--severity error,warning,info] [--fix] [--branch <name>]
   autopai revise --repo <path> --message <change>
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
@@ -336,6 +348,16 @@ loads the original prompt, creates a new session, or approves the backlog.
 
 qa-fix turns a failed manual QA review into fix tickets for the current feature
 and starts dev again. It never approves the qa gate.
+
+resolve-conflicts takes an explicit conflicting pull request, merges the base
+into its branch, and runs one executor session to resolve the conflicts without
+committing, pushing, or merging. Review the result, run the gates, then commit
+and push manually.
+
+diagnostics parses compiler errors, warnings, and optional info messages. With
+--fix it creates a dedicated branch, asks one executor to repair the selected
+diagnostics, and adopts the branch through the normal gates and pull request
+flow.
 
 Human gates pause the assisted loop after prepare, approve, dev, identify,
 promote, or refactor. pauseAfter defaults to backlog, plan, and qa. resume at a

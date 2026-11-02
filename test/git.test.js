@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { classifySwitchError, logCommits, normalizeHeadCommitMessage, statusTrackedPorcelain, switchTicketBranch } from '../src/lib/git.js'
+import { classifySwitchError, inspectWorktree, logCommits, normalizeHeadCommitMessage, statusTrackedPorcelain, switchTicketBranch } from '../src/lib/git.js'
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -102,4 +102,23 @@ test('normalizes a duplicate commit body on the latest commit', async () => {
   const result = await normalizeHeadCommitMessage({ repoPath: repo })
   assert.equal(result.changed, true)
   assert.equal(git(repo, ['log', '-1', '--format=%B']).trim(), 'refactor: gen panel context section')
+})
+
+test('inspects tracked and untracked worktree state without changing it', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-worktree-'))
+  git(repo, ['init', '-b', 'main', '--quiet'])
+  git(repo, ['config', 'user.email', 'test@example.com'])
+  git(repo, ['config', 'user.name', 'AutopAI Test'])
+  await fs.writeFile(path.join(repo, 'tracked.txt'), 'one\n', 'utf8')
+  git(repo, ['add', 'tracked.txt'])
+  git(repo, ['commit', '--quiet', '-m', 'chore: seed'])
+  await fs.writeFile(path.join(repo, 'tracked.txt'), 'two\n', 'utf8')
+  await fs.writeFile(path.join(repo, 'untracked.txt'), 'new\n', 'utf8')
+
+  const status = await inspectWorktree(repo)
+  assert.equal(status.available, true)
+  assert.equal(status.branch, 'main')
+  assert.equal(status.dirty, true)
+  assert.deepEqual(status.trackedChanges, ['tracked.txt'])
+  assert.deepEqual(status.untracked, ['untracked.txt'])
 })
