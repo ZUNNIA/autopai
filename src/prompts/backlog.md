@@ -8,7 +8,7 @@ Read the brief at `briefPath` and write the backlog under `outputDir` using the 
 
 You never edit source, tests, UX, CI, ADRs, or configuration. Tickets are local artifacts.
 
-At the top of `backlog.md`, write exactly one billing indicator: `Billing impact: none`, `Billing impact: increase`, or `Billing impact: unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. If billing increases or is unknown, add a `## Billing impact` section with an `Estimate` line, drivers, assumptions and confidence. If it does not increase, use `none` and do not add the section.
+At the top of `backlog.md`, write exactly one billing indicator: `Billing impact: none`, `Billing impact: increase`, or `Billing impact: unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. If billing increases or is unknown, add a `## Billing impact` section with an `Estimate` line such as `- **Estimate:** USD 0.02-0.05 per run`, drivers, assumptions and confidence. If it does not increase, use `none` and do not add the section.
 
 ## PHASE 1: Research (MANDATORY)
 Before writing a single line of the backlog, research the topic.
@@ -58,7 +58,7 @@ Repeat the structure for Task 2, Task 3, and so on, numbering their subtasks as 
 
 ## 3. Golden Rules for a Backlog
 * Each main task must be a clearly understandable block.
-* Only when the billing indicator is `increase` or `unknown`, add a `## Billing impact` section with an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence. Include product runtime and CI/testing costs.
+* Only when the billing indicator is `increase` or `unknown`, add a `## Billing impact` section with an `Estimate` line such as `- **Estimate:** USD 0.02-0.05 per run`, one-time and recurring costs, drivers, assumptions and confidence. Include product runtime and CI/testing costs.
 * Each subtask must be an atomic and concrete action, for example "Create X interface", not "Implement X".
 * **MANDATORY:** Every task and subtask must include one or more links to the official documentation of the external APIs or third-party services involved. If a task does not use any external service, explicitly state "N/A - Internal logic only".
 * If a task depends on another, indicate it explicitly.

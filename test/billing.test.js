@@ -39,6 +39,13 @@ test('requires an estimate section for increase and unknown', () => {
   )
 })
 
+test('accepts a bold estimate line without a bullet', () => {
+  const text = ['Billing impact: increase', '', '# Backlog', '', '## Billing impact', '**Estimate:** USD 0.02 per run'].join('\n')
+  const report = validateBillingText(text, { file: 'bold.md' })
+  assert.equal(report.billing, 'increase')
+  assert.equal(report.estimate, 'USD 0.02 per run')
+})
+
 test('accepts a document indicator and an Unknown estimate', () => {
   const text = ['Billing impact: unknown', '', '# Finding', '', '## Billing impact', '- **Estimate:** Unknown'].join('\n')
   const report = validateBillingText(text, { file: 'finding.md' })

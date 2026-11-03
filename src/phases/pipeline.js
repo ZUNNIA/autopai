@@ -28,6 +28,15 @@ export async function runPrepare({ config, stateStore, options, log }) {
   const recovered = await recoverPrepareReview({ config, stateStore, log, feature })
   if (recovered) {
     const backlogFiles = await listMarkdown(backlogDir)
+    let billingReports
+    try {
+      billingReports = await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
+    } catch (error) {
+      recovered.phase = 'backlog'
+      recovered.completedPhases = (recovered.completedPhases ?? []).filter(phase => !['prepare', 'backlog'].includes(phase))
+      await stateStore.save(recovered)
+      throw error
+    }
     await log?.(`Backlog ready for review at ${backlogDir}.`)
     return {
       feature,
@@ -36,7 +45,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
       phase: 'awaiting_approval',
       sessions: recovered.sessions ?? [],
       plannerMessages: [],
-      billingReports: [],
+      billingReports,
       recovered: true
     }
   }
@@ -98,12 +107,15 @@ export async function runPrepare({ config, stateStore, options, log }) {
     throw new Error('The planner could not generate the backlog.')
   }
 
-  state.phase = 'awaiting_approval'
-  state.completedPhases = [...new Set([...state.completedPhases, 'prepare', 'backlog'])]
+  state.phase = 'backlog'
   await stateStore.save(state)
 
   const backlogFiles = await listMarkdown(backlogDir)
   const billingReports = await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
+
+  state.phase = 'awaiting_approval'
+  state.completedPhases = [...new Set([...state.completedPhases, 'prepare', 'backlog'])]
+  await stateStore.save(state)
   await log?.(`Backlog ready for review at ${backlogDir}.`)
   return {
     feature,
@@ -122,6 +134,7 @@ export async function runApprove({ config, stateStore, options, log }) {
   const feature = await resolveFeature({ config, options, state: previous, dirs: [config.ticketDirs.backlog] })
   const backlogDir = path.join(config.repoPath, config.ticketDirs.backlog, feature)
   if (!await exists(backlogDir)) throw new Error(`No backlog found for feature ${feature}. Run prepare first.`)
+  await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
 
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
   await ensureDir(readyDir)
