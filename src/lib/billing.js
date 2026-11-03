@@ -20,7 +20,7 @@ export function hasBillingSection(text) {
 }
 
 export function readBillingEstimate(text) {
-  const match = String(text ?? '').match(/^\s*[-*]\s+(?:\*\*)?Estimate:(?:\*\*)?\s*(.+?)\s*$/im)
+  const match = String(text ?? '').match(/^\s*(?:[-*]\s+)?(?:\*\*)?Estimate:(?:\*\*)?\s*(.+?)\s*$/im)
   return match ? match[1].trim() : null
 }
 
@@ -43,7 +43,7 @@ export function validateBillingText(text, { file = '<memory>' } = {}) {
   }
   const estimate = readBillingEstimate(text)
   if (!estimate) {
-    throw new Error(`${file}: the Billing impact section must include an Estimate line.`)
+    throw new Error(`${file}: the Billing impact section must include an Estimate line, such as "- **Estimate:** ...".`)
   }
   return { file, billing, estimate }
 }
