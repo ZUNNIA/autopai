@@ -79,7 +79,7 @@ What parts of the application consume or depend on the defective code.
 Related issues, previous pull requests, and resources. Never reference a ticket file or an ADR number from code snippets.
 
 ## 5. Billing impact
-Set the top-of-document `Billing impact:` line to `none`, `increase`, or `unknown`. When it is `increase` or `unknown`, add a `## Billing impact` section with an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence, using the payload `billingCurrency`. Cover product runtime and CI/testing costs. When it does not increase, use `none` and omit the section.
+Set the top-of-document `Billing impact:` line to `none`, `increase`, or `unknown`. When it is `increase` or `unknown`, add the numbered `## 5. Billing impact` section shown above with an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence, using the payload `billingCurrency`. Cover product runtime and CI/testing costs. When it does not increase, use `none` and omit the section.
 
 ## GOLDEN RULES (NON-NEGOTIABLE)
 1. **ZERO SOLUTIONS:** never propose refactors, new architectures, or complete solutions. Only the finding is documented.

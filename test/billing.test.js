@@ -46,6 +46,15 @@ test('accepts a bold estimate line without a bullet', () => {
   assert.equal(report.estimate, 'USD 0.02 per run')
 })
 
+test('accepts the numbered billing sections used by generated tickets', () => {
+  for (const heading of ['## Billing impact', '## 5. Billing impact', '## 6. Billing impact', '## 7. Billing impact']) {
+    const text = ['Billing impact: unknown', '', '# Ticket', '', heading, '**Estimate:** Unknown'].join('\n')
+    const report = validateBillingText(text, { file: 'ticket.md' })
+    assert.equal(report.billing, 'unknown')
+    assert.equal(report.estimate, 'Unknown')
+  }
+})
+
 test('accepts a document indicator and an Unknown estimate', () => {
   const text = ['Billing impact: unknown', '', '# Finding', '', '## Billing impact', '- **Estimate:** Unknown'].join('\n')
   const report = validateBillingText(text, { file: 'finding.md' })

@@ -62,6 +62,6 @@ The technical change needed to fix the QA failure, including interfaces, functio
 Exact QA steps to repeat after the fix, with expected results. Write "None" only when automated tests fully cover the behavior.
 
 ## 6. Billing impact
-Set front-matter `billing` to `none`, `increase`, or `unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. Add this section only when billing is `increase` or `unknown`; it must include an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence. If billing does not increase, use `none` and omit this section. When billing is `increase` or `unknown`, include one line with the estimate and confidence in your final message.
+Set front-matter `billing` to `none`, `increase`, or `unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. Add the numbered `## 6. Billing impact` section shown above only when billing is `increase` or `unknown`; it must include an `Estimate` line, one-time and recurring costs, drivers, assumptions and confidence. If billing does not increase, use `none` and omit this section. When billing is `increase` or `unknown`, include one line with the estimate and confidence in your final message.
 
 Save each ticket in English under `outputDir` using a numbered kebab-case file name.

@@ -16,7 +16,7 @@ export function readBillingIndicator(text) {
 }
 
 export function hasBillingSection(text) {
-  return /^##\s+Billing impact\s*$/im.test(String(text ?? ''))
+  return /^##\s+(?:\d+\.\s+)?Billing impact\s*$/im.test(String(text ?? ''))
 }
 
 export function readBillingEstimate(text) {
@@ -39,7 +39,7 @@ export function validateBillingText(text, { file = '<memory>' } = {}) {
   if (billing === 'none') return { file, billing, estimate: null }
 
   if (!hasBillingSection(text)) {
-    throw new Error(`${file}: billing is ${billing}, so a ## Billing impact section with an Estimate is required.`)
+    throw new Error(`${file}: billing is ${billing}, so a Billing impact section ("## Billing impact" or "## 7. Billing impact") with an Estimate is required.`)
   }
   const estimate = readBillingEstimate(text)
   if (!estimate) {
