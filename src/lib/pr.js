@@ -145,6 +145,33 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
   return { ...blocker, file }
 }
 
+async function writeCiWorkflowBlocker({ config, state, stateStore, executorPayload, run }) {
+  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
+  const dir = path.join(config.stateDir, 'needs-human')
+  await ensureDir(dir)
+  const file = path.join(dir, `${stamp}-ci-workflow-invalid.json`)
+  const workflow = run.workflowName ?? run.name ?? 'workflow'
+  const blocker = {
+    ticketId: executorPayload?.ticketId ?? null,
+    ticketFile: executorPayload?.ticketFile ?? null,
+    failedChecks: config.requiredChecks ?? [],
+    reason: `GitHub Actions workflow "${workflow}" failed before creating any jobs. The workflow file is invalid or cannot start.`,
+    files: run.url ? [run.url] : [],
+    run: {
+      id: run.databaseId ?? null,
+      workflow,
+      conclusion: run.conclusion ?? null,
+      url: run.url ?? null
+    },
+    decision: 'A human must fix the workflow file or its trigger. Do not change application source for this failure and do not ignore the required checks.',
+    suggestedAction: `Open ${run.url ?? 'the failed workflow run'}, fix the workflow configuration, push, and run autopai resume without --fix.`
+  }
+  await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
+  state.blockers = [...(state.blockers ?? []), file]
+  await stateStore.save(state)
+  return { ...blocker, file }
+}
+
 async function writeCiInfrastructureBlocker({ config, state, stateStore, executorPayload, checks, annotations }) {
   const failed = checks.filter(check => FAILED_STATES.has(check.state))
   const links = failed.map(check => check.link).filter(Boolean)
@@ -299,6 +326,22 @@ export async function pushOpenWaitMerge({
 
   let checks = await waitForChecks({ config, artifacts, prNumber: pr.number })
   await log?.(`CI checks: ${checks.ok ? 'passed' : checks.reason}`)
+
+  if (!checks.ok && checks.checks.length === 0) {
+    const headSha = await git.revParse(config.repoPath, branch)
+    const failedRun = await github.failedWorkflowRun(config.repoPath, headSha)
+    if (failedRun) {
+      const blocker = await writeCiWorkflowBlocker({
+        config,
+        state,
+        stateStore,
+        executorPayload,
+        run: failedRun
+      })
+      await log?.(`CI workflow failed without jobs: ${blocker.reason}`)
+      throw new Error(blockerMessage([blocker]))
+    }
+  }
 
   let attempt = 0
   let noLogReruns = 0

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRunIdFromLink, classifyCheckAnnotations, formatCheckAnnotations } from '../src/lib/ci-failure.js'
+import { checkRunIdFromLink, classifyCheckAnnotations, formatCheckAnnotations, isWorkflowRunWithoutJobs } from '../src/lib/ci-failure.js'
 import { collectFailureLogs } from '../src/lib/pr.js'
 
 test('classifies GitHub Actions billing annotations before generic infrastructure', () => {
@@ -75,4 +75,12 @@ test('keeps code failures without annotations out of the infrastructure path', a
 
   assert.deepEqual(failure.infrastructure, [])
   assert.equal(failure.annotations[0].classification.kind, 'unknown')
+})
+
+test('recognizes a completed failed workflow with no jobs', () => {
+  assert.equal(isWorkflowRunWithoutJobs({ status: 'completed', conclusion: 'failure', jobs: [] }), true)
+  assert.equal(isWorkflowRunWithoutJobs({ status: 'completed', conclusion: 'startup_failure', jobs: [] }), true)
+  assert.equal(isWorkflowRunWithoutJobs({ status: 'in_progress', conclusion: null, jobs: [] }), false)
+  assert.equal(isWorkflowRunWithoutJobs({ status: 'completed', conclusion: 'success', jobs: [] }), false)
+  assert.equal(isWorkflowRunWithoutJobs({ status: 'completed', conclusion: 'failure', jobs: [{ id: 1 }] }), false)
 })
