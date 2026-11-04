@@ -1,5 +1,5 @@
 import { runCommand } from './runner.js'
-import { checkRunIdFromLink } from './ci-failure.js'
+import { checkRunIdFromLink, isWorkflowRunWithoutJobs } from './ci-failure.js'
 
 const repoNames = new Map()
 
@@ -115,6 +115,32 @@ export async function rerunFailedRun(repo, runId) {
     ok: result.code === 0,
     reason: result.code === 0 ? null : (result.stderr || result.stdout || 'gh run rerun failed').trim()
   }
+}
+
+export async function failedWorkflowRun(repo, sha) {
+  const list = await gh(repo, ['run', 'list', '--commit', String(sha), '--limit', '20', '--json', 'databaseId,name,workflowName,conclusion,status,url,headSha'], { allowFailure: true })
+  if (list.code !== 0) return null
+  let runs
+  try {
+    runs = parseJson(list.stdout, [])
+  } catch {
+    return null
+  }
+  for (const run of runs) {
+    if (run?.status !== 'completed') continue
+    if (!['failure', 'startup_failure', 'cancelled', 'timed_out'].includes(String(run.conclusion ?? ''))) continue
+    const view = await gh(repo, ['run', 'view', String(run.databaseId), '--json', 'jobs'], { allowFailure: true })
+    if (view.code !== 0) continue
+    let jobs = []
+    try {
+      jobs = parseJson(view.stdout, { jobs: [] }).jobs ?? []
+    } catch {
+      continue
+    }
+    const candidate = { ...run, jobs }
+    if (isWorkflowRunWithoutJobs(candidate)) return candidate
+  }
+  return null
 }
 
 export async function runView(repo, runId) {

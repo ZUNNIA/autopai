@@ -637,6 +637,7 @@ After the pull request exists, the orchestrator polls `gh pr checks` every `chec
 
 - A failed, cancelled, timed-out, or action-required check on a non-ignored check fails immediately.
 - Required checks must appear within 120 seconds and must finish in `SUCCESS`.
+- If no checks appear and a workflow run for the head SHA is already failed with zero jobs, the workflow itself is invalid: the run stops with a workflow-configuration blocker instead of a runner or billing diagnosis.
 - When no required checks are configured, every non-ignored check must finish in `SUCCESS`, `SKIPPED`, or `NEUTRAL`.
 - `ignoredChecks` are excluded from all of the above.
 
@@ -644,7 +645,7 @@ The reported checks are stored as `checks-latest.json` artifacts on every poll.
 
 ### 9.6 Fix loop
 
-On CI failure, the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. If no failure log is available, it reads the check annotations. A billing or spending-limit annotation writes `<timestamp>-ci-billing-unavailable.json`; a runner, permission, or not-started annotation writes `<timestamp>-ci-infrastructure-unavailable.json`. Both stop immediately with the exact checks and annotations, without re-runs or source changes. Otherwise, it re-runs the failed job up to twice; if the failure remains, it makes one automatic diagnosis attempt using the failed check names and links; the executor reproduces the check locally before changing code. When the attempt budget is exhausted, or the no-log diagnosis still fails, the run stops with a blocker that names the failed checks.
+Before the fix loop, a failed workflow run for the head SHA with zero jobs writes `<timestamp>-ci-workflow-invalid.json` and stops without a source attempt. Otherwise, on CI failure the orchestrator collects the failed logs (`ci-failure-<n>.log`, truncated for the prompt), sends them to the executor with the attempt number, re-validates policy, re-runs the local gates, pushes, and waits again. The loop runs up to `maxAttempts` times. If no failure log is available, it reads the check annotations. A billing or spending-limit annotation writes `<timestamp>-ci-billing-unavailable.json`; a runner, permission, or not-started annotation writes `<timestamp>-ci-infrastructure-unavailable.json`. Both stop immediately with the exact checks and annotations, without re-runs or source changes. Otherwise, it re-runs the failed job up to twice; if the failure remains, it makes one automatic diagnosis attempt using the failed check names and links; the executor reproduces the check locally before changing code. When the attempt budget is exhausted, or the no-log diagnosis still fails, the run stops with a blocker that names the failed checks.
 
 ### 9.7 Merge rules
 
@@ -851,6 +852,8 @@ A dev ticket needs a new pattern the repository has not decided yet.
 **`CI did not pass after <n> attempts.`** The fix budget is exhausted. Read the `ci-failure-<n>.log` artifacts, fix locally, push, and resume.
 
 **`<timestamp>-ci-billing-unavailable.json` or `<timestamp>-ci-infrastructure-unavailable.json`.** GitHub Actions did not start the job. The blocker contains the exact check and the GitHub annotation. Fix billing/spending or provide a runner; do not change source. Ignoring a real check is a separate, explicit protection removal. `requiredChecks: []` is not a bypass: every non-ignored check must pass, and only an exact `ignoredChecks` entry excludes one.
+
+**`<timestamp>-ci-workflow-invalid.json`.** The workflow run failed before creating any jobs, so the workflow file or trigger is invalid. Open the linked run, fix the YAML or trigger, push, and resume. Do not change application source or ignore the required checks.
 
 **`Executor failed with exit code <n>.`** Read the corresponding `executor-*.log` artifact. Common causes are missing build tools, a command timeout, or a blocker written under `needs-human/`.
 

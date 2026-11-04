@@ -56,3 +56,9 @@ export function checkRunIdFromLink(link) {
   const match = String(link ?? '').match(/\/job\/(\d+)/)
   return match ? match[1] : null
 }
+
+export function isWorkflowRunWithoutJobs(run) {
+  if (run?.status !== 'completed') return false
+  if (!['failure', 'startup_failure', 'cancelled', 'timed_out'].includes(String(run.conclusion ?? ''))) return false
+  return Array.isArray(run.jobs) && run.jobs.length === 0
+}
