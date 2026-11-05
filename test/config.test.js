@@ -140,3 +140,23 @@ test('defaults the audit chunk size and rejects invalid values', async () => {
   }), 'utf8')
   await assert.rejects(() => loadConfig(invalid), /auditChunkFiles/)
 })
+
+test('validates command runner options when loading configuration', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-command-'))
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'command',
+    baseBranch: 'main',
+    releaseBranch: 'main',
+    runnerOptions: { run: ['tool', 'run'], prompt: 'stdin' }
+  }), 'utf8')
+  const config = await loadConfig(repo)
+  assert.deepEqual(config.runnerOptions.run, ['tool', 'run'])
+
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'command',
+    baseBranch: 'main',
+    releaseBranch: 'main',
+    runnerOptions: { run: [] }
+  }), 'utf8')
+  await assert.rejects(() => loadConfig(repo), /non-empty array/)
+})

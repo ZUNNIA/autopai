@@ -2,6 +2,7 @@ import path from 'node:path'
 import { DEFAULT_TICKET_DIRS, DEFAULTS } from './config-schema.js'
 import { normalizePauseAfter } from './pauses.js'
 import { expandEnv, exists, readJson, assert } from './util.js'
+import { validateCommandRunnerOptions } from '../runners/command.js'
 
 /**
  * Loads and normalizes the per-repository AutopAI configuration.
@@ -35,6 +36,7 @@ export async function loadConfig(repoPath) {
   config.pauseAfter = normalizePauseAfter(config.pauseAfter)
 
   assert(typeof config.runner === 'string' && config.runner.trim() !== '', 'runner is required in autopai.json')
+  if (config.runner === 'command') validateCommandRunnerOptions(config.runnerOptions)
   assert(config.protectedPaths.every(item => typeof item === 'string'), 'protectedPaths must be an array of strings')
   assert(config.baseBranch, 'baseBranch is required')
   assert(config.releaseBranch, 'releaseBranch is required')

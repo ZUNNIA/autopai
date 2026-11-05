@@ -11,13 +11,18 @@ test('resolves a configured runner', async () => {
   assert.equal(typeof runner.runSession, 'function')
 })
 
+test('resolves the generic command runner', async () => {
+  const runner = await resolveRunner({ runner: 'command' })
+  assert.equal(typeof runner.runSession, 'function')
+})
+
 test('requires a configured runner', async () => {
   await assert.rejects(() => resolveRunner({}), /runner is required/)
 })
 
 test('rejects unknown runners', async () => {
   await assert.rejects(() => resolveRunner({ runner: 'unknown' }), /Unknown runner/)
-  assert.deepEqual(availableRunners(), ['opencode'])
+  assert.deepEqual(availableRunners(), ['opencode', 'command'])
 })
 
 test('builds OpenCode arguments with agent and model, without the prompt', () => {

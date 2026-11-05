@@ -41,7 +41,7 @@ The same workflow is available through slash commands or natural language. The o
 - Resumable phases: state lives in local files, and a crashed run resumes where it stopped.
 - Clean loops: after every merge it deletes the remote branch, fast-forwards the local base branch, and deletes the merged local branch.
 - Local artifacts: tickets, briefs, findings, and evidence never touch Git.
-- Any coding tool and any language: one runner module per tool, and no ecosystem detection.
+- Any coding tool and any language: the generic command runner covers most CLIs, with one module only for custom protocols, and no ecosystem detection.
 
 ## How it works
 
@@ -154,7 +154,7 @@ The identify filter reaches the auditor and the promotion, so non-matching findi
 
 - Node.js 20 or newer.
 - Git and GitHub CLI (`gh`) authenticated.
-- The CLI of at least one supported coding tool. The bundled platform targets OpenCode; adding another tool is documented in `spec/PLATFORMS.md`.
+- The CLI of at least one coding tool. The bundled platform targets OpenCode; the generic `command` runner configures other CLIs without new code. Both are documented in `spec/PLATFORMS.md`.
 
 ## Install
 
@@ -261,14 +261,14 @@ The commands accept natural language (`/autopai-identify audit the last 2 merged
 
 ## Migrating to another tool
 
-Installing this repository is not the same as using it with another coding tool. The kit ships one bundled platform. To run the orchestrator with another tool:
+Installing this repository is not the same as using it with another coding tool. The kit ships one bundled platform. For most tools:
 
-1. Add `src/runners/<tool>.js` exporting `runSession`.
-2. Register it in `src/runners/index.js`.
-3. Set `runner` in the target repository `autopai.json`.
-4. Recreate the agent roles and permissions under `platforms/<tool>/`.
+1. Set `runner: "command"` in `autopai.json`.
+2. Fill `runnerOptions.run`, and optionally `continue`, `list`, and `delete`.
+3. Choose `prompt: "stdin"`, `"file"`, or `"argument"`.
+4. Recreate the agent roles and permissions under `platforms/<tool>/` and set their names in `agents`.
 
-The core prompts, phases, state, policy, and merge logic do not change. Read `spec/PLATFORMS.md` and `BOOTSTRAP_PROMPT.md` for the details.
+Add `src/runners/<tool>.js` only when the CLI needs custom parsing or a protocol the command templates cannot express. The core prompts, phases, state, policy, and merge logic do not change. Read `spec/PLATFORMS.md` and `BOOTSTRAP_PROMPT.md` for the details.
 
 ## Troubleshooting
 

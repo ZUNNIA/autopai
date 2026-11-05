@@ -63,6 +63,23 @@ test('accepts a complete current configuration', async () => {
   assert.deepEqual(report.missing, [])
 })
 
+test('validates the command runner options', async () => {
+  const valid = await repoWith({
+    runner: 'command',
+    runnerOptions: { run: ['tool', 'run', '{prompt}'], prompt: 'argument' }
+  })
+  const validReport = await auditConfig(valid)
+  assert.equal(validReport.errors.some(item => item.field === 'runnerOptions'), false)
+
+  const invalid = await repoWith({
+    runner: 'command',
+    runnerOptions: { run: ['tool', '{missing}'] }
+  })
+  const invalidReport = await auditConfig(invalid)
+  assert.equal(invalidReport.ok, false)
+  assert.match(invalidReport.errors.find(item => item.field === 'runnerOptions').message, /unknown placeholder/)
+})
+
 test('reports missing defaults without failing', async () => {
   const repo = await repoWith({ runner: 'opencode' })
   const report = await auditConfig(repo)

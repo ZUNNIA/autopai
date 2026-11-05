@@ -156,6 +156,8 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 ### Runners
 
+- `src/runners/command.js`
+- `src/runners/common.js`
 - `src/runners/index.js`
 - `src/runners/opencode.js`
 
@@ -169,6 +171,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/ci-fix.test.js`
 - `test/cli.test.js`
 - `test/codefiles.test.js`
+- `test/command-runner.test.js`
 - `test/commit-message.test.js`
 - `test/config-audit.test.js`
 - `test/config.test.js`

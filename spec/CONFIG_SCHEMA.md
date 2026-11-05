@@ -4,8 +4,8 @@ The configuration file lives at the root of each target repository. It is create
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `runner` | string | Required. Session runner name. The installation provides the bundled `opencode` runner; add new runners under `src/runners/`. |
-| `runnerOptions` | object | Optional runner settings, such as extra environment variables. |
+| `runner` | string | Required. Session runner name. The installation provides `opencode` and the generic `command` runner; add a custom runner under `src/runners/` only for protocols the command templates cannot express. |
+| `runnerOptions` | object | Optional runner settings. The `command` runner uses `run`, `prompt`, `continue`, `list`, `delete`, `env`, and `keepSessions`; see the command runner section in `spec/PLATFORMS.md`. |
 | `protectedPaths` | string array | Repository-relative globs the executor must never modify. Defaults to `.github/**`, `AGENTS.md`, and `autopai.json`. |
 | `baseBranch` | string | Integration branch for feature pull requests. |
 | `releaseBranch` | string | Production branch for release pull requests. |
@@ -44,6 +44,21 @@ Commands are arrays of arguments, never shell strings. Example shape:
   "restoreCommand": ["dotnet", "restore", "Solution.sln"],
   "buildCommand": ["dotnet", "build", "Solution.sln", "-c", "Debug", "--no-restore"],
   "testCommand": ["dotnet", "test", "Solution.sln", "-c", "Debug", "--no-build"]
+}
+```
+
+The generic command runner uses argv templates and supports `stdin`, `file`, and `argument` prompt delivery:
+
+```json
+{
+  "runner": "command",
+  "runnerOptions": {
+    "run": ["my-tool", "run", "--agent", "{agent}", "--model", "{model}", "--title", "{title}"],
+    "prompt": "stdin",
+    "continue": ["my-tool", "run", "--session", "{sessionId}"],
+    "list": ["my-tool", "sessions", "--json"],
+    "delete": ["my-tool", "sessions", "delete", "{sessionId}"]
+  }
 }
 ```
 
