@@ -1,11 +1,12 @@
 const RUNNERS = {
-  opencode: () => import('./opencode.js')
+  opencode: () => import('./opencode.js'),
+  command: () => import('./command.js')
 }
 
 /**
- * Resolves the session runner declared in `autopai.json`. Adding support
- * for another coding tool means adding one module here and one entry to the
- * map; the core never imports a concrete runner.
+ * Resolves the session runner declared in `autopai.json`. The generic command
+ * runner covers most CLIs; a custom module is for protocols argv templates
+ * cannot express. The core never imports a concrete runner.
  */
 export async function resolveRunner(config) {
   const name = config.runner

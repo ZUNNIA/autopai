@@ -11,6 +11,7 @@
 - Pull request and merge bodies may contain any useful detail. Bullet points, numbered lists, and list markers are forbidden in all message bodies.
 - Merge commit subject is the pull request title. The body summarizes the actual change from the pull request summary or commit subjects. It never contains branch-into-base boilerplate, CI status, coverage, or ticket/ADR/issue references.
 - The default GitHub merge message is forbidden.
+- Every changed text file is scanned for ticket and ADR references regardless of language or extension. Binary files and files larger than 5 MiB are skipped.
 
 ## Billing reports
 

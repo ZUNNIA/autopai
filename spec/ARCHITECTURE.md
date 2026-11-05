@@ -6,7 +6,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 
 - The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `autopai.json` or from the repository itself.
 - Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
-- Session execution goes through `src/runners/`. Adding a coding tool means adding one runner module and one entry to the runner map.
+- Session execution goes through `src/runners/`. The generic `command` runner configures most coding tools; a custom runner module is needed only for protocols argv templates cannot express.
 - One session per phase or per ticket, except the retained brief and backlog review sessions. No long-running conversation carries the run or approves a gate; the review conversations only let the user edit the artifacts in place.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop at a human gate, identify debt, refactor, or release.
 - Human gates pause the assisted loop after `prepare`, `approve`, `dev`, `identify`, `promote`, or `refactor`. The `pauseAfter` configuration selects them; a pause is never an implicit approval.
@@ -63,5 +63,5 @@ The orchestrator validates branch names, commit subjects, added code, repository
 - Branch: `<type>/<kebab-case-slug>`, derived from the short semantic ticket name without the source PR or finding ordinal and capped at 32 characters.
 - Commit and pull request title: `<type>: <subject>` with no scope parentheses, source PR number, or finding ordinal.
 - Commit bodies contain two to four sentences that add information beyond the subject. Pull request and merge bodies may contain any useful detail. Bullet points, numbered lists, and list markers are forbidden in all message bodies.
-- No ticket paths, ADR numbers, or issue references in code, commits, branches, pull requests, or merges.
+- No ticket paths, ADR numbers, or issue references in code, commits, branches, pull requests, or merges. Every changed text file is scanned regardless of language; binary files and files larger than 5 MiB are skipped.
 - Issue-style references are checked in commit and pull request text only, because color literals such as `#0AFFFFFF` are valid in styles.

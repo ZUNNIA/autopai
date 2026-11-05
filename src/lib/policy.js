@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-const CODE_EXTENSIONS = /\.(cs|py|ts|tsx|js|jsx|rs|go|java|kt|cpp|cc|h|hpp|axaml|xaml)$/i
+const MAX_POLICY_FILE_BYTES = 5 * 1024 * 1024
 const TYPES = 'feat|fix|refactor|perf|test|docs|chore'
 const SUBJECT_RE = new RegExp(`^(${TYPES}): [^\\s].+$`)
 const SCOPED_RE = new RegExp(`^(${TYPES})\\([^)]*\\):`)
@@ -163,19 +163,36 @@ export function formatViolations(violations) {
   }).join('\n')
 }
 
+function decodePolicyText(buffer) {
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    return buffer.subarray(2).toString('utf16le')
+  }
+  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const swapped = Buffer.from(buffer.subarray(2))
+    swapped.swap16()
+    return swapped.toString('utf16le')
+  }
+  if (buffer.includes(0)) return null
+  return buffer.toString('utf8')
+}
+
 /**
- * Scans the current content of the changed code files. The Git artifact policy
+ * Scans the current content of every changed text file. The Git artifact policy
  * forbids ticket and ADR references in code even when they predate the branch,
- * so fixing the files the branch already touches is part of adoption.
+ * so fixing the files the branch already touches is part of adoption. Binary
+ * files and files larger than the safety limit are skipped.
  */
 export async function scanRepositoryFiles(repoPath, files) {
   const violations = []
   for (const file of files ?? []) {
-    if (!CODE_EXTENSIONS.test(file)) continue
     const full = path.join(repoPath, file)
     let text
     try {
-      text = await fs.readFile(full, 'utf8')
+      const stat = await fs.stat(full)
+      if (!stat.isFile() || stat.size > MAX_POLICY_FILE_BYTES) continue
+      const buffer = await fs.readFile(full)
+      text = decodePolicyText(buffer)
+      if (text == null) continue
     } catch {
       continue
     }

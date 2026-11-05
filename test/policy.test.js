@@ -1,11 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import {
   validateBranchName,
   validateCommitMessage,
   validatePrBody,
   validatePrTitle,
-  scanAddedLines
+  scanAddedLines,
+  scanRepositoryFiles
 } from '../src/lib/policy.js'
 
 test('accepts a conventional branch name', () => {
@@ -61,4 +65,14 @@ test('does not flag hexadecimal colors as issue references', () => {
     '+<Setter Property="Background" Value="#0AFFFFFF"/>'
   ].join('\n')
   assert.equal(scanAddedLines(diff).length, 0)
+})
+
+test('scans changed text files regardless of extension and skips binaries', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-policy-'))
+  await fs.writeFile(path.join(dir, 'script.lua'), '-- see tickets/ready-for-dev/001-thing.md\n', 'utf8')
+  await fs.writeFile(path.join(dir, 'README.md'), 'ADR-029 is local.\n', 'utf8')
+  await fs.writeFile(path.join(dir, 'image.bin'), Buffer.from([0, 1, 2, 3]))
+  await fs.writeFile(path.join(dir, 'utf16.md'), Buffer.from('\uFEFFADR-030\n', 'utf16le'))
+  const violations = await scanRepositoryFiles(dir, ['script.lua', 'README.md', 'utf16.md', 'image.bin'])
+  assert.deepEqual(violations.map(item => item.code), ['file-ticket-ref', 'file-adr-ref', 'file-adr-ref'])
 })

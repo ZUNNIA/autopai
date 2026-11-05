@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { availableRunners } from '../runners/index.js'
+import { validateCommandRunnerOptions } from '../runners/command.js'
 import { GATES } from './pauses.js'
 import {
   AGENT_KEYS,
@@ -106,6 +107,7 @@ export async function auditConfig(repoPath) {
   if (hasOwn(raw, 'ticketDirs')) auditTicketDirs(report, raw.ticketDirs)
   if (hasOwn(raw, 'stateDir')) auditStateDir(report, raw.stateDir)
   auditCheckOverlap(report, raw.requiredChecks, raw.ignoredChecks)
+  if (raw.runner === 'command') auditCommandRunnerOptions(report, hasOwn(raw, 'runnerOptions') ? raw.runnerOptions : {})
   return finish(report)
 }
 
@@ -261,6 +263,14 @@ function auditRunnerOptions(report, value) {
     return
   }
   auditSecretKeys(report, 'runnerOptions', value)
+}
+
+function auditCommandRunnerOptions(report, value) {
+  try {
+    validateCommandRunnerOptions(value)
+  } catch (error) {
+    addError(report, 'invalid-command-runner', 'runnerOptions', error.message)
+  }
 }
 
 function auditSecretKeys(report, prefix, value) {

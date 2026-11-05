@@ -67,7 +67,7 @@ flowchart LR
 
 **Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. The brief and backlog sessions are retained after their runs so the user can request changes in place; no long-running conversation carries the run or approves a gate.
 
-**Runner.** The adapter between the orchestrator and the coding tool CLI. The bundled runner is `opencode`. Adding a tool means adding one runner module, never touching the core.
+**Runner.** The adapter between the orchestrator and the coding tool CLI. The bundled runner is `opencode`; the generic `command` runner configures most other tools through `runnerOptions` without a new module. Adding a custom tool module is only needed for protocols the command runner cannot express.
 
 **Platform.** The agent, permission, and command files for a specific coding tool. The bundled platform lives under `platforms/opencode/` and is installed into the tool's global configuration.
 
@@ -384,9 +384,9 @@ The branch name comes from the ticket type and the short semantic ticket slug, f
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `runner` | string | required | Session runner name. The bundled runner is `opencode`. |
+| `runner` | string | required | Session runner name. The bundled runners are `opencode` and `command`. |
 | `billingCurrency` | string | `USD` | Three-letter ISO 4217 currency used by generated billing estimates. |
-| `runnerOptions` | object | `{}` | Runner settings. The OpenCode runner reads `env` for extra environment variables and `keepSessions` to retain the tool sessions after each run. |
+| `runnerOptions` | object | `{}` | Runner settings. `opencode` reads `env` and `keepSessions`; `command` reads `run`, `prompt`, `continue`, `list`, `delete`, `env`, and `keepSessions`. |
 | `protectedPaths` | string array | `.github/**`, `AGENTS.md`, `autopai.json` | Repository-relative globs the executor must never modify. |
 | `baseBranch` | string | `main` | Integration branch for feature pull requests. |
 | `releaseBranch` | string | `main` | Production branch for release pull requests. |
@@ -622,7 +622,7 @@ Before any push and before any merge, the orchestrator validates:
 - **Branch name.** `<type>/<kebab-case-slug>` with allowed types, at most 32 characters. The slug is the short semantic ticket name without the source PR number or finding ordinal, truncated at whole words. No numeric segments that look like ticket identifiers, no `ticket` or `#` references, no ADR references.
 - **Commit subjects and bodies.** `<type>: <subject>` from the short semantic ticket slug, no scope parentheses, no source PR number, no ticket paths, no `TICKET-123`, no `ADR-000`, no `#123` issue references, no GitHub default merge subject. A commit body must contain two to four sentences that add information beyond the subject; bullet points, numbered lists, and list markers are forbidden.
 - **Added code lines.** No ticket paths, no ADR references. Issue-style `#123` is only checked in commit and pull request text because color literals such as `#0AFFFFFF` are valid in styles.
-- **Repository files.** Changed code files are scanned again in full, so references that predate the branch are caught when the branch touches the file.
+- **Repository files.** Every changed text file is scanned in full, regardless of language or extension, so references that predate the branch are caught when the branch touches the file. Binary files and files larger than 5 MiB are skipped.
 - **Pull request title and body.** Same subject rules, no references of any kind, and no bullet or numbered lists.
 
 When violations appear during a push, the orchestrator asks the executor for a focused `policy-fix` session and re-verifies. If violations remain, the run stops.
@@ -670,13 +670,17 @@ Before the fix loop, a failed workflow run for the head SHA with zero jobs write
 
 ## 11. Extending AutopAI
 
-### 11.1 Adding a coding tool runner
+### 11.1 Adding a coding tool
 
-1. Create `src/runners/<name>.js` exporting `runSession({ config, agent, promptText, title, logFile, role })`.
-2. Register the module in the runner map at `src/runners/index.js`.
-3. Set `"runner": "<name>"` in every repository that uses it.
+Prefer the generic `command` runner:
 
-Keep the prompt text passed in by the orchestrator. The runner only maps the call to the tool CLI and handles timeout, logging, and environment.
+1. Inspect the tool's non-interactive CLI and its working-directory, model, and approval flags.
+2. Set `"runner": "command"` in `autopai.json`.
+3. Fill `runnerOptions.run`, and optionally `continue`, `list`, and `delete`.
+4. Choose `prompt: "stdin"`, `"file"`, or `"argument"`. Use `{promptFile}` or `{prompt}` when required.
+5. Recreate the four roles and permissions under `platforms/<tool>/` and set their names in `agents`.
+
+Create `src/runners/<name>.js` exporting `runSession({ config, agent, promptText, title, logFile, role })` only when the CLI needs custom parsing or a protocol the command templates cannot express, then register it in `src/runners/index.js`. Keep the prompt text passed in by the orchestrator. The runner only maps the call to the tool CLI and handles timeout, logging, and environment.
 
 ### 11.2 Adding a platform
 
