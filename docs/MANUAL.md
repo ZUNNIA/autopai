@@ -114,7 +114,7 @@ The prompts that drive each session are owned by the core and live in `src/promp
 - `dev`: implement one ready-for-dev ticket.
 - `refactor`: implement one ready-for-refactor ticket with the same discipline.
 
-**Permissions (bundled platform).** The executor may edit any file except protected paths, run any command except `git push`, `git merge`, `git rebase`, `git reset --hard`, `gh`, and destructive delete commands. It cannot ask questions, run tasks, or touch files outside the repository.
+**Permissions (bundled platform).** The executor may edit any file except protected paths and may run build and test commands. It cannot run `autopai` or `opencode`, push, fetch, pull, merge, rebase, force-push, change branches, run `gh`, or write and delete files through the shell. It cannot ask questions, run tasks, or touch files outside the repository.
 
 **Commits.** The executor stages only the files it changed and commits with the exact `commitSubject` from the payload, no scope parentheses, and no source PR number, ticket, ADR, or issue references. The subject comes from the short semantic ticket slug. A commit body must contain two to four sentences, never bullet points, numbered lists, or list markers. It must add information beyond the subject and never repeat or paraphrase it. The orchestrator removes a body that merely restates the subject from the latest local commit.
 
@@ -150,9 +150,9 @@ The prompts that drive each session are owned by the core and live in `src/promp
 
 **Feature discussions.** A feature idea starts a conversation, not a `prepare` run. The operator discusses the problem, scope, non-goals, providers and models, parameters, persistence, UX and acceptance criteria, proposes a short feature name, and writes nothing. It generates the brief and backlog only after an explicit request or confirmation. A wish to implement the feature is not, by itself, an explicit request to generate; when the intent is unclear, the operator asks. Open questions stay in the conversation and are never written into the brief, backlog, or UX proposal. `/autopai-plan` is the same command for both stages: it discusses first and generates after the confirmation. After generation, the brief and backlog sessions remain open. A change request is applied by the operator with `autopai revise`, which continues the retained backlog session; it never re-runs `prepare`, reloads a core prompt, or asks the user to paste the change. The agent never infers approval from the original idea and never approves the backlog. The retained sessions are deleted only after a successful backlog approval.
 
-**Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source.
+**Permissions.** The operator agent edits only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`). It can run `autopai`, `git`, and `gh` commands, but it never edits source and cannot access files outside the repository.
 
-**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, and `/autopai-run`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes and `autopai qa-fix --message <failure>` for a failed QA review; they are not slash commands. `/autopai-adr` records or updates a decision only; it runs `autopai status` after writing, reports the current phase, gate, blockers, and failures, and never approves a gate or starts a phase. `/autopai-init` is the other exception: it does not call the operational CLI; the operator agent reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
+**Manual commands.** The platform commands (`/autopai-plan`, `/autopai-dev`, `/autopai-identify`, `/autopai-promote`, `/autopai-refactor`, `/autopai-release`, `/autopai-adopt`, `/autopai-adr`, `/autopai-init`, `/autopai-status`, `/autopai-resume`, `/autopai-run`, `/autopai-qa-fix`, `/autopai-resolve-conflicts`, `/autopai-diagnostics`, and `/autopai-abort`) run through the operator agent (`autopai`). They are convenience wrappers: each one calls the CLI with fixed arguments, and they also accept natural language, which the operator agent translates into flags. The operator also runs the internal `autopai revise --message <change>` command for review changes. `/autopai-adr` records or updates a decision only; it runs `autopai status` after writing, reports the current phase, gate, blockers, and failures, and never approves a gate or starts a phase. `/autopai-init` is the other exception: it does not call the operational CLI; the operator agent reconciles `autopai.json` directly, using `autopai status` only to validate. The other commands share the same CLI entry point.
 
 The operator does not force the selected command. If the request belongs to another phase (for example, "resolve the technical debt" under release), it stops and names the correct command; it never bumps a version for a non-release request.
 
@@ -515,6 +515,8 @@ Commands are argument arrays, never shell strings, so no shell quoting or inject
 
 ```
 autopai help
+autopai --help
+autopai --version
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
 autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
 autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
@@ -609,7 +611,7 @@ tickets/.autopai/
 
 ### 9.1 Executor restrictions
 
-The executor can edit source and tests and can commit. It cannot push, fetch new branches, merge, rebase, force-push, run `gh`, or delete files destructively. It cannot edit tickets, ADRs, `.github/**`, `AGENTS.md`, `opencode.json*`, or `autopai.json`. The orchestrator re-verifies the diff before every push regardless of what the agent reported.
+The executor can edit source and tests and can commit. It cannot push, fetch, pull, merge, rebase, force-push, change branches, run `gh`, or run `autopai`/`opencode`. It cannot write or delete files through the shell and cannot edit tickets, ADRs, `.github/**`, `AGENTS.md`, `opencode.json*`, or `autopai.json`. The orchestrator re-verifies the diff before every push regardless of what the agent reported.
 
 ### 9.2 Protected paths
 

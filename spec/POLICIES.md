@@ -36,7 +36,7 @@
 
 ## Permissions
 
-- **executor**: may edit source and tests, commit, run build and tests. It may not push, merge, rebase, force-push, or run `gh`.
+- **executor**: may edit source and tests, commit, run build and tests. It may not push, fetch, pull, merge, rebase, force-push, change branches, run `gh`, or run `autopai`/`opencode`. It never writes or deletes files through the shell; file changes use the edit tool.
 - **planner**: may write only under the configured backlog, ready-for-dev, and ready-for-refactor directories. Read-only over source.
 - **auditor**: may write only under the configured identified and UX directories. Read-only over source and UX.
 - **operator** (agent `autopai`): may edit only `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`).

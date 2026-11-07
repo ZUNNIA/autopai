@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseCliArgs } from './lib/util.js'
 import { loadConfig } from './lib/config.js'
@@ -24,7 +25,12 @@ async function main() {
   const repoPath = path.resolve(String(options.repo ?? process.cwd()))
   const log = message => process.stdout.write(`${message}\n`)
 
-  if (command === 'help' || options.help) return printHelp()
+  if (command === 'help' || command === '--help' || command === '-h' || options.help) return printHelp()
+  if (command === '--version' || command === '-v') {
+    const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    process.stdout.write(`${pkg.version}\n`)
+    return
+  }
   if (command === 'config') return runConfigCommand(repoPath, options)
 
   const config = await loadConfig(repoPath)

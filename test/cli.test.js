@@ -35,6 +35,15 @@ test('prints help including the config audit and revise command', () => {
   assert.match(output, /autopai diagnostics --repo <path>/)
 })
 
+test('supports --help and --version aliases', () => {
+  const help = execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' })
+  assert.match(help, /autopai adopt --repo/)
+  const shortHelp = execFileSync(process.execPath, [cli, '-h'], { encoding: 'utf8' })
+  assert.match(shortHelp, /autopai status --repo/)
+  const version = execFileSync(process.execPath, [cli, '--version'], { encoding: 'utf8' }).trim()
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+})
+
 test('runs config check through the CLI without loading a runtime config', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-config-cli-'))
   await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({ runner: 'opencode' }), 'utf8')

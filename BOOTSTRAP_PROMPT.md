@@ -79,14 +79,19 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `platforms/opencode/agents/autopai.md`
 - `platforms/opencode/agents/executor.md`
 - `platforms/opencode/agents/planner.md`
+- `platforms/opencode/commands/autopai-abort.md`
 - `platforms/opencode/commands/autopai-adopt.md`
 - `platforms/opencode/commands/autopai-adr.md`
 - `platforms/opencode/commands/autopai-dev.md`
+- `platforms/opencode/commands/autopai-diagnostics.md`
 - `platforms/opencode/commands/autopai-identify.md`
 - `platforms/opencode/commands/autopai-init.md`
 - `platforms/opencode/commands/autopai-plan.md`
+- `platforms/opencode/commands/autopai-promote.md`
+- `platforms/opencode/commands/autopai-qa-fix.md`
 - `platforms/opencode/commands/autopai-refactor.md`
 - `platforms/opencode/commands/autopai-release.md`
+- `platforms/opencode/commands/autopai-resolve-conflicts.md`
 - `platforms/opencode/commands/autopai-resume.md`
 - `platforms/opencode/commands/autopai-run.md`
 - `platforms/opencode/commands/autopai-status.md`
@@ -183,6 +188,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/gates.test.js`
 - `test/git.test.js`
 - `test/pauses.test.js`
+- `test/platform-commands.test.js`
 - `test/platform-permissions.test.js`
 - `test/platform-plan-flow.test.js`
 - `test/policy.test.js`

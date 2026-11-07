@@ -109,16 +109,19 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Revise a pending brief or backlog | Operator runs `autopai revise` | Ask for the change; the operator applies it in the retained backlog session. |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
+| Adopt an existing branch | `/autopai-adopt` | "finish this branch and take it through CI" |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
-| Fix failed QA | Operator runs `autopai qa-fix` | Report the failed QA item; the operator creates fix tickets and restarts dev. |
+| Fix failed QA | `/autopai-qa-fix "<failure>"` | Report the failed QA item; the operator creates fix tickets and restarts dev. |
 | Audit filtered debt | `/autopai-identify "only urgent code smells"` | "identify only urgent code smells" |
+| Promote findings | `/autopai-promote` | "turn the findings into refactor tickets" |
 | Refactor | `/autopai-refactor` | "refactor the pending tickets" |
 | Refactor filtered debt | `/autopai-refactor "only minor missing documentation"` | "resolve only minor missing documentation" |
 | Repair repairable gate failures | `/autopai-resume --fix` | "fix the gate failures and continue" |
-| Resolve a PR conflict | `autopai resolve-conflicts --pr <n>` | "resolve the conflicts in this pull request" |
-| Audit build diagnostics | `autopai diagnostics` | "show compiler errors and warnings" |
-| Fix build diagnostics | `autopai diagnostics --severity error,warning --fix` | "fix the compiler warnings and errors" |
+| Resolve a PR conflict | `/autopai-resolve-conflicts <n>` | "resolve the conflicts in this pull request" |
+| Audit build diagnostics | `/autopai-diagnostics` | "show compiler errors and warnings" |
+| Fix build diagnostics | `/autopai-diagnostics --fix` | "fix the compiler warnings and errors" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
+| Abort the run | `/autopai-abort` | "stop the current run" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
 The operator agent translates the request and confirms ambiguous interpretations; it works in any language. Explicit flags run verbatim; the CLI underneath is deterministic. If a request does not match the command you opened, the operator stops and points to the right phase. A release never resolves technical debt.
@@ -247,7 +250,7 @@ The commands accept natural language (`/autopai-identify audit the last 2 merged
 - Branch names are `<type>/<kebab-case-slug>`. Commit subjects and pull request titles are `<type>: <subject>` with no scope parentheses. The slug is the short semantic ticket name without a source PR number or finding ordinal, and the complete branch is capped at 32 characters.
 - Commit bodies contain two to four sentences that add information beyond the subject. Pull request and merge bodies may contain any useful detail. Bullet points, numbered lists, and list markers are forbidden in all message bodies.
 - No ADR numbers or issue references in code, branches, commits, pull requests, or merges.
-- The executor may commit but never push, merge, rebase, or force-push. The orchestrator owns those operations and merges only after the required checks pass.
+- The executor may commit but never push, fetch, pull, merge, rebase, force-push, change branches, run `gh`, or run `autopai`/`opencode`. It never writes or deletes files through the shell. The orchestrator owns those operations and merges only after the required checks pass.
 - Tests may be changed freely. The CI build, test suite, and coverage threshold are the quality gates.
 - No diagnostic reports. Audit evidence stays local.
 - Generated artifacts are written in English. No language detection.
