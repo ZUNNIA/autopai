@@ -17,7 +17,7 @@ For each main task, or complex subtask, in the backlog, generate an independent 
 **OUTPUT INSTRUCTION:** Create one Markdown file per ticket in English under `outputDir`, or by default in `tickets/ready-for-dev/[feature]/[number-of-ticket]-[ticket-name].md`.
 
 ## Front Matter (MANDATORY)
-Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git:
+Every ticket starts with this front matter so the orchestrator can order tickets without ticket identifiers in Git. The Core validates every required field, the ticket type, the priority, the required sections, the Manual Verification section, and billing; invalid output fails the phase.
 
 ```yaml
 ---

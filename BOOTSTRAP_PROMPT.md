@@ -103,6 +103,9 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 ### Core libraries
 
+- `src/lib/adr.js`
+- `src/lib/artifact-check.js`
+- `src/lib/artifact-contracts.js`
 - `src/lib/artifacts.js`
 - `src/lib/billing.js`
 - `src/lib/blockers.js`
@@ -111,6 +114,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/codefiles.js`
 - `src/lib/commit-message.js`
 - `src/lib/config-audit.js`
+- `src/lib/config-reconcile.js`
 - `src/lib/config-schema.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
@@ -122,11 +126,13 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/git.js`
 - `src/lib/github.js`
 - `src/lib/pauses.js`
+- `src/lib/plan.js`
 - `src/lib/policy.js`
 - `src/lib/pr.js`
 - `src/lib/prepare-review.js`
 - `src/lib/promotion.js`
 - `src/lib/prompts.js`
+- `src/lib/release.js`
 - `src/lib/resume.js`
 - `src/lib/runner.js`
 - `src/lib/session-retry.js`
@@ -156,7 +162,6 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/qa-fix.md`
 - `src/prompts/ready-for-dev.md`
 - `src/prompts/ready-for-refactor.md`
-- `src/prompts/release.md`
 - `src/prompts/resolve-conflicts.md`
 
 ### Runners
@@ -168,6 +173,9 @@ Copy every file below from the repository. Do not rewrite the contents.
 
 ### Tests
 
+- `test/adr.test.js`
+- `test/artifact-check.test.js`
+- `test/artifact-contracts.test.js`
 - `test/billing-prompts.test.js`
 - `test/billing.test.js`
 - `test/blockers.test.js`
@@ -179,6 +187,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/command-runner.test.js`
 - `test/commit-message.test.js`
 - `test/config-audit.test.js`
+- `test/config-reconcile.test.js`
 - `test/config.test.js`
 - `test/coverage.test.js`
 - `test/defaults.test.js`
@@ -188,6 +197,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/gates.test.js`
 - `test/git.test.js`
 - `test/pauses.test.js`
+- `test/plan.test.js`
 - `test/platform-commands.test.js`
 - `test/platform-permissions.test.js`
 - `test/platform-plan-flow.test.js`
@@ -197,6 +207,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/promotion.test.js`
 - `test/prompts.test.js`
 - `test/qa-fix.test.js`
+- `test/release.test.js`
 - `test/resume.test.js`
 - `test/runner.test.js`
 - `test/runners.test.js`

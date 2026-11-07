@@ -6,6 +6,8 @@ The orchestrator invoked you with this JSON payload:
 
 The payload provides `scope`, `patchPath`, `changedFiles`, `evidenceFile`, `outputDir`, and `filters`.
 
+The Core validates the required sections, one checked classification, one checked priority, the billing indicator, and the absence of an Open Questions section; invalid output fails the phase.
+
 ## PHASE 0: Evidence and Scope (MANDATORY)
 1. Read the patch and the evidence file, and treat the payload `changedFiles` as the only scope.
 2. The evidence file may reference compiler warnings, test output, and recent runtime logs. Use it as evidence; do not create any diagnostic report.

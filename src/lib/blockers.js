@@ -17,9 +17,36 @@ export async function listBlockers(config) {
     } catch {
       // Keep the path so the human can inspect the raw file.
     }
-    blockers.push({ ...payload, file })
+    const errors = validateBlockerPayload(payload)
+    blockers.push({ ...payload, file, valid: errors.length === 0, errors })
   }
   return blockers
+}
+
+/**
+ * The executor contract requires four fields so the orchestrator can always
+ * report a human-readable stop reason. Invalid blockers stop the run even when
+ * the raw file is preserved for inspection.
+ */
+export function validateBlockerPayload(payload) {
+  const errors = []
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return ['the blocker must be a JSON object.']
+  }
+  if (typeof payload.reason !== 'string' || !payload.reason.trim()) errors.push('"reason" must be a non-empty string.')
+  if (!Array.isArray(payload.files) || payload.files.some(file => typeof file !== 'string')) {
+    errors.push('"files" must be an array of strings.')
+  }
+  if (typeof payload.decision !== 'string' || !payload.decision.trim()) errors.push('"decision" must be a non-empty string.')
+  if (typeof payload.suggestedAction !== 'string' || !payload.suggestedAction.trim()) errors.push('"suggestedAction" must be a non-empty string.')
+  return errors
+}
+
+export function assertValidBlockers(blockers) {
+  const invalid = (blockers ?? []).filter(blocker => blocker.valid === false)
+  if (invalid.length === 0) return
+  const details = invalid.map(blocker => `${blocker.file}: ${blocker.errors.join(' ')}`).join('\n')
+  throw new Error(`The executor wrote an invalid blocker:\n${details}`)
 }
 
 /**
@@ -52,7 +79,8 @@ export function blockerMessage(blockers) {
   const lines = blockers.map(blocker => {
     const reason = String(blocker.reason ?? blocker.decision ?? '').trim()
     const action = String(blocker.suggestedAction ?? '').trim()
-    return `${blocker.file}${reason ? `: ${reason}` : ''}${action ? ` (${action})` : ''}`
+    const invalid = blocker.errors?.length > 0 ? ` [invalid: ${blocker.errors.join(' ')}]` : ''
+    return `${blocker.file}${reason ? `: ${reason}` : ''}${action ? ` (${action})` : ''}${invalid}`
   })
   return `The executor is blocked:\n${lines.join('\n')}\nResolve the blocker and run autopai resume.`
 }

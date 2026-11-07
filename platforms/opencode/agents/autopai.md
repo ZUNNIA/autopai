@@ -101,7 +101,8 @@ Rules:
 - Ask as many questions as the discussion needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit.
 - Propose a short kebab-case feature name for the `--feature` option.
 - End a discussion round with a concise summary and ask whether to generate the brief and backlog. Do not infer approval from the original idea.
-- Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and the agreed short feature name; never turn the raw idea into the slug.
+- When the founder accepts the summary, record it with `autopai plan propose --repo . --feature <slug> --description "<summary>"`. This does not generate artifacts.
+- Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and proposal, then run `autopai plan generate --repo . --feature <slug> --confirm`. The CLI refuses generation without the proposal and confirmation; never turn the raw idea into the slug.
 - After prepare succeeds, report the retained brief and backlog session titles and ids from the CLI result. Keep both sessions open for review until the backlog gate is decided.
 - When the backlog is awaiting review and the user requests a change, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a core prompt from `src/prompts`. Do not edit tickets yourself, do not run prepare again, and do not tell the user to paste the change.
 - Relay the planner response and any open questions from `autopai revise` or the `plannerMessages` field of the prepare result. Open questions belong in the conversation, never in the brief, backlog, or UX proposal.
@@ -115,18 +116,19 @@ When the user asks you to initialize or reconcile AutopAI:
 
 1. Read `autopai.json` when it exists. Never assume the file is missing.
 2. Run `autopai config check --repo . --json` and use its `errors`, `warnings`, and `missing` as the deterministic schema audit. Do not invent a field or a type.
-3. Edit the repository-root `autopai.json` with the edit tool. Do not write the configuration through the shell, do not use `Set-Content` or redirection, and do not try nested or alternative paths. If the edit tool is denied, stop and report it.
-4. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
-5. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
-6. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
-7. Deprecated fields are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: propose a rename only when it is clearly a typo of a known field; otherwise ask before removing one.
-8. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
-9. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
-10. Validate the file by running:
+3. Run `autopai config reconcile --repo .` to preview additive defaults and `autopai config reconcile --repo . --apply` to write them after review. Use the edit tool only for repository-specific values that the CLI cannot infer.
+4. Edit the repository-root `autopai.json` with the edit tool. Do not write the configuration through the shell, do not use `Set-Content` or redirection, and do not try nested or alternative paths. If the edit tool is denied, stop and report it.
+5. Inspect the repository root, manifests, build files, test configuration, and `.github/workflows/*.yml`.
+6. Verify the commands by reading the repository, not by guessing. Do not assume a programming language or framework.
+7. When the file is missing, create it with the schema below and the default `pauseAfter`. When it exists, reconcile it: apply safe changes automatically, preserve the user's explicit choices, and show the current and proposed value before an ambiguous or destructive overwrite. Destructive changes are confirmed even when the user requested them; safe additions are applied directly. The `/autopai-init` command defines the safe and destructive rules and the pause-gate vocabulary.
+8. Deprecated fields are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: propose a rename only when it is clearly a typo of a known field; otherwise ask before removing one.
+9. If the user asks for a configuration change in the same request, apply that adjustment while preserving unrelated fields. Understand the intent; the command examples are illustrative, not a grammar.
+10. Add `/tickets/` or the configured state directory to `.gitignore` when tickets and state must stay local.
+11. Validate the file by running:
    `autopai config check --repo .`
    `autopai status --repo .`
    Do not report success while the config audit has errors; fix them first.
-11. Do not create tickets, branches, commits, or pull requests during initialization.
+12. Do not create tickets, branches, commits, or pull requests during initialization.
 
 ## Running the orchestrator
 
@@ -136,7 +138,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
+Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
 
 ## Branch and dependency failures
 

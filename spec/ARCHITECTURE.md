@@ -7,7 +7,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - The orchestrator is language, framework, repository, and coding-tool agnostic. Every command comes from `autopai.json` or from the repository itself.
 - Task prompts live in `src/prompts/` and are owned by the core. Platform folders only define agents, permissions, and manual wrappers.
 - Session execution goes through `src/runners/`. The generic `command` runner configures most coding tools; a custom runner module is needed only for protocols argv templates cannot express.
-- One session per phase or per ticket, except the retained brief and backlog review sessions. No long-running conversation carries the run or approves a gate; the review conversations only let the user edit the artifacts in place.
+- One session per phase or per ticket, except release, which is deterministic, and the retained brief and backlog review sessions. No long-running conversation carries the run or approves a gate; the review conversations only let the user edit the artifacts in place.
 - The orchestrator starts at any phase. A run can adopt an existing branch, stop at a human gate, identify debt, refactor, or release.
 - Human gates pause the assisted loop after `prepare`, `approve`, `dev`, `identify`, `promote`, or `refactor`. The `pauseAfter` configuration selects them; a pause is never an implicit approval.
 - Phase arguments are optional: `--feature` and `--scope` resolve from the previous run state or the latest ticket directory. The resolver fails instead of guessing when no candidate exists.
@@ -17,6 +17,8 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - Executors commit. The orchestrator pushes, opens pull requests, and merges.
 - After a merge the orchestrator deletes the remote branch, fast-forwards the local base branch, and deletes the merged local branch. Local divergences are never overwritten.
 - The orchestrator verifies facts: commits, diffs, protected paths, commit format, build, tests, coverage, and CI checks. It never trusts the agent's summary.
+- Generated briefs, backlogs, findings, tickets, and UX proposals are validated against structural contracts before the phase advances. A malformed artifact stops the run.
+- Release version, changelog, and manifest updates are deterministic. The release phase does not delegate those operations to a model.
 
 ## Phases
 
@@ -27,7 +29,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - `identify`: audits one or more branch or pull request scopes and writes local findings. Without `--scope` it audits the scopes recorded by the last dev, refactor, adopt, or identify run; `--last <n>` audits the last n pull requests merged into the base branch. Directory scopes list tracked and untracked code files with Git ignore rules and split large trees into bounded audit chunks.
 - `promote`: the planner turns the Identified findings of the last audit into ready-for-refactor tickets, one session per audit chunk. Every completed chunk is recorded in the state, so an interrupted promotion resumes without redoing finished work. The auditor never promotes its own findings.
 - `refactor`: executes ready-for-refactor tickets with the same gates. Refactors preserve the user-visible behavior unless the finding documents a UX defect.
-- `release`: updates version and changelog, opens a release pull request, merges, and tags.
+- `release`: updates the version manifest and changelog deterministically, opens a release pull request, merges, and tags.
 
 `run --from <phase> --to <phase>` chains any range of phases and stops after a phase whose gate is in `pauseAfter`.
 

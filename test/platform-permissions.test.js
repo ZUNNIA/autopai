@@ -34,7 +34,7 @@ test('operator prompt forbids permission bypass with the shell', async () => {
   const command = await fs.readFile(initCommand, 'utf8')
   assert.match(agent, /Never bypass a denial with shell redirection/)
   assert.match(agent, /Do not write the configuration through the shell/)
-  assert.match(command, /Write `autopai\.json` only with the edit tool/)
+  assert.match(command, /Use `autopai config reconcile --apply` for schema defaults/)
   assert.match(command, /Never use shell redirection/)
 })
 

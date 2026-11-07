@@ -33,6 +33,9 @@
 - Tickets, briefs, findings, UX proposals, and audit evidence stay local. Never commit, push, or reference them from Git.
 - No diagnostic reports. Audit evidence is an input to the auditor, not a deliverable.
 - Generated artifacts are written in English. No language detection.
+- Briefs, backlogs, findings, tickets, and UX proposals have structural contracts. The Core validates required sections, front matter, classifications, priorities, manual verification, and billing before the phase advances.
+- Blockers are JSON objects with `reason`, `files`, `decision`, and `suggestedAction`. Invalid blockers stop the run.
+- Release version, changelog, and manifest updates are deterministic and never delegated to a model.
 
 ## Permissions
 

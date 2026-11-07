@@ -17,6 +17,8 @@ Read the QA checklist at `qaFile` and the user's reported failure. Write one or 
 - Do not write open questions into the tickets. If a decision is missing, state the question in your final message and create no incomplete ticket.
 - Do not reference ticket files or ADR numbers from code snippets, branch names, or commit examples.
 
+The Core validates the required front matter, `type: fix`, the priority, the required sections, the Manual Verification section, and billing; invalid output fails the phase.
+
 ## Front Matter
 
 ```yaml

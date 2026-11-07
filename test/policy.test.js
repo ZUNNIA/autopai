@@ -36,6 +36,13 @@ test('rejects ticket and ADR references in commit messages', () => {
   assert.ok(validateCommitMessage('fix: close #123').length > 0)
 })
 
+test('requires a two-to-four sentence prose commit body', () => {
+  assert.equal(validateCommitMessage('feat: add panel\n\nThe panel adds one field. It keeps the old behavior.').length, 0)
+  assert.ok(validateCommitMessage('feat: add panel\n\nOne sentence only.').some(item => item.code === 'commit-body-sentences'))
+  assert.ok(validateCommitMessage('feat: add panel\n\nFirst sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.').some(item => item.code === 'commit-body-sentences'))
+  assert.ok(validateCommitMessage('feat: add panel\n\n- First change\n- Second change').some(item => item.code === 'commit-body-list'))
+})
+
 test('rejects scoped PR titles', () => {
   const violations = validatePrTitle('docs(audit): record findings')
   assert.ok(violations.some(item => item.code === 'pr-title-scope'))

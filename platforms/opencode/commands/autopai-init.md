@@ -11,7 +11,7 @@ Read the request by meaning, not by exact wording. The examples in this command 
 
 Read `autopai.json` when it exists. Inspect the repository root, manifests, build files, test configuration, `.github/workflows/*.yml`, and the current configuration.
 
-Write `autopai.json` only with the edit tool at the repository root. Never use shell redirection, `Set-Content`, `Out-File`, `tee`, a different tool, or an alternative nested path. If the edit tool is denied, stop and report the exact path and error; do not try to bypass the permission.
+Use `autopai config reconcile --apply` for schema defaults and the edit tool for repository-specific values at the repository root. Never use shell redirection, `Set-Content`, `Out-File`, `tee`, a different tool, or an alternative nested path. If an edit is denied, stop and report the exact path and error; do not try to bypass the permission.
 
 ## When autopai.json is missing
 
@@ -25,7 +25,7 @@ Create it:
 6. Set `runtimeLogs` only when the application writes local logs. Use environment variables for machine-specific paths.
 7. Include `pauseAfter` with the default gates `["backlog", "plan", "qa"]` unless the user asked for different stops.
 8. Ensure the state directory and the ticket directories stay local, and add them to `.gitignore` when needed.
-9. Create `autopai.json` with the edit tool at the repository root once the values are resolved. Do not write it through the shell.
+9. Create `autopai.json` with the edit tool at the repository root once the values are resolved. Do not write it through the shell; `autopai config reconcile --apply` is the only CLI writer for schema defaults.
 10. Validate with `autopai config check --repo .` and `autopai status --repo .`.
 11. Report the final configuration and any remaining uncertainty.
 
@@ -35,7 +35,8 @@ Reconcile it instead of recreating it:
 
 1. Run `autopai config check --repo . --json` first and read `errors`, `warnings`, and `missing`. This deterministic audit is the schema source of truth. Also compare the configuration with the repository and CI. Read the current values before changing anything.
 2. Apply safe changes automatically:
-   - Fill a missing field reported by the audit with the detected repository value or its default. Prefer detected branches, commands, and checks over generic defaults.
+   - Run `autopai config reconcile --repo .` to preview the additive defaults and `autopai config reconcile --repo . --apply` to write them after review.
+   - Fill a missing repository-specific field with the detected value only when the repository makes it unambiguous.
    - Add the default `pauseAfter` when the key is missing.
    - Migrate legacy agent names (`agents.executor` and `agents.operator`).
    - Add missing local state and ticket paths to `.gitignore`.

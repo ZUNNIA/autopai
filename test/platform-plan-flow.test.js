@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 test('the plan command discusses before it prepares', async () => {
   const text = await fs.readFile('platforms/opencode/commands/autopai-plan.md', 'utf8')
   assert.match(text, /never skips the discussion/)
-  assert.match(text, /Do not run the CLI/)
+  assert.match(text, /Do not run prepare or any generation CLI/)
   assert.match(text, /as many questions as the plan needs/)
   assert.match(text, /no fixed limit/)
   assert.match(text, /Run prepare only when the user explicitly asks/)
@@ -53,7 +53,7 @@ test('the operator routes by intent, not by a literal phrase', async () => {
   const text = await fs.readFile('platforms/opencode/agents/autopai.md', 'utf8')
   assert.match(text, /Decide from the intent and the conversation, never from a fixed phrase/)
   assert.match(text, /A statement of intent to implement a feature is a goal, not an instruction to run a phase/)
-  assert.match(text, /Only then run `prepare`/)
+  assert.match(text, /autopai plan generate --repo/)
   assert.match(text, /Never run a phase by default/)
 })
 

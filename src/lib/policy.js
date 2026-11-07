@@ -69,6 +69,16 @@ export function validateCommitMessage(message) {
   if (bodyLines.some(line => /^Merge pull request /.test(line))) {
     violations.push({ code: 'commit-merge-default', message: 'Commit message uses the GitHub default merge subject.' })
   }
+  const body = bodyLines.join('\n').trim()
+  if (body) {
+    if (LIST_LINE_RE.test(body)) {
+      violations.push({ code: 'commit-body-list', message: 'Commit body must use prose; bullet and numbered lists are forbidden.' })
+    }
+    const sentences = body.match(/[.!?](?=\s|$)/g)?.length ?? 0
+    if (sentences < 2 || sentences > 4) {
+      violations.push({ code: 'commit-body-sentences', message: 'Commit body must contain two to four sentences.' })
+    }
+  }
   return violations
 }
 

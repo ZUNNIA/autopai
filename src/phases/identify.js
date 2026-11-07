@@ -11,6 +11,7 @@ import { listCodeFiles } from '../lib/codefiles.js'
 import { chunkCodeFiles } from '../lib/chunks.js'
 import { normalizeFilters } from '../lib/filters.js'
 import { validateBillingFiles } from '../lib/billing.js'
+import { validateArtifactFiles } from '../lib/artifact-contracts.js'
 import { filterFindingFiles } from '../lib/tickets.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
@@ -140,6 +141,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
       throw new Error(`Auditor failed for scope ${resolved.name} with exit code ${execution.code}.`)
     }
     const written = await walkFiles(outputDir, file => file.endsWith('.md'))
+    await validateArtifactFiles(written, 'identified')
     billingReports.push(...await validateBillingFiles(written))
     resolved.tickets = await filterFindingFiles(written, filters)
     const excluded = written.length - resolved.tickets.length

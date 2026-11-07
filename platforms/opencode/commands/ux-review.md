@@ -38,4 +38,4 @@ At least one alternative and its tradeoff.
 
 Do not add an Open Questions section and do not write unresolved decisions into the proposal. State them in the final chat message instead. The proposal must contain the review, not the pending questions.
 
-Write proposals in English. End with a short list of the files you created and any questions the user must answer.
+Write proposals in English. The operator can validate them with `autopai artifacts check --repo .` after the auditor returns. End with a short list of the files you created and any questions the user must answer.

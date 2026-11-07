@@ -295,3 +295,18 @@ export async function tag(repo, name, ref = 'HEAD') {
 export async function pushTag(repo, name) {
   await git(repo, ['push', 'origin', name])
 }
+
+export async function lastTag(repo) {
+  const result = await git(repo, ['describe', '--tags', '--abbrev=0'], { allowFailure: true })
+  return result.code === 0 ? result.stdout.trim() || null : null
+}
+
+export async function add(repo, files) {
+  await git(repo, ['add', '--', ...files])
+}
+
+export async function commit(repo, subject, body) {
+  const args = ['commit', '-m', subject]
+  if (body) args.push('-m', body)
+  await git(repo, args)
+}

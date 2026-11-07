@@ -7,13 +7,15 @@ import { runGates, gateFailureText } from '../lib/gates.js'
 import { generatePrBody, ticketTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
-import { archiveBlockers, listBlockers, blockerMessage } from '../lib/blockers.js'
+import { archiveBlockers, assertValidBlockers, listBlockers, blockerMessage } from '../lib/blockers.js'
 import { blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, listTickets, moveTicket, orderTickets, resolveTicketBranch, selectTickets, ticketDoneDir } from '../lib/tickets.js'
 import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '../lib/filters.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
 import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
 import { currentGate } from '../lib/pauses.js'
 import { validateBillingFiles } from '../lib/billing.js'
+import { validateArtifactFiles } from '../lib/artifact-contracts.js'
+import { prepareRelease } from '../lib/release.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { sessionRetryDelayMs, shouldRetrySession } from '../lib/session-retry.js'
 import { ensureDir, sleep, slugify, truncate } from '../lib/util.js'
@@ -30,6 +32,8 @@ export async function runPrepare({ config, stateStore, options, log }) {
     const backlogFiles = await listMarkdown(backlogDir)
     let billingReports
     try {
+      await validateArtifactFiles([briefPath], 'brief')
+      await validateArtifactFiles([path.join(backlogDir, 'backlog.md')], 'backlog')
       billingReports = await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
     } catch (error) {
       recovered.phase = 'backlog'
@@ -83,6 +87,7 @@ export async function runPrepare({ config, stateStore, options, log }) {
     if (briefRun.stdout?.trim()) plannerMessages.push({ kind: 'brief', text: briefRun.stdout.trim() })
     await stateStore.save(state)
     if (briefRun.code !== 0) throw new Error('The planner could not write the feature brief.')
+    await validateArtifactFiles([briefPath], 'brief')
   }
 
   const backlogRun = await runSession({
@@ -111,6 +116,8 @@ export async function runPrepare({ config, stateStore, options, log }) {
   await stateStore.save(state)
 
   const backlogFiles = await listMarkdown(backlogDir)
+  await validateArtifactFiles([briefPath], 'brief')
+  await validateArtifactFiles([path.join(backlogDir, 'backlog.md')], 'backlog')
   const billingReports = await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
 
   state.phase = 'awaiting_approval'
@@ -134,6 +141,8 @@ export async function runApprove({ config, stateStore, options, log }) {
   const feature = await resolveFeature({ config, options, state: previous, dirs: [config.ticketDirs.backlog] })
   const backlogDir = path.join(config.repoPath, config.ticketDirs.backlog, feature)
   if (!await exists(backlogDir)) throw new Error(`No backlog found for feature ${feature}. Run prepare first.`)
+  await validateArtifactFiles([path.join(backlogDir, 'brief.md')], 'brief')
+  await validateArtifactFiles([path.join(backlogDir, 'backlog.md')], 'backlog')
   await validateBillingFiles([path.join(backlogDir, 'backlog.md')])
 
   const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
@@ -151,7 +160,9 @@ export async function runApprove({ config, stateStore, options, log }) {
     role: 'planner'
   })
   if (generated.code !== 0) throw new Error('The planner could not generate ready-for-dev tickets.')
-  const billingReports = await validateBillingFiles(await listMarkdown(readyDir))
+  const readyFiles = await listMarkdown(readyDir)
+  await validateArtifactFiles(readyFiles, 'ready-for-dev')
+  const billingReports = await validateBillingFiles(readyFiles)
 
   const state = previous ?? await stateStore.create('approve', { feature })
   state.mode = 'approve'
@@ -209,6 +220,7 @@ export async function runDev({ config, stateStore, options, log }) {
   const doneRoot = path.join(config.repoPath, config.ticketDirs.done)
   const tickets = orderTickets(await listTickets(readyDir), { completed: await listTickets(doneRoot) })
   if (tickets.length === 0) throw new Error(`No ready-for-dev tickets found in ${readyDir}.`)
+  await validateArtifactFiles(tickets.map(ticket => ticket.file), 'ready-for-dev')
 
   const state = loaded ?? await stateStore.create('dev', { feature })
   const artifacts = new Artifacts(config, state.runId)
@@ -302,6 +314,7 @@ export async function runQaFix({ config, stateStore, options, log }) {
   }
 
   await log?.(`Created ${created.length} QA fix ticket(s) for ${feature}.`)
+  await validateArtifactFiles(created.map(ticket => ticket.file), 'qa-fix')
   const billingReports = await validateBillingFiles(created.map(ticket => ticket.file))
   const result = await runDev({ config, stateStore, options: { ...options, feature }, log })
   return {
@@ -347,6 +360,7 @@ export async function runRefactor({ config, stateStore, options, log }) {
   }
 
   const tickets = selectTickets({ allTickets: queue, tickets: candidates, completed: done })
+  await validateArtifactFiles(tickets.map(ticket => ticket.file), 'ready-for-refactor')
   const state = loaded ?? await stateStore.create('refactor', { feature: requested, filters })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
@@ -461,6 +475,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
         })
         const blockers = await listBlockers(config)
         if (blockers.length > 0) {
+          assertValidBlockers(blockers)
           state.blockers = blockers.map(blocker => blocker.file)
           await stateStore.save(state)
           throw new Error(blockerMessage(blockers))
@@ -564,6 +579,7 @@ async function fixLocalGates({ config, stateStore, state, artifacts, ticket, bra
   })
   const blockers = await listBlockers(config)
   if (blockers.length > 0) {
+    assertValidBlockers(blockers)
     state.blockers = blockers.map(blocker => blocker.file)
     await stateStore.save(state)
     throw new Error(blockerMessage(blockers))
@@ -632,6 +648,7 @@ export async function runPromote({ config, stateStore, options, log }) {
     if (execution.code !== 0) throw new Error(`The planner could not generate ready-for-refactor tickets for ${group.name}.`)
     const written = (await listMarkdown(outputDir)).filter(file => !before.has(file))
     for (const file of written) before.add(file)
+    await validateArtifactFiles(written, 'ready-for-refactor')
     billingReports.push(...await validateBillingFiles(written))
     state.completedPhases = [...new Set([...state.completedPhases, `promote:${group.name}`])]
     await stateStore.save(state)
@@ -660,27 +677,8 @@ export async function runRelease({ config, stateStore, options, log }) {
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
 
-  const execution = await runSession({
-    config,
-    prompt: 'release',
-    agent: config.agents.executor,
-    payload: {
-      mode: 'release',
-      version,
-      branch,
-      baseBranch: config.baseBranch,
-      releaseBranch: config.releaseBranch,
-      restoreCommand: config.restoreCommand,
-      buildCommand: config.buildCommand,
-      testCommand: config.testCommand,
-      stateDir: config.stateDir
-    },
-    title: `AutopAI release v${version}`,
-    logFile: artifacts.path(`release-v${version}.log`),
-    role: 'executor'
-  })
-  if (execution.code !== 0) throw new Error('The executor could not prepare the release.')
-  await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
+  const prepared = await prepareRelease({ config, version, log })
+  await log?.(`Release manifest updated from ${prepared.previousVersion ?? 'unknown'} to ${version}.`)
 
   const range = `origin/${config.baseBranch}..${branch}`
   const commits = await git.logCommits(config.repoPath, range)
@@ -697,8 +695,15 @@ export async function runRelease({ config, stateStore, options, log }) {
     prBody: generatePrBody({ commits, coverage: gates.coverage }),
     state,
     stateStore,
-    executorPrompt: 'release',
-    executorPayload: { mode: 'release', version, baseBranch: config.baseBranch, releaseBranch: config.releaseBranch, stateDir: config.stateDir },
+    executorPrompt: 'ci-fix',
+    executorPayload: {
+      mode: 'release',
+      version,
+      branch,
+      baseBranch: config.baseBranch,
+      releaseBranch: config.releaseBranch,
+      stateDir: config.stateDir
+    },
     coverage: gates.coverage,
     log
   })

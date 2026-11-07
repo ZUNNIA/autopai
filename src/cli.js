@@ -4,6 +4,7 @@ import path from 'node:path'
 import { parseCliArgs } from './lib/util.js'
 import { loadConfig } from './lib/config.js'
 import { auditConfig, formatConfigReport } from './lib/config-audit.js'
+import { reconcileConfig } from './lib/config-reconcile.js'
 import * as git from './lib/git.js'
 import { StateStore, mergeStateIssues, reconcileMergeState } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
@@ -17,6 +18,9 @@ import { nextPhase } from './lib/resume.js'
 import { hasFilters, normalizeFilters } from './lib/filters.js'
 import { currentGate, gateAfterPhase, gateLabel, normalizeApprovedGate, normalizePauseAfter } from './lib/pauses.js'
 import { recoverPrepareReview } from './lib/prepare-review.js'
+import { clearPlanProposal, readPlanProposal, writePlanProposal } from './lib/plan.js'
+import { adrStatuses, createAdr } from './lib/adr.js'
+import { checkArtifacts } from './lib/artifact-check.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
@@ -31,10 +35,29 @@ async function main() {
     process.stdout.write(`${pkg.version}\n`)
     return
   }
+  if (command === 'adr') return runAdrCommand(repoPath, options)
   if (command === 'config') return runConfigCommand(repoPath, options)
 
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
+
+  if (command === 'plan') return runPlanCommand({ config, stateStore, options, log })
+
+  if (command === 'artifacts') {
+    const action = String((options._ ?? [])[0] ?? '')
+    if (action !== 'check') throw new Error('Usage: autopai artifacts check --repo <path> [--json]')
+    const report = await checkArtifacts(config)
+    if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    else {
+      for (const check of report.checks) {
+        if (check.ok) process.stdout.write(`OK ${check.kind} ${check.file}\n`)
+        else process.stdout.write(`ERROR ${check.kind} ${check.file}: ${check.errors.join(' ')}\n`)
+      }
+      process.stdout.write(report.ok ? 'Result: ok\n' : 'Result: failed\n')
+    }
+    if (!report.ok) process.exitCode = 1
+    return report
+  }
 
   if (command === 'status') {
     if (!await stateStore.isActiveRun()) await recoverPrepareReview({ config, stateStore })
@@ -259,9 +282,80 @@ async function abortRun(stateStore) {
   process.stdout.write('AutopAI run marked as aborted and the lock was released.\n')
 }
 
+async function runAdrCommand(repoPath, options) {
+  const action = String((options._ ?? [])[0] ?? '')
+  if (action !== 'new') throw new Error('Usage: autopai adr new --repo <path> --title <title> [--status Proposed|Accepted|Deprecated|Superseded] [--json]')
+  const status = String(options.status ?? 'Proposed').trim()
+  if (!adrStatuses().includes(status)) throw new Error(`ADR status must be one of: ${adrStatuses().join(', ')}.`)
+  const result = await createAdr({
+    repoPath: path.resolve(repoPath),
+    title: String(options.title ?? ''),
+    status
+  })
+  if (options.json === true) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+  else process.stdout.write(`${result.file}\n`)
+  return result
+}
+
+async function runPlanCommand({ config, stateStore, options, log }) {
+  const action = String((options._ ?? [])[0] ?? '')
+
+  if (action === 'propose') {
+    const proposal = await writePlanProposal({
+      config,
+      feature: options.feature,
+      description: options.description
+    })
+    process.stdout.write(`Plan proposal: ${proposal.file}\n`)
+    process.stdout.write(`Feature: ${proposal.feature}\n`)
+    return proposal
+  }
+
+  if (action === 'generate') {
+    if (options.confirm !== true) throw new Error('plan generate requires --confirm after the founder approves the proposal.')
+    const proposal = await readPlanProposal(config)
+    if (!proposal) throw new Error('No plan proposal found. Run plan propose after the discussion.')
+    const feature = String(options.feature ?? proposal.feature).trim()
+    if (feature !== proposal.feature) {
+      throw new Error(`The proposal is for ${proposal.feature}, not ${feature}. Run plan propose for the new feature first.`)
+    }
+
+    await stateStore.lock()
+    try {
+      const result = await runPrepare({
+        config,
+        stateStore,
+        options: { ...options, feature, description: proposal.description },
+        log
+      })
+      await clearPlanProposal(config)
+      printResult(result)
+      return result
+    } finally {
+      await stateStore.unlock()
+    }
+  }
+
+  throw new Error('Usage: autopai plan propose --repo <path> --feature <slug> --description <text> OR autopai plan generate --repo <path> --feature <slug> --confirm')
+}
+
 async function runConfigCommand(repoPath, options) {
   const action = String((options._ ?? [])[0] ?? 'check')
-  if (action !== 'check') throw new Error('Usage: autopai config check --repo <path> [--json] [--strict]')
+
+  if (action === 'reconcile') {
+    const report = await reconcileConfig(repoPath, { apply: options.apply === true })
+    if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    else {
+      process.stdout.write(`Config: ${report.configPath}\n`)
+      process.stdout.write(`${report.applied ? 'APPLIED' : 'DRY RUN'}\n`)
+      for (const key of report.added) process.stdout.write(`ADDED ${key}\n`)
+      for (const key of report.unknown) process.stdout.write(`UNKNOWN ${key}\n`)
+      if (!report.applied && report.changed) process.stdout.write('Run with --apply to write the safe defaults.\n')
+    }
+    return report
+  }
+
+  if (action !== 'check') throw new Error('Usage: autopai config check|reconcile --repo <path> [--json] [--strict] [--apply]')
 
   const report = await auditConfig(repoPath)
   if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
@@ -340,7 +434,12 @@ Usage:
   autopai revise --repo <path> --message <change>
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
+  autopai plan propose --repo <path> --feature <slug> --description <text>
+  autopai plan generate --repo <path> --feature <slug> --confirm
+  autopai adr new --repo <path> --title <title> [--status <status>] [--json]
+  autopai artifacts check --repo <path> [--json]
   autopai config check --repo <path> [--json] [--strict]
+  autopai config reconcile --repo <path> [--apply] [--json]
   autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
   autopai abort --repo <path>
 
@@ -385,10 +484,25 @@ Local gate failures are retried once by default. --fix adds one executor fix
 attempt only for repairable gate failures. Branch checkout, blocked dependency,
 executor, policy, and merge failures are not repaired by --fix.
 
+autopai plan propose records the agreed feature summary without generating
+artifacts. autopai plan generate requires --confirm and an existing proposal,
+then runs prepare and clears the proposal.
+
+autopai adr new creates the next numbered ADR from the standard template and
+selects tickets/adr or docs/adr, whichever directory already exists.
+
+autopai artifacts check validates every local brief, backlog, finding, ticket,
+and UX proposal against its structural contract. It never writes.
+
 autopai config check audits autopai.json against the schema without writing:
 it reports missing defaults, unknown or deprecated fields, invalid types, paths,
 and legacy agent names. It exits 1 on errors; --strict also fails on warnings and
 missing defaults. --json prints the report for /autopai-init.
+
+autopai config reconcile applies only additive defaults that do not require
+repository-specific knowledge. It preserves explicit values, reports unknown
+keys, and never invents branches, commands, checks, coverage, or runner settings.
+Without --apply it prints the proposed changes and writes nothing.
 `)
 }
 

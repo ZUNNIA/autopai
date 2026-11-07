@@ -65,7 +65,7 @@ flowchart LR
 
 **Phase.** One step of the lifecycle: `adopt`, `prepare`, `approve`, `dev`, `identify`, `promote`, `refactor`, `release`. Each phase can be run alone, chained with `run --from --to`, or resumed after a failure.
 
-**Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket. The brief and backlog sessions are retained after their runs so the user can request changes in place; no long-running conversation carries the run or approves a gate.
+**Session.** One non-interactive coding tool invocation with a core-owned prompt and a JSON payload. There is one session per phase step or per ticket, except release, which is deterministic and runs no model session. The brief and backlog sessions are retained after their runs so the user can request changes in place; no long-running conversation carries the run or approves a gate.
 
 **Runner.** The adapter between the orchestrator and the coding tool CLI. The bundled runner is `opencode`; the generic `command` runner configures most other tools through `runnerOptions` without a new module. Adding a custom tool module is only needed for protocols the command runner cannot express.
 
@@ -93,14 +93,14 @@ AutopAI runs four roles. The role names are stable; the agent names are configur
 
 | Role | Default agent | Writes | Read-only over | Invoked by |
 | --- | --- | --- | --- | --- |
-| executor | `executor` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor`, `release` |
+| executor | `executor` | Source and tests, commits | Tickets, CI, configuration | `adopt`, `dev`, `refactor` |
 | planner | `planner` | `tickets/backlog/**`, `tickets/ready-for-dev/**`, `tickets/ready-for-refactor/**`, `tickets/done/**` | Source, tests | `prepare`, `approve`, `promote` |
 | auditor | `auditor` | `tickets/identified/**`, `tickets/ux/**` | Source, tests, UX | `identify` |
 | operator | `autopai` | `autopai.json`, `.gitignore`, ADRs | Everything else | `/autopai-init` and manual commands |
 
 An important clarification: `build` is a built-in agent of OpenCode, not part of AutopAI. It has no role in a run. Every AutopAI session names its agent explicitly, and the agent name comes from the configuration.
 
-The prompts that drive each session are owned by the core and live in `src/prompts/` (`autopai-finish.md`, `autopai-dev.md`, `feature-brief.md`, `backlog.md`, `ready-for-dev.md`, `identified.md`, `ready-for-refactor.md`, `release.md`). The platform files under `platforms/opencode/agents/` only define permissions and standing rules. A port to another tool recreates the roles, not the prompts.
+The prompts that drive each session are owned by the core and live in `src/prompts/` (`autopai-finish.md`, `autopai-dev.md`, `feature-brief.md`, `backlog.md`, `ready-for-dev.md`, `identified.md`, `ready-for-refactor.md`). The platform files under `platforms/opencode/agents/` only define permissions and standing rules. A port to another tool recreates the roles, not the prompts. Release notes and manifest updates are deterministic and do not use a release prompt.
 
 ### 3.1 Executor (`executor`)
 
@@ -306,9 +306,10 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 
 1. Require `--version` in `MAJOR.MINOR.PATCH` format.
 2. Create `chore/release-v<version>` from the base branch.
-3. Run the executor in release mode: update the version and the changelog.
-4. Run the local gates, use `chore: release v<version>` as the title, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the fix loop, and merge.
-5. Tag `v<version>` on the merge commit and push the tag.
+3. Update the supported version manifest and generate `CHANGELOG.md` deterministically from Conventional Commit subjects since the last tag. Supported manifests are `package.json`, `pyproject.toml`, `Cargo.toml`, `.csproj`, `Directory.Build.props`, and `VERSION`.
+4. Commit the release with `chore: release v<version>` and a generated prose body.
+5. Run the local gates, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the CI fix loop, and merge.
+6. Tag `v<version>` on the merge commit and push the tag.
 
 **Intent guard.** Release only ships a version. The operator refuses a request that is not a release (for example, resolving technical debt) and points to the correct phase; it never bumps the version for an unrelated request.
 
@@ -527,12 +528,25 @@ autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--p
 autopai release --repo <path> --version <x.y.z>
 autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
 autopai status --repo <path>
+autopai plan propose --repo <path> --feature <slug> --description <text>
+autopai plan generate --repo <path> --feature <slug> --confirm
+autopai adr new --repo <path> --title <title> [--status <status>] [--json]
+autopai artifacts check --repo <path> [--json]
 autopai config check --repo <path> [--json] [--strict]
+autopai config reconcile --repo <path> [--apply] [--json]
 autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
 autopai abort --repo <path>
 ```
 
 **Config check.** `autopai config check --repo <path>` audits `autopai.json` against the schema without writing. `--json` prints the machine-readable report; `--strict` exits 1 on warnings and missing defaults. It is the audit `/autopai-init` uses before reconciling a configuration.
+
+**Config reconcile.** `autopai config reconcile` previews additive schema defaults and `--apply` writes them. It preserves explicit values and never invents branches, commands, checks, coverage, or runner settings.
+
+**Plan proposal.** `autopai plan propose` records an agreed feature summary without running a model. `autopai plan generate --confirm` refuses to run without the proposal and the explicit flag.
+
+**ADR scaffold.** `autopai adr new` creates the next numbered ADR in `tickets/adr` or `docs/adr` from the standard template.
+
+**Artifacts check.** `autopai artifacts check` validates every local brief, backlog, finding, ready ticket, and UX proposal against its structural contract.
 
 **Global flags.** `--repo <path>` selects the target repository and defaults to the current directory. Flags accept `--flag value` and `--flag=value`. `--scope`, `--classification`, and `--priority` can be repeated; the debt filters also accept comma-separated lists.
 
@@ -808,7 +822,7 @@ The first command audits only the last three merged pull requests and records on
 autopai run --repo . --from release --to release --version 1.4.0
 ```
 
-The executor updates the version and changelog on `chore/release-v1.4.0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
+The Core updates the version and changelog deterministically on `chore/release-v1.4.0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
 
 ### 12.4 Walkthrough: blocked on an architecture decision
 

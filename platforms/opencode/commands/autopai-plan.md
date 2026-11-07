@@ -9,24 +9,28 @@ The user request: $ARGUMENTS
 
 ## Stage 1: discuss
 
-- A feature idea, a design question, or a request to explore a feature starts a discussion. Do not run the CLI.
+- A feature idea, a design question, or a request to explore a feature starts a discussion. Do not run prepare or any generation CLI; `plan propose` only records the agreed summary.
 - If the user asks for an opinion or says not to generate, discuss and stop.
 - Read the repository only when needed. Do not write files or state.
 - Discuss the problem, target user, desired behavior, scope, non-goals, providers and models, canonical parameters, persistence, UX, acceptance criteria, dependencies and risks.
 - Ask as many questions as the plan needs. Group them by topic and ask only questions whose answers change the plan. There is no fixed limit. Ask them in the conversation; never write them into the brief or backlog.
 - Propose a short kebab-case feature name for the `--feature` option.
-- End each discussion round with a concise agreed summary and the open points. Do not run prepare.
+- End each discussion round with a concise agreed summary and the open points.
+- When the founder accepts the summary, record it without generating artifacts:
+
+`autopai plan propose --repo . --feature <slug> --description "<agreed summary>"`
 
 ## Stage 2: generate
 
 Run prepare only when the user explicitly asks to generate, formalize or prepare the brief and backlog, or explicitly confirms the discussed summary. Do not infer generation from a wish to implement the feature or from a general description.
 
-- If no agreed summary exists, ask for the idea and stay in Stage 1.
-- Summarize problem, scope, decisions, non-goals and acceptance in a concise `--description`.
-- Use the agreed short feature name with `--feature <slug>`. If none is agreed, propose one and use it after confirmation. Do not let the description become an 80-character slug.
-- Use the bash tool with a timeout of at least 14400000 ms:
+- If no agreed summary or proposal exists, ask for the idea and stay in Stage 1.
+- Use the agreed short feature name with `--feature <slug>`. If none is agreed, propose one and use it after confirmation.
+- Generate only after explicit confirmation, using the proposal recorded in Stage 1:
 
-`autopai run --repo . --from prepare --to prepare <composed arguments>`
+`autopai plan generate --repo . --feature <slug> --confirm`
+
+The CLI refuses generation without `--confirm` or without a matching proposal. It runs prepare, stops at the backlog gate, and clears the proposal after the artifacts are written.
 
 Report the CLI output verbatim, the backlog path, the retained brief and backlog session titles and ids, any `plannerMessages` questions, and any `billingReports` with billing `increase` or `unknown`. The orchestrator writes the brief and the backlog and stops at the backlog gate; both review sessions stay open.
 

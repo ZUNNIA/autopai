@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { archiveBlockers, blockerMessage, listBlockers } from '../src/lib/blockers.js'
+import { archiveBlockers, assertValidBlockers, blockerMessage, listBlockers, validateBlockerPayload } from '../src/lib/blockers.js'
 
 test('archives recorded blockers before a retry', async () => {
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-blockers-'))
@@ -42,6 +42,18 @@ test('keeps the ADR suggestion supplied by an architecture blocker', () => {
     suggestedAction: 'run /autopai-adr'
   }])
   assert.match(message, /run \/autopai-adr/)
+})
+
+test('validates the blocker contract', () => {
+  const valid = {
+    reason: 'Needs a human decision.',
+    files: ['src/Program.cs'],
+    decision: 'Choose option A or B.',
+    suggestedAction: 'Run /autopai-adr.'
+  }
+  assert.deepEqual(validateBlockerPayload(valid), [])
+  assert.match(validateBlockerPayload({ reason: 'Only reason.' }).join(' '), /files/)
+  assert.throws(() => assertValidBlockers([{ file: 'blocked.json', valid: false, errors: ['missing decision'] }]), /invalid blocker/)
 })
 
 test('ignores missing blockers and an empty list', async () => {

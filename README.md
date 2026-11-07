@@ -25,7 +25,7 @@ The same workflow is available through slash commands or natural language. The o
 ## The loop
 
 1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name. Open questions stay in the conversation; they are never written into the brief or backlog.
-2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. It runs `prepare`, which writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or ask the operator for changes; the operator runs `autopai revise` against the retained backlog session, so you never paste the change yourself and the original prompt is not reloaded. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
+2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. The operator records the agreed summary with `autopai plan propose`, then runs `autopai plan generate --confirm`; `prepare` writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or ask the operator for changes; the operator runs `autopai revise` against the retained backlog session, so you never paste the change yourself and the original prompt is not reloaded. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
 3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist. If an item fails, report it to the operator; it runs `autopai qa-fix`, creates fix tickets for the current feature, and restarts dev. When QA passes, identify the pull requests of the new feature, promote the findings, and refactor them.
@@ -54,7 +54,7 @@ The same workflow is available through slash commands or natural language. The o
 | `identify` | Audits the new pull requests and writes local findings. |
 | `promote` | Turns the findings into ready-for-refactor tickets. |
 | `refactor` | Executes refactor tickets with the same gates. |
-| `release` | Updates version and changelog, opens the release pull request, merges, and tags. |
+| `release` | Updates the version manifest and changelog deterministically, opens the release pull request, merges, and tags. |
 
 `autopai run --from <phase> --to <phase>` chains any range and stops at the configured gates.
 
@@ -121,6 +121,8 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Audit build diagnostics | `/autopai-diagnostics` | "show compiler errors and warnings" |
 | Fix build diagnostics | `/autopai-diagnostics --fix` | "fix the compiler warnings and errors" |
 | Release | `/autopai-release <version>` | "release 1.3.0" |
+| Create an ADR | `/autopai-adr` | "record this architecture decision" |
+| Validate local artifacts | `autopai artifacts check` | "check the briefs and tickets" |
 | Abort the run | `/autopai-abort` | "stop the current run" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
@@ -134,7 +136,11 @@ The operator agent translates the request and confirms ambiguous interpretations
 autopai config check --repo .
 autopai config check --repo . --json
 autopai config check --repo . --strict
+autopai config reconcile --repo .
+autopai config reconcile --repo . --apply
 ```
+
+`config reconcile` applies only additive defaults. It preserves explicit values, reports unknown keys, and never invents branches, commands, checks, coverage, or runner settings. Without `--apply` it writes nothing.
 
 The audit is read-only. It reports missing optional fields with their effective defaults, unknown or deprecated fields, invalid types, paths and pause gates, legacy agent names, secret-like keys, personal absolute paths, and checks that are both required and ignored. `/autopai-init` uses the report to fill safe defaults, preserves your explicit choices, and confirms deprecated-field removal or any other destructive change. `--strict` exits 1 on warnings and missing defaults; errors always exit 1.
 
