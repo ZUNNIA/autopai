@@ -30,12 +30,12 @@ The configuration file lives at the root of each target repository. It is create
 | `approvalRequired` | boolean | Reserved and superseded by `pauseAfter`. |
 | `pauseAfter` | string array | Human gates where the assisted loop stops. Default `["backlog", "plan", "qa"]`; an empty array disables human pauses. |
 | `prTitle` | string or null | Null lets the executor decide the title. |
-| `runtimeLogs` | string array | Local runtime log globs for audit evidence. Use environment variables for machine-specific paths. |
+| `runtimeLogs` | string array | Local runtime log globs for audit evidence. Use `${NAME}`, `%NAME%`, or `~` for machine-specific paths; do not persist absolute paths. |
 | `commitTypes` | string array | Allowed Conventional Commit types. |
 | `agents` | object | Agent names for `executor`, `planner`, `auditor`, and `operator`. |
 | `models` | object | Optional model overrides for `executor`, `planner`, `auditor`, and `operator`. |
 | `ticketDirs` | object | Paths for `backlog`, `readyForDev`, `identified`, `readyForRefactor`, `ux`, `qa`, and `done`. Keep the defaults when using the bundled platform agents, because their permissions allow those paths. |
-| `stateDir` | string | Local state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. |
+| `stateDir` | string | Repository-relative state directory. Use `tickets/.autopai` when tickets are local, otherwise `.autopai`. |
 
 Commands are arrays of arguments, never shell strings. Example shape:
 

@@ -9,6 +9,7 @@ import { clearAgentTitle, deriveTitle, generatePrBody, resolveTitle } from '../l
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { findForbidden } from '../lib/forbidden.js'
+import { toRepoRelative } from '../lib/portable-paths.js'
 
 const ALLOWED_UNTRACKED = ['autopai.json', 'tickets/', '.autopai/']
 
@@ -79,7 +80,14 @@ export async function runAdopt({ config, stateStore, options, log }) {
   state.baseSha = baseSha
   state.headSha = headSha
   state.changedFiles = changedFiles
-  state.scopes = [{ name: branch, baseBranch, baseSha, headSha, changedFiles, patch: artifacts.path('branch.patch') }]
+  state.scopes = [{
+    name: branch,
+    baseBranch,
+    baseSha,
+    headSha,
+    changedFiles,
+    patch: toRepoRelative(config.repoPath, artifacts.path('branch.patch')) ?? artifacts.path('branch.patch')
+  }]
   await stateStore.save(state)
   await artifacts.write('branch.patch', diff)
   await artifacts.write('commits.txt', commits.map(item => `${item.sha} ${item.subject}`).join('\n'))
@@ -127,7 +135,7 @@ export async function runAdopt({ config, stateStore, options, log }) {
   })
   const blockers = await listBlockers(config)
   if (blockers.length > 0) {
-    state.blockers = blockers.map(blocker => blocker.file)
+    state.blockers = blockers.map(blocker => toRepoRelative(config.repoPath, blocker.file) ?? blocker.file)
     await stateStore.save(state)
     throw new Error(blockerMessage(blockers))
   }
@@ -158,7 +166,14 @@ export async function runAdopt({ config, stateStore, options, log }) {
 
   state.headSha = await git.revParse(config.repoPath, branch)
   state.changedFiles = updatedFiles
-  state.scopes = [{ name: branch, baseBranch, baseSha, headSha: state.headSha, changedFiles: updatedFiles, patch: artifacts.path('branch.patch') }]
+  state.scopes = [{
+    name: branch,
+    baseBranch,
+    baseSha,
+    headSha: state.headSha,
+    changedFiles: updatedFiles,
+    patch: toRepoRelative(config.repoPath, artifacts.path('branch.patch')) ?? artifacts.path('branch.patch')
+  }]
   state.prTitle = title
   await artifacts.write('branch.patch', updatedDiff)
   await artifacts.write('changed-files.txt', updatedFiles.join('\n'))

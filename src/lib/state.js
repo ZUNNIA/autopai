@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { portableState } from './portable-paths.js'
 import { atomicWriteJson, isAlive, readJson } from './util.js'
 
 export class StateStore {
@@ -16,8 +17,9 @@ export class StateStore {
 
   async save(state) {
     state.updatedAt = new Date().toISOString()
-    await atomicWriteJson(this.file, state)
-    return state
+    const portable = portableState(state, this.config.repoPath)
+    await atomicWriteJson(this.file, portable)
+    return portable
   }
 
   async create(mode, options = {}) {
@@ -28,7 +30,7 @@ export class StateStore {
       mode,
       phase: options.phase ?? mode,
       completedPhases: [],
-      repo: this.config.repoPath,
+      repo: '.',
       feature: options.feature ?? null,
       branch: options.branch ?? null,
       baseBranch: options.baseBranch ?? this.config.baseBranch,
