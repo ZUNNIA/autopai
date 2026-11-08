@@ -14,7 +14,7 @@ test('manual phase commands have slash wrappers', async () => {
   }
   for (const [file, command] of Object.entries(expected)) {
     const text = await fs.readFile(`${commandDir}/${file}`, 'utf8')
-    assert.match(text, /^---\n[\s\S]*agent: autopai[\s\S]*\n---\n/, file)
+    assert.match(text, /^---\r?\n[\s\S]*agent: autopai[\s\S]*\r?\n---\r?\n/, file)
     assert.ok(text.includes(command), `${file} must run ${command}`)
   }
 })
