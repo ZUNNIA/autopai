@@ -8,6 +8,7 @@ import { generatePrBody, ticketTitle } from '../lib/title.js'
 import { pushOpenWaitMerge } from '../lib/pr.js'
 import { Artifacts } from '../lib/artifacts.js'
 import { archiveBlockers, assertValidBlockers, listBlockers, blockerMessage } from '../lib/blockers.js'
+import { toRepoRelative } from '../lib/portable-paths.js'
 import { blockedDependents, collectManualVerification, filterFindingFiles, filterTicketsByFeature, listTickets, moveTicket, orderTickets, resolveTicketBranch, selectTickets, ticketDoneDir } from '../lib/tickets.js'
 import { describeFilters, filterTickets, hasFilters, normalizeFilters } from '../lib/filters.js'
 import { featureFromDescription, resolveFeature } from '../lib/defaults.js'
@@ -225,7 +226,11 @@ export async function runDev({ config, stateStore, options, log }) {
   const state = loaded ?? await stateStore.create('dev', { feature })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
-  const archivedBlockers = await archiveBlockers({ blockers: state.blockers, artifactsDir: artifacts.dir })
+  const archivedBlockers = await archiveBlockers({
+    blockers: state.blockers,
+    artifactsDir: artifacts.dir,
+    repoPath: config.repoPath
+  })
   if (archivedBlockers.length > 0) await log?.(`Archived ${archivedBlockers.length} resolved blocker(s).`)
   state.mode = 'dev'
   state.feature = feature
@@ -364,7 +369,11 @@ export async function runRefactor({ config, stateStore, options, log }) {
   const state = loaded ?? await stateStore.create('refactor', { feature: requested, filters })
   const artifacts = new Artifacts(config, state.runId)
   await artifacts.init()
-  const archivedBlockers = await archiveBlockers({ blockers: state.blockers, artifactsDir: artifacts.dir })
+  const archivedBlockers = await archiveBlockers({
+    blockers: state.blockers,
+    artifactsDir: artifacts.dir,
+    repoPath: config.repoPath
+  })
   if (archivedBlockers.length > 0) await log?.(`Archived ${archivedBlockers.length} resolved blocker(s).`)
   state.mode = 'refactor'
   state.feature = requested ?? state.feature ?? null
@@ -476,7 +485,7 @@ async function runTicketQueue({ config, stateStore, options, log, state, artifac
         const blockers = await listBlockers(config)
         if (blockers.length > 0) {
           assertValidBlockers(blockers)
-          state.blockers = blockers.map(blocker => blocker.file)
+          state.blockers = blockers.map(blocker => toRepoRelative(config.repoPath, blocker.file) ?? blocker.file)
           await stateStore.save(state)
           throw new Error(blockerMessage(blockers))
         }
@@ -580,7 +589,7 @@ async function fixLocalGates({ config, stateStore, state, artifacts, ticket, bra
   const blockers = await listBlockers(config)
   if (blockers.length > 0) {
     assertValidBlockers(blockers)
-    state.blockers = blockers.map(blocker => blocker.file)
+    state.blockers = blockers.map(blocker => toRepoRelative(config.repoPath, blocker.file) ?? blocker.file)
     await stateStore.save(state)
     throw new Error(blockerMessage(blockers))
   }
@@ -729,7 +738,7 @@ function resolvePrepareFeature(options) {
 }
 
 async function resolveFindingGroups({ config, state }) {
-  const recorded = stateFindingGroups(state)
+  const recorded = stateFindingGroups(state, config.repoPath)
   if (recorded !== null) return recorded.filter(group => group.findings.length > 0)
 
   const files = await listMarkdown(path.join(config.repoPath, config.ticketDirs.identified))

@@ -1,16 +1,21 @@
+import { fromRepoRelative } from './portable-paths.js'
+
 /**
  * Returns the finding groups recorded by the current identify or promotion
  * state, or null when the caller must fall back to the identified directory.
  * An empty array is a real result: a filtered audit that found nothing must not
  * make promotion walk older findings.
  */
-export function stateFindingGroups(state) {
+export function stateFindingGroups(state, repoPath = null) {
   const scopes = Array.isArray(state?.scopes) ? state.scopes : []
   if (scopes.length === 0) return null
   if (state.mode !== 'identify' && state.mode !== 'promote') return null
+  const resolve = file => repoPath ? fromRepoRelative(repoPath, file) : file
   return scopes.map(scope => ({
     name: String(scope.name),
-    findings: (scope.tickets ?? []).filter(file => String(file).endsWith('.md'))
+    findings: (scope.tickets ?? [])
+      .filter(file => String(file).endsWith('.md'))
+      .map(resolve)
   }))
 }
 

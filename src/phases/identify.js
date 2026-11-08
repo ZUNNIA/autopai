@@ -12,6 +12,7 @@ import { chunkCodeFiles } from '../lib/chunks.js'
 import { normalizeFilters } from '../lib/filters.js'
 import { validateBillingFiles } from '../lib/billing.js'
 import { validateArtifactFiles } from '../lib/artifact-contracts.js'
+import { fromRepoRelative, toRepoRelative } from '../lib/portable-paths.js'
 import { filterFindingFiles } from '../lib/tickets.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
 
@@ -47,7 +48,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
         name: scope.name,
         kind: scope.kind,
         changedFiles: scope.changedFiles ?? [],
-        patchPath: scope.patch ?? null,
+        patchPath: scope.patch ? fromRepoRelative(config.repoPath, scope.patch) : null,
         tickets: await filterFindingFiles(written, filters)
       })
     }
@@ -82,7 +83,7 @@ export async function runIdentify({ config, stateStore, options, log }) {
       name: scope.name,
       kind: scope.kind,
       changedFiles: scope.changedFiles,
-      patch: scope.patchPath,
+      patch: scope.patchPath ? toRepoRelative(config.repoPath, scope.patchPath) : null,
       tickets: []
     }))
     await stateStore.save(state)
@@ -162,8 +163,8 @@ export async function runIdentify({ config, stateStore, options, log }) {
     name: scope.name,
     kind: scope.kind,
     changedFiles: scope.changedFiles,
-    patch: scope.patchPath,
-    tickets: scope.tickets ?? []
+    patch: scope.patchPath ? toRepoRelative(config.repoPath, scope.patchPath) : null,
+    tickets: (scope.tickets ?? []).map(ticket => toRepoRelative(config.repoPath, ticket) ?? ticket)
   }))
   await stateStore.save(state)
 
@@ -255,7 +256,7 @@ async function collectRuntimeLogs(config, artifacts) {
     for (const match of matches.slice(-5)) {
       const target = path.join(targetDir, path.basename(match))
       await fs.copyFile(match, target)
-      collected.push(target)
+      collected.push(toRepoRelative(config.repoPath, target) ?? target)
     }
   }
   return collected

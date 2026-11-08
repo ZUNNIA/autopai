@@ -245,6 +245,7 @@ The commands accept natural language (`/autopai-identify audit the last 2 merged
 - `spec/POLICIES.md`: Git artifact rules, local artifact rules, and per-role permissions.
 - `spec/CONFIG_SCHEMA.md`: the `autopai.json` schema and generation rules.
 - `spec/PLATFORMS.md`: the runner interface and the guide for porting to another coding tool.
+- `docs/PORTABLE_PATHS.md`: persisted path rules for state, patches, tickets, blockers, and runtime evidence.
 
 ## Install with an AI agent
 

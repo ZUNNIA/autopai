@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { fromRepoRelative } from './portable-paths.js'
 import { ensureDir, walkFiles } from './util.js'
 
 /**
@@ -54,7 +55,7 @@ export function assertValidBlockers(blockers) {
  * input directory before an explicit dev or refactor retry. A new blocker from
  * the retry remains active and still stops the run.
  */
-export async function archiveBlockers({ blockers, artifactsDir }) {
+export async function archiveBlockers({ blockers, artifactsDir, repoPath = null }) {
   const archived = []
   if (!Array.isArray(blockers) || blockers.length === 0) return archived
 
@@ -63,10 +64,11 @@ export async function archiveBlockers({ blockers, artifactsDir }) {
   for (const [index, blocker] of blockers.entries()) {
     const file = typeof blocker === 'string' ? blocker : blocker?.file
     if (!file) continue
+    const resolved = repoPath ? fromRepoRelative(repoPath, file) : file
     const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)
-    const target = path.join(targetDir, `${stamp}-${index}-${path.basename(file)}`)
+    const target = path.join(targetDir, `${stamp}-${index}-${path.basename(resolved)}`)
     try {
-      await fs.rename(file, target)
+      await fs.rename(resolved, target)
       archived.push({ from: file, to: target })
     } catch (error) {
       if (error.code !== 'ENOENT') throw new Error(`Could not archive blocker ${file}: ${error.message}`)

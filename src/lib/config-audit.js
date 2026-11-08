@@ -188,7 +188,10 @@ function auditField(report, key, value) {
       addError(report, 'invalid-type', key, `"${key}" must be an array of non-empty strings.`)
     }
     if (key === 'protectedPaths' && Array.isArray(value)) auditPersonalStrings(report, key, value)
-    if (key === 'runtimeLogs' && Array.isArray(value)) auditPersonalStrings(report, key, value)
+    if (key === 'runtimeLogs' && Array.isArray(value)) {
+      auditPersonalStrings(report, key, value)
+      auditAbsoluteRuntimeLogs(report, key, value)
+    }
     return
   }
 
@@ -288,6 +291,15 @@ function auditPersonalStrings(report, field, values) {
   values.forEach((value, index) => {
     if (typeof value === 'string' && looksPersonal(value)) {
       addWarning(report, 'personal-path', `${field}[${index}]`, 'Avoid personal absolute paths; use an environment variable or a repository-relative path.')
+    }
+  })
+}
+
+function auditAbsoluteRuntimeLogs(report, field, values) {
+  values.forEach((value, index) => {
+    if (typeof value !== 'string') return
+    if (path.isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value)) {
+      addWarning(report, 'absolute-path', `${field}[${index}]`, 'Use an environment placeholder instead of an absolute runtime log path.')
     }
   })
 }

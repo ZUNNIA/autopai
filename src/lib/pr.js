@@ -9,6 +9,7 @@ import { findForbidden } from './forbidden.js'
 import { runGates, gateFailureText } from './gates.js'
 import { generateMergeBody } from './title.js'
 import { classifyCheckAnnotations, formatCheckAnnotations, isInfrastructureKind } from './ci-failure.js'
+import { toRepoRelative } from './portable-paths.js'
 import { ensureDir, sleep, truncate } from './util.js'
 
 const FAILED_STATES = new Set(['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
@@ -140,7 +141,10 @@ async function writeCiLogBlocker({ config, state, stateStore, executorPayload, c
     suggestedAction: 'Inspect the linked GitHub Actions job and restore CI access; then run autopai resume without --fix.'
   }
   await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
-  state.blockers = [...(state.blockers ?? []), file]
+  state.blockers = [
+    ...(state.blockers ?? []),
+    toRepoRelative(config.repoPath, file) ?? file
+  ]
   await stateStore.save(state)
   return { ...blocker, file }
 }
@@ -167,7 +171,10 @@ async function writeCiWorkflowBlocker({ config, state, stateStore, executorPaylo
     suggestedAction: `Open ${run.url ?? 'the failed workflow run'}, fix the workflow configuration, push, and run autopai resume without --fix.`
   }
   await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
-  state.blockers = [...(state.blockers ?? []), file]
+  state.blockers = [
+    ...(state.blockers ?? []),
+    toRepoRelative(config.repoPath, file) ?? file
+  ]
   await stateStore.save(state)
   return { ...blocker, file }
 }
@@ -201,7 +208,10 @@ async function writeCiInfrastructureBlocker({ config, state, stateStore, executo
     suggestedAction: `Resolve the GitHub Actions billing/spending limit or provide a working runner, then run autopai resume without --fix. To proceed without CI, add only the exact failing check name to ignoredChecks with explicit approval and remove it after the merge.`
   }
   await fs.writeFile(file, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8')
-  state.blockers = [...(state.blockers ?? []), file]
+  state.blockers = [
+    ...(state.blockers ?? []),
+    toRepoRelative(config.repoPath, file) ?? file
+  ]
   await stateStore.save(state)
   return { ...blocker, file }
 }
@@ -421,7 +431,7 @@ export async function pushOpenWaitMerge({
     })
     const blockers = await listBlockers(config)
     if (blockers.length > 0) {
-      state.blockers = blockers.map(blocker => blocker.file)
+      state.blockers = blockers.map(blocker => toRepoRelative(config.repoPath, blocker.file) ?? blocker.file)
       await stateStore.save(state)
       throw new Error(blockerMessage(blockers))
     }
