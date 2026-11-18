@@ -219,7 +219,7 @@ The order used by `run --from --to` is `prepare`, `approve`, `dev`, `identify`, 
 **Flow.**
 
 1. Resolve a concise feature slug from `--feature` or the agreed name. A description can derive it, but prefer a short explicit name over an 80-character sentence.
-2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` was provided, run the planner to write the brief from the agreed summary.
+2. If `tickets/backlog/<feature>/brief.md` is missing and `--description` or `--description-file` was provided, run the planner to write the brief from the agreed summary. Use the file form for multi-line descriptions.
 3. Run the planner to write `backlog.md` next to the brief.
 4. Stop at the `backlog` gate.
 
@@ -236,6 +236,8 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 3. Save the state as `approve/approved` and stop at the `plan` gate.
 
 `approve` does not start the development loop. Review the generated tickets and the technical plan, then run `autopai resume --approve plan` (or `/autopai-dev`) to implement them. This is the plan checkpoint before any branch is created.
+
+A change request at this gate uses `autopai revise-plan --repo . [--feature <slug>] [--ticket <id>] [--include-summary] [--message "<change>"|--message-file <path>]`. Use `--message-file` for multi-line review text so the Windows command shim cannot truncate it. The planner edits the current feature's ready-for-dev tickets in place, the core validates the artifact contract and dependency graph, and the run stays at the plan gate. With `--ticket`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature's brief and backlog; this flag requires explicit founder authorization, cannot be combined with `--ticket`, and the core validates the summary documents. The command never edits source, never regenerates the whole plan, and never approves the plan. Use `autopai revise` only while the backlog is awaiting approval.
 
 ### 4.4 dev
 
@@ -370,7 +372,7 @@ The branch name comes from the ticket type and the short semantic ticket slug, f
 ### 5.3 Reviewing and editing
 
 - Review `backlog.md` at the `backlog` gate before running `approve`. Edit it freely; the planner reads it at that moment.
-- Review the ready-for-dev tickets at the `plan` gate before running `dev`.
+- Review the ready-for-dev tickets at the `plan` gate before running `dev`. For a change request, use `autopai revise-plan`; it edits the current feature's tickets and stays at the gate. Add `--include-summary` only when the founder explicitly authorizes reconciling the approved brief and backlog. Do not re-run `approve` to regenerate the plan.
 - Review `tickets/qa/<feature>.md` at the `qa` gate before running identify. If it fails, report the item; the operator uses `autopai qa-fix` to create fix tickets and restart dev.
 - If a ticket fails, review `state.failures` and the preserved branch. Run `resume` to retry. Use `resume --fix` only for a failure marked `repairable: true`; branch checkout and blocked dependency failures need their cause fixed first. Do not start a duplicate branch manually.
 - Edit `depends_on`, `priority`, `classification`, or `type` front matter to change execution order, debt filters, or branch type.
@@ -521,16 +523,17 @@ autopai --version
 autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
 autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
 autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
-autopai prepare --repo <path> [--feature <slug>] [--description <text>]
+autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]
 autopai approve --repo <path> [--feature <slug>]
+autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--message <change>|--message-file <path>]
 autopai dev --repo <path> [--feature <slug>]
 autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
 autopai release --repo <path> --version <x.y.z>
 autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
 autopai status --repo <path>
-autopai plan propose --repo <path> --feature <slug> --description <text>
+autopai plan propose --repo <path> --feature <slug> --description <text>|--description-file <path>
 autopai plan generate --repo <path> --feature <slug> --confirm
-autopai adr new --repo <path> --title <title> [--status <status>] [--json]
+autopai adr new --repo <path> --title <title> [--status <status>] [--content-file <path>] [--json]
 autopai artifacts check --repo <path> [--json]
 autopai config check --repo <path> [--json] [--strict]
 autopai config reconcile --repo <path> [--apply] [--json]
@@ -542,9 +545,11 @@ autopai abort --repo <path>
 
 **Config reconcile.** `autopai config reconcile` previews additive schema defaults and `--apply` writes them. It preserves explicit values and never invents branches, commands, checks, coverage, or runner settings.
 
-**Plan proposal.** `autopai plan propose` records an agreed feature summary without running a model. `autopai plan generate --confirm` refuses to run without the proposal and the explicit flag.
+**Plan revision.** `autopai revise-plan` applies a change to the ready-for-dev tickets of a run paused at the plan gate. Use `--message-file` for multi-line review text. It starts a planner session over the current tickets, validates the artifact contract and dependency graph, and leaves the gate untouched. With `--ticket <id>`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature brief and backlog after explicit founder authorization; the flag cannot be combined with `--ticket` and the core validates both summary documents. It never edits source, never regenerates the whole plan, and never approves the plan.
 
-**ADR scaffold.** `autopai adr new` creates the next numbered ADR in `tickets/adr` or `docs/adr` from the standard template.
+**Plan proposal.** `autopai plan propose` records an agreed feature summary without running a model. `autopai plan generate --confirm` refuses to run without the proposal and the explicit flag. `--description-file` keeps multi-line summaries intact on Windows.
+
+**ADR scaffold.** `autopai adr new` creates the next numbered ADR in `tickets/adr` or `docs/adr` from the standard template. With `--content-file`, the provided content replaces the template: `{{number}}`, `{{title}}`, and `{{status}}` are resolved before writing, the heading is prepended when missing, and sections 1 to 5 are required.
 
 **Artifacts check.** `autopai artifacts check` validates every local brief, backlog, finding, ready ticket, and UX proposal against its structural contract.
 
@@ -611,7 +616,7 @@ tickets/.autopai/
 └── logs/<runId>.jsonl      event log for the run
 ```
 
-**Tool sessions.** The OpenCode runner normally deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The brief and backlog sessions are retained after `prepare`, recorded in `state.sessions`, and shown by `status` and the `prepare` result. Review changes are applied with `autopai revise`, which sends the raw user request to the retained backlog session through `opencode run --session`; the original prompt stays in that conversation and is never loaded or injected again. After a successful backlog approval, both retained sessions are deleted. If approval fails, or a session cannot be deleted, they stay available for review. An interrupted prepare with both files is reconnected by `status` or `resume`; the state moves to `awaiting_approval` without running a prompt or approving. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. The operator conversation is not a planner session and is never deleted by AutopAI. Set `runnerOptions.keepSessions` to true to keep every session in the tool history; that also opts out of the prepare-session cleanup.
+**Tool sessions.** The OpenCode runner normally deletes the non-interactive session it creates after each run; the transcript stays in the artifacts. The brief and backlog sessions are retained after `prepare`, recorded in `state.sessions`, and shown by `status` and the `prepare` result. Review changes are applied with `autopai revise`, which sends the raw user request to the retained backlog session through `opencode run --session`; the original prompt stays in that conversation and is never loaded or injected again. After a successful backlog approval, both retained sessions are deleted. Plan-gate changes use `autopai revise-plan`, which starts a new planner revision over the current tickets; it does not require a retained prepare session and it never approves the gate. If approval fails, or a session cannot be deleted, they stay available for review. An interrupted prepare with both files is reconnected by `status` or `resume`; the state moves to `awaiting_approval` without running a prompt or approving. The title carries a random per-run token and only an unambiguous match is deleted, so sessions you create yourself are never touched. The operator conversation is not a planner session and is never deleted by AutopAI. Set `runnerOptions.keepSessions` to true to keep every session in the tool history; that also opts out of the prepare-session cleanup.
 
 **state.json fields.** `schemaVersion`, `runId`, `mode`, `phase`, `completedPhases`, `repo`, `feature`, `branch`, `baseBranch`, `releaseBranch`, `baseSha`, `headSha`, `prNumber`, `prTitle`, `mergeCommit`, `scopes`, `filters`, `changedFiles`, `attempts`, `sessions`, `blockers`, `createdAt`, `updatedAt`. `repo` is `.`; repository paths are resolved from the current `--repo`. `scopes[].patch`, `scopes[].tickets`, and `blockers` are repository-relative and are resolved before use. `filters` holds the canonical `classifications` and `priorities` arrays of the current run. `sessions` holds the retained prepare review conversations with `kind`, `feature`, `title`, `id`, and `createdAt`; the orchestrator records them before it stops at the backlog gate and clears them after a successful approval. See `docs/PORTABLE_PATHS.md`.
 

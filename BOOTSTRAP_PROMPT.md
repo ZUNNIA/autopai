@@ -112,6 +112,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/blockers.js`
 - `src/lib/chunks.js`
 - `src/lib/ci-failure.js`
+- `src/lib/cli-message.js`
 - `src/lib/codefiles.js`
 - `src/lib/commit-message.js`
 - `src/lib/config-audit.js`
@@ -162,6 +163,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/feature-brief.md`
 - `src/prompts/identified.md`
 - `src/prompts/qa-fix.md`
+- `src/prompts/ready-for-dev-revision.md`
 - `src/prompts/ready-for-dev.md`
 - `src/prompts/ready-for-refactor.md`
 - `src/prompts/resolve-conflicts.md`
@@ -184,6 +186,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/chunks.test.js`
 - `test/ci-failure.test.js`
 - `test/ci-fix.test.js`
+- `test/cli-message.test.js`
 - `test/cli.test.js`
 - `test/codefiles.test.js`
 - `test/command-runner.test.js`
@@ -199,6 +202,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/gates.test.js`
 - `test/git.test.js`
 - `test/pauses.test.js`
+- `test/plan-revision.test.js`
 - `test/plan.test.js`
 - `test/platform-commands.test.js`
 - `test/platform-permissions.test.js`

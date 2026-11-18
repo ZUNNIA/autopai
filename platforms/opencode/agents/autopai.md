@@ -104,8 +104,10 @@ Rules:
 - When the founder accepts the summary, record it with `autopai plan propose --repo . --feature <slug> --description "<summary>"`. This does not generate artifacts.
 - Start prepare only when the user explicitly says to generate, formalize or prepare the brief/backlog, or confirms the summary. Use the agreed summary and proposal, then run `autopai plan generate --repo . --feature <slug> --confirm`. The CLI refuses generation without the proposal and confirmation; never turn the raw idea into the slug.
 - After prepare succeeds, report the retained brief and backlog session titles and ids from the CLI result. Keep both sessions open for review until the backlog gate is decided.
-- When the backlog is awaiting review and the user requests a change, run `autopai revise --repo . --message "<change>"`. It continues the retained backlog session without loading a core prompt from `src/prompts`. Do not edit tickets yourself, do not run prepare again, and do not tell the user to paste the change.
+- When the backlog is awaiting review and the user requests a change, run `autopai revise --repo . --message "<change>"` or use `--message-file <path>` for multi-line text. It continues the retained backlog session without loading a core prompt from `src/prompts`. Do not edit tickets yourself, do not run prepare again, and do not tell the user to paste the change.
 - Relay the planner response and any open questions from `autopai revise` or the `plannerMessages` field of the prepare result. Open questions belong in the conversation, never in the brief, backlog, or UX proposal.
+- When the run is paused at the plan gate and the user requests a change to the ready-for-dev tickets, run `autopai revise-plan --repo . [--feature <slug>] [--ticket <id>] [--message "<change>"|--message-file <path>]`. Use `--message-file` for multi-line text. It starts a planner revision over the existing tickets, validates them, and stays at the plan gate. With `--ticket`, only that ticket may change. Do not edit tickets yourself, do not run approve again to regenerate the plan, and never approve the plan. The command reports the changed files and the planner response.
+- Use `--include-summary` on `revise-plan` only when the founder explicitly authorizes reconciling the approved brief and backlog. It permits edits to the current feature's `brief.md` and `backlog.md` in addition to the ready-for-dev tickets; it cannot be combined with `--ticket`. Report `summaryDocs` and never infer this permission.
 - When reporting generated backlogs, findings, or tickets, include the billing impact only when the artifact marks billing as `increase` or `unknown`. Use `billingReports` from the `prepare`, `approve`, `identify`, `promote`, or `qa-fix` CLI result, or the `## Billing impact` section. Never invent an estimate; keep `Unknown` when the artifact says so. Use the project `billingCurrency`.
 - The orchestrator deletes the retained prepare sessions only after a successful backlog approval. If approval fails or a session cannot be deleted, leave it and report it.
 - If the user says no or wants to keep discussing, stay in the discussion. Never approve the backlog.
@@ -138,7 +140,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
+Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `revise`, `revise-plan`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
 
 ## Branch and dependency failures
 

@@ -21,7 +21,7 @@ export async function nextAdrNumber(dir) {
   return maximum + 1
 }
 
-export async function createAdr({ repoPath, title, status = 'Proposed' }) {
+export async function createAdr({ repoPath, title, status = 'Proposed', content = null }) {
   const name = String(title ?? '').trim()
   if (!name) throw new Error('An ADR title is required.')
   if (!STATUSES.includes(status)) throw new Error(`ADR status must be one of: ${STATUSES.join(', ')}.`)
@@ -32,8 +32,33 @@ export async function createAdr({ repoPath, title, status = 'Proposed' }) {
   const slug = slugify(name)
   const file = path.join(dir, `${number}-${slug}.md`)
   if (await exists(file)) throw new Error(`ADR already exists: ${file}`)
-  await fs.writeFile(file, renderAdrTemplate({ number, title: name, status }), 'utf8')
+  const text = content === null || content === undefined
+    ? renderAdrTemplate({ number, title: name, status })
+    : renderAdrContent({ content, number, title: name, status })
+  await fs.writeFile(file, text, 'utf8')
   return { file, number, title: name, status }
+}
+
+export function renderAdrContent({ content, number, title, status }) {
+  const text = String(content ?? '')
+    .replaceAll('{{number}}', () => number)
+    .replaceAll('{{title}}', () => title)
+    .replaceAll('{{status}}', () => status)
+    .trim()
+  if (!text) throw new Error('The ADR content file is empty.')
+  for (const section of ['1', '2', '3', '4', '5']) {
+    if (!new RegExp(`^##\\s+${section}\\.\\s+\\S+`, 'm').test(text)) {
+      throw new Error(`The ADR content must include section ${section}.`)
+    }
+  }
+  const heading = `# ${number}: ${title}`
+  if (text.startsWith('# ')) {
+    if (!text.startsWith(`${heading}\n`) && !text.startsWith(`${heading}\r\n`)) {
+      throw new Error(`The ADR content heading must be "${heading}".`)
+    }
+    return `${text}\n`
+  }
+  return `${heading}\n\n${text}\n`
 }
 
 export function renderAdrTemplate({ number, title, status }) {

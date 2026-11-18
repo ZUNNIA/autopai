@@ -2,6 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseCliArgs } from './lib/util.js'
+import { readCliDescription, readCliMessage, readCliTextFile } from './lib/cli-message.js'
 import { loadConfig } from './lib/config.js'
 import { auditConfig, formatConfigReport } from './lib/config-audit.js'
 import { reconcileConfig } from './lib/config-reconcile.js'
@@ -11,7 +12,7 @@ import { runAdopt } from './phases/adopt.js'
 import { runResolveConflicts } from './phases/conflicts.js'
 import { runDiagnostics } from './phases/diagnostics.js'
 import { runIdentify } from './phases/identify.js'
-import { runApprove, runDev, runPrepare, runPromote, runQaFix, runRefactor, runRelease } from './phases/pipeline.js'
+import { runApprove, runDev, runPrepare, runPromote, runQaFix, runRefactor, runRelease, runRevisePlan } from './phases/pipeline.js'
 import { Artifacts } from './lib/artifacts.js'
 import { continueSession } from './lib/session.js'
 import { nextPhase } from './lib/resume.js'
@@ -40,6 +41,14 @@ async function main() {
 
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
+
+  if (command !== 'plan' && options.descriptionFile !== undefined) {
+    options.description = await readCliDescription(
+      options,
+      'Usage: autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]'
+    )
+    delete options.descriptionFile
+  }
 
   if (command === 'plan') return runPlanCommand({ config, stateStore, options, log })
 
@@ -80,6 +89,7 @@ async function main() {
     else if (command === 'release') result = await runRelease(ctx)
     else if (command === 'run') result = await runSequence(ctx)
     else if (command === 'revise') result = await runRevise(ctx)
+    else if (command === 'revise-plan') result = await runRevisePlan(ctx)
     else if (command === 'qa-fix') result = await runQaFix(ctx)
     else if (command === 'resolve-conflicts') result = await runResolveConflicts(ctx)
     else if (command === 'diagnostics') result = await runDiagnostics(ctx)
@@ -92,8 +102,7 @@ async function main() {
 }
 
 async function runRevise({ config, stateStore, options, log }) {
-  const message = String(options.message ?? '').trim()
-  if (!message || message === 'true') throw new Error('Usage: autopai revise --repo <path> --message <change>')
+  const message = await readCliMessage(options, 'Usage: autopai revise --repo <path> [--message <change>|--message-file <path>]')
 
   const recovered = await recoverPrepareReview({ config, stateStore, log })
   const state = recovered ?? await stateStore.load()
@@ -284,13 +293,18 @@ async function abortRun(stateStore) {
 
 async function runAdrCommand(repoPath, options) {
   const action = String((options._ ?? [])[0] ?? '')
-  if (action !== 'new') throw new Error('Usage: autopai adr new --repo <path> --title <title> [--status Proposed|Accepted|Deprecated|Superseded] [--json]')
+  const usage = 'Usage: autopai adr new --repo <path> --title <title> [--status Proposed|Accepted|Deprecated|Superseded] [--content-file <path>] [--json]'
+  if (action !== 'new') throw new Error(usage)
   const status = String(options.status ?? 'Proposed').trim()
   if (!adrStatuses().includes(status)) throw new Error(`ADR status must be one of: ${adrStatuses().join(', ')}.`)
+  const content = options.contentFile !== undefined
+    ? await readCliTextFile(options.contentFile, 'content', usage)
+    : null
   const result = await createAdr({
     repoPath: path.resolve(repoPath),
     title: String(options.title ?? ''),
-    status
+    status,
+    content
   })
   if (options.json === true) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
   else process.stdout.write(`${result.file}\n`)
@@ -301,10 +315,14 @@ async function runPlanCommand({ config, stateStore, options, log }) {
   const action = String((options._ ?? [])[0] ?? '')
 
   if (action === 'propose') {
+    const description = await readCliDescription(
+      options,
+      'Usage: autopai plan propose --repo <path> --feature <slug> --description <text>|--description-file <path>'
+    )
     const proposal = await writePlanProposal({
       config,
       feature: options.feature,
-      description: options.description
+      description
     })
     process.stdout.write(`Plan proposal: ${proposal.file}\n`)
     process.stdout.write(`Feature: ${proposal.feature}\n`)
@@ -423,7 +441,7 @@ Usage:
   autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
   autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
   autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
-  autopai prepare --repo <path> [--feature <slug>] [--description <text>]
+  autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]
   autopai approve --repo <path> [--feature <slug>]
   autopai dev --repo <path> [--feature <slug>]
   autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
@@ -431,12 +449,13 @@ Usage:
   autopai qa-fix --repo <path> --message <failure>
   autopai resolve-conflicts --repo <path> [--pr <number>]
   autopai diagnostics --repo <path> [--severity error,warning,info] [--fix] [--branch <name>]
-  autopai revise --repo <path> --message <change>
+  autopai revise --repo <path> [--message <change>|--message-file <path>]
+  autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--message <change>|--message-file <path>]
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
-  autopai plan propose --repo <path> --feature <slug> --description <text>
+  autopai plan propose --repo <path> --feature <slug> --description <text>|--description-file <path>
   autopai plan generate --repo <path> --feature <slug> --confirm
-  autopai adr new --repo <path> --title <title> [--status <status>] [--json]
+  autopai adr new --repo <path> --title <title> [--status <status>] [--content-file <path>] [--json]
   autopai artifacts check --repo <path> [--json]
   autopai config check --repo <path> [--json] [--strict]
   autopai config reconcile --repo <path> [--apply] [--json]
@@ -458,8 +477,15 @@ the dependency. Filters persist through resume.
 
 approve generates the ready-for-dev tickets and stops; dev implements them.
 
-revise continues the retained backlog session with a review message. It never
+revise continues the retained backlog session with a review message. Use --message-file for multi-line changes. It never
 loads the original prompt, creates a new session, or approves the backlog.
+
+revise-plan starts a planner session over the current ready-for-dev tickets and
+applies a review message in place. Use --message-file for multi-line changes. With --ticket, only that ticket may change.
+With --include-summary, the planner may also reconcile the current feature's
+brief and backlog with the Work Order and tickets; that flag requires explicit
+founder authorization. It validates the artifacts, stays at the plan gate, and
+never approves or starts dev.
 
 qa-fix turns a failed manual QA review into fix tickets for the current feature
 and starts dev again. It never approves the qa gate.
@@ -486,10 +512,14 @@ executor, policy, and merge failures are not repaired by --fix.
 
 autopai plan propose records the agreed feature summary without generating
 artifacts. autopai plan generate requires --confirm and an existing proposal,
-then runs prepare and clears the proposal.
+then runs prepare and clears the proposal. Use --description-file for multi-line
+descriptions that a Windows command shim would truncate.
 
 autopai adr new creates the next numbered ADR from the standard template and
-selects tickets/adr or docs/adr, whichever directory already exists.
+selects tickets/adr or docs/adr, whichever directory already exists. With
+--content-file, the provided content replaces the template; {{number}},
+{{title}}, and {{status}} are resolved before writing, and sections 1 to 5 are
+required.
 
 autopai artifacts check validates every local brief, backlog, finding, ticket,
 and UX proposal against its structural contract. It never writes.

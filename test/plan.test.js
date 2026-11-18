@@ -28,6 +28,27 @@ test('plan propose records the agreed summary without generating artifacts', asy
   assert.equal(await exists(path.join(repo, 'tickets', 'backlog')), false)
 })
 
+test('plan propose reads a description file without truncating lines', async () => {
+  const repo = await makeRepo()
+  const descriptionFile = path.join(repo, 'description.md')
+  await fs.writeFile(descriptionFile, 'First constraint.\nSecond constraint.\n', 'utf8')
+
+  execFileSync(process.execPath, [
+    cli,
+    'plan',
+    'propose',
+    '--repo',
+    repo,
+    '--feature',
+    'demo-feature',
+    '--description-file',
+    descriptionFile
+  ])
+
+  const proposal = JSON.parse(await fs.readFile(path.join(repo, '.autopai', 'plan-proposal.json'), 'utf8'))
+  assert.equal(proposal.description, 'First constraint.\nSecond constraint.')
+})
+
 test('plan generate requires an explicit confirmation', async () => {
   const repo = await makeRepo()
   execFileSync(process.execPath, [
