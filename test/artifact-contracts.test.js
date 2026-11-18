@@ -34,8 +34,15 @@ test('validates ready-for-dev, ready-for-refactor, and QA fix front matter', () 
   assert.deepEqual(validateQaFixText(qaTicket()), { file: '<memory>', kind: 'qa-fix' })
 
   assert.throws(() => validateReadyForDevText(devTicket().replace('depends_on: []\n', '')), /depends_on/)
+  assert.throws(() => validateReadyForDevText(devTicket().replace('depends_on: []', 'depends_on: []\ncovers: AC-1')), /covers/)
+  assert.throws(() => validateReadyForDevText(devTicket().replace('depends_on: []', 'depends_on: []\ncovers: [not-a-criterion]')), /covers id/)
   assert.throws(() => validateReadyForRefactorText(refactorTicket().replace('type: refactor', 'type: feat')), /type: refactor/)
   assert.throws(() => validateQaFixText(qaTicket().replace('type: fix', 'type: feat')), /type: fix/)
+})
+
+test('accepts inline and block covers lists', () => {
+  assert.deepEqual(validateReadyForDevText(devTicket().replace('depends_on: []', 'depends_on: []\ncovers: [AC-1, AC-2]')), { file: '<memory>', kind: 'ready-for-dev' })
+  assert.deepEqual(validateReadyForDevText(devTicket().replace('depends_on: []', 'depends_on: []\ncovers:\n  - AC-1\n  - AC-2')), { file: '<memory>', kind: 'ready-for-dev' })
 })
 
 test('validates the UX proposal contract', () => {

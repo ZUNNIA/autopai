@@ -221,8 +221,9 @@ function sameSession(left, right) {
  * run phase.
  */
 export async function runRevisePlan({ config, stateStore, options, log }) {
-  const message = await readCliMessage(options, 'Usage: autopai revise-plan --repo <path> [--include-summary] [--message <change>|--message-file <path>]')
+  const message = await readCliMessage(options, 'Usage: autopai revise-plan --repo <path> [--include-summary] [--review-file <path>] [--message <change>|--message-file <path>]')
   const includeSummary = options.includeSummary === true
+  const review = options.reviewFile !== undefined ? await readReviewFile(options.reviewFile) : null
 
   const state = await stateStore.load()
   if (!state || state.mode !== 'approve' || state.phase !== 'approved' || currentGate(state) !== 'plan') {
@@ -281,6 +282,7 @@ export async function runRevisePlan({ config, stateStore, options, log }) {
       readyDir,
       message,
       includeSummary,
+      review,
       targetTicket: targetTicket ? {
         id: targetTicket.id,
         title: targetTicket.title,
@@ -379,6 +381,20 @@ export async function runRevisePlan({ config, stateStore, options, log }) {
     logFile,
     billingReports
   }
+}
+
+async function readReviewFile(file) {
+  const target = path.resolve(String(file))
+  let parsed
+  try {
+    parsed = JSON.parse(await fs.readFile(target, 'utf8'))
+  } catch (error) {
+    throw new Error(`Could not read the plan review file ${target}: ${error.message}`)
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.coverage) || !Array.isArray(parsed.gaps)) {
+    throw new Error(`The plan review file ${target} must contain coverage and gaps arrays.`)
+  }
+  return parsed
 }
 
 function findTicket(tickets, value) {
