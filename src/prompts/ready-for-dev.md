@@ -27,8 +27,12 @@ type: [feat|fix|refactor|perf|test|docs|chore]
 priority: [urgent|important|minor]
 billing: [none|increase|unknown]
 depends_on: [id-or-empty-list]
+covers:
+  - [acceptance-criterion-id]
 ---
 ```
+
+`covers` lists every acceptance-criterion id from the brief or backlog that the ticket implements. Use only ids that already exist in the source artifacts (for example `AC-1`). Never invent, renumber, or normalize an id. Every acceptance-criterion id in the brief must appear in at least one ticket's `covers` list. Use an empty list only when the source has no acceptance-criterion ids.
 
 Never put ticket identifiers or ADR numbers in code snippets, branch names, commit examples, or pull request examples.
 

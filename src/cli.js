@@ -450,7 +450,7 @@ Usage:
   autopai resolve-conflicts --repo <path> [--pr <number>]
   autopai diagnostics --repo <path> [--severity error,warning,info] [--fix] [--branch <name>]
   autopai revise --repo <path> [--message <change>|--message-file <path>]
-  autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--message <change>|--message-file <path>]
+  autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--review-file <path>] [--message <change>|--message-file <path>]
   autopai run --repo <path> --from <phase> --to <phase> [--auto] [--pause-after <gates>] [--fix] [--classification <list>] [--priority <list>] [phase options]
   autopai status --repo <path>
   autopai plan propose --repo <path> --feature <slug> --description <text>|--description-file <path>
@@ -481,7 +481,8 @@ revise continues the retained backlog session with a review message. Use --messa
 loads the original prompt, creates a new session, or approves the backlog.
 
 revise-plan starts a planner session over the current ready-for-dev tickets and
-applies a review message in place. Use --message-file for multi-line changes. With --ticket, only that ticket may change.
+applies a review message in place. Use --message-file for multi-line changes. Use --review-file to pass the structured
+plan-review result so the planner edits against the coverage matrix and gap history. With --ticket, only that ticket may change.
 With --include-summary, the planner may also reconcile the current feature's
 brief and backlog with the Work Order and tickets; that flag requires explicit
 founder authorization. It validates the artifacts, stays at the plan gate, and

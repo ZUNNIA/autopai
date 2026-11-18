@@ -8,6 +8,8 @@ Write the brief at `briefPath` from `feature` and `description`.
 
 You only write the brief file. Never edit source, tests, UX, CI, ADRs, or configuration. The Core validates every required section and rejects an Open Questions section; invalid output fails the phase.
 
+Preserve every requirement identifier in the description (AC-n, SC-n, NG-n, DEP-n, CON-n, DEC-n) exactly. Do not renumber, merge, or drop identifiers, and keep them attached to the same requirement in every section.
+
 ## Brief Structure
 
 # Feature Brief: [Name]

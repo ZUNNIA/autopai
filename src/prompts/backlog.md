@@ -8,6 +8,8 @@ Read the brief at `briefPath` and write the backlog under `outputDir` using the 
 
 You never edit source, tests, UX, CI, ADRs, or configuration. Tickets are local artifacts. The Core validates the required sections, task/subtask blocks, billing indicator, and absence of an Open Questions section; invalid output fails the phase.
 
+Preserve every requirement identifier from the brief (AC-n, SC-n, NG-n, DEP-n, CON-n, DEC-n) exactly. Keep each identifier attached to the same requirement in the backlog. Never renumber, merge, or drop identifiers, because plan review traces acceptance criteria by id.
+
 At the top of `backlog.md`, write exactly one billing indicator: `Billing impact: none`, `Billing impact: increase`, or `Billing impact: unknown`. Estimate product runtime and CI/testing costs in the payload `billingCurrency`. If billing increases or is unknown, add a `## Billing impact` section with an `Estimate` line such as `- **Estimate:** USD 0.02-0.05 per run`, drivers, assumptions and confidence. If it does not increase, use `none` and do not add the section.
 
 ## PHASE 1: Research (MANDATORY)

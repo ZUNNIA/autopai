@@ -34,6 +34,7 @@ export function validateReadyForDevText(text, { file = '<memory>' } = {}) {
   requireFields(meta, file, ['id', 'feature', 'type', 'priority', 'billing', 'depends_on'])
   requireTicketType(meta, file)
   requirePriority(meta, file)
+  validateCovers(meta, file)
   const qaFix = /^#{1,6}\s*1\.\s*QA Failure\b/im.test(String(text ?? ''))
   requireSections(text, file, qaFix
     ? ['0. Classification', '1. QA Failure', '2. Files', '3. Implementation', '4. Acceptance Criteria', '5. Manual Verification']
@@ -132,7 +133,10 @@ function parseFrontMatter(source) {
       meta[key] = []
     } else {
       currentListKey = null
-      meta[key] = value.trim()
+      const inlineList = value.trim().match(/^\[(.*)\]$/)
+      meta[key] = inlineList
+        ? inlineList[1].split(',').map(item => item.trim()).filter(Boolean)
+        : value.trim()
     }
   }
   return meta
@@ -155,6 +159,16 @@ function requirePriority(meta, file) {
   const value = normalizePriority(meta.priority)
   if (!value || !PRIORITIES.includes(value)) {
     throw contractError(file, `invalid priority "${String(meta.priority ?? '')}". Use ${PRIORITIES.join(', ')}.`)
+  }
+}
+
+function validateCovers(meta, file) {
+  if (!('covers' in meta)) return
+  if (!Array.isArray(meta.covers)) throw contractError(file, 'front matter "covers" must be a list.')
+  for (const value of meta.covers) {
+    if (!/^[A-Za-z]+-\d+$/.test(String(value).trim())) {
+      throw contractError(file, `invalid covers id "${String(value)}". Use an existing criterion id such as AC-1.`)
+    }
   }
 }
 

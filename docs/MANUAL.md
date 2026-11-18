@@ -237,7 +237,7 @@ Nothing is implemented yet. This is the human checkpoint: read the brief, edit t
 
 `approve` does not start the development loop. Review the generated tickets and the technical plan, then run `autopai resume --approve plan` (or `/autopai-dev`) to implement them. This is the plan checkpoint before any branch is created.
 
-A change request at this gate uses `autopai revise-plan --repo . [--feature <slug>] [--ticket <id>] [--include-summary] [--message "<change>"|--message-file <path>]`. Use `--message-file` for multi-line review text so the Windows command shim cannot truncate it. The planner edits the current feature's ready-for-dev tickets in place, the core validates the artifact contract and dependency graph, and the run stays at the plan gate. With `--ticket`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature's brief and backlog; this flag requires explicit founder authorization, cannot be combined with `--ticket`, and the core validates the summary documents. The command never edits source, never regenerates the whole plan, and never approves the plan. Use `autopai revise` only while the backlog is awaiting approval.
+A change request at this gate uses `autopai revise-plan --repo . [--feature <slug>] [--ticket <id>] [--include-summary] [--review-file <path>] [--message "<change>"|--message-file <path>]`. Use `--message-file` for multi-line review text so the Windows command shim cannot truncate it. Use `--review-file` to pass a structured plan-review result with the coverage matrix and gap history; the planner then edits against the exact criterion ids and reports its own coverage check. The planner edits the current feature's ready-for-dev tickets in place, the core validates the artifact contract and dependency graph, and the run stays at the plan gate. With `--ticket`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature's brief and backlog; this flag requires explicit founder authorization, cannot be combined with `--ticket`, and the core validates the summary documents. The command never edits source, never regenerates the whole plan, and never approves the plan. Use `autopai revise` only while the backlog is awaiting approval.
 
 ### 4.4 dev
 
@@ -358,10 +358,12 @@ classification: code-smell|unnecessary-complexity|lack-of-coverage|outdated-libr
 priority: urgent|important|minor
 billing: none|increase|unknown
 depends_on: []
+covers:
+  - AC-1
 ---
 ```
 
-The orchestrator reads this front matter, not the ticket identifiers, so Git artifacts stay free of ticket references. `id` is required; `type` defaults to `feat`; `priority` defaults to `important`; unknown priorities fall back to `important`. `classification` is optional for feature tickets and is written by the refactor planner from the Identified finding; when it is absent, the orchestrator falls back to the checked classification in the ticket body. `depends_on` accepts an inline list `[a, b]` or a YAML block list.
+The orchestrator reads this front matter, not the ticket identifiers, so Git artifacts stay free of ticket references. `id` is required; `type` defaults to `feat`; `priority` defaults to `important`; unknown priorities fall back to `important`. `classification` is optional for feature tickets and is written by the refactor planner from the Identified finding; when it is absent, the orchestrator falls back to the checked classification in the ticket body. `depends_on` accepts an inline list `[a, b]` or a YAML block list. Ready-for-dev tickets also carry `covers`, the acceptance-criterion ids from the brief or backlog that the ticket implements. The planner preserves the ids exactly, and every acceptance criterion must appear in at least one ticket. `covers` accepts an inline list or a YAML block list.
 
 ### 5.2 Ordering and branch naming
 
@@ -525,7 +527,7 @@ autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:
 autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
 autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]
 autopai approve --repo <path> [--feature <slug>]
-autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--message <change>|--message-file <path>]
+autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--review-file <path>] [--message <change>|--message-file <path>]
 autopai dev --repo <path> [--feature <slug>]
 autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
 autopai release --repo <path> --version <x.y.z>
@@ -545,7 +547,7 @@ autopai abort --repo <path>
 
 **Config reconcile.** `autopai config reconcile` previews additive schema defaults and `--apply` writes them. It preserves explicit values and never invents branches, commands, checks, coverage, or runner settings.
 
-**Plan revision.** `autopai revise-plan` applies a change to the ready-for-dev tickets of a run paused at the plan gate. Use `--message-file` for multi-line review text. It starts a planner session over the current tickets, validates the artifact contract and dependency graph, and leaves the gate untouched. With `--ticket <id>`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature brief and backlog after explicit founder authorization; the flag cannot be combined with `--ticket` and the core validates both summary documents. It never edits source, never regenerates the whole plan, and never approves the plan.
+**Plan revision.** `autopai revise-plan` applies a change to the ready-for-dev tickets of a run paused at the plan gate. Use `--message-file` for multi-line review text and `--review-file` for a structured plan-review result with coverage and gap history. It starts a planner session over the current tickets, validates the artifact contract and dependency graph, and leaves the gate untouched. The planner keeps the `covers` lists aligned with the acceptance-criterion ids and reports its own coverage check. With `--ticket <id>`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature brief and backlog after explicit founder authorization; the flag cannot be combined with `--ticket` and the core validates both summary documents. It never edits source, never regenerates the whole plan, and never approves the plan.
 
 **Plan proposal.** `autopai plan propose` records an agreed feature summary without running a model. `autopai plan generate --confirm` refuses to run without the proposal and the explicit flag. `--description-file` keeps multi-line summaries intact on Windows.
 

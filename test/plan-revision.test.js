@@ -106,6 +106,63 @@ test('revise-plan edits ready-for-dev tickets and keeps the plan gate', async t 
   assert.equal(await fs.access(result.logFile).then(() => true), true)
 })
 
+test('revise-plan passes the structured review file to the planner', async t => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-revise-review-'))
+  t.after(() => fs.rm(repo, { recursive: true, force: true }))
+  execFileSync('git', ['init'], { cwd: repo, stdio: 'ignore' })
+
+  const feature = 'history-review'
+  const readyDir = path.join(repo, 'tickets', 'ready-for-dev', feature)
+  await fs.mkdir(readyDir, { recursive: true })
+  const ticket = path.join(readyDir, '01-native-fix.md')
+  await fs.writeFile(ticket, TICKET, 'utf8')
+  const reviewFile = path.join(repo, 'review.json')
+  await fs.writeFile(reviewFile, JSON.stringify({
+    verdict: 'revise',
+    coverage: [{ id: 'AC-1', requirement: 'The surface is empty.', status: 'missing', evidence: [], tickets: [], note: 'structured test' }],
+    gaps: [{ id: 'GAP-1', severity: 'blocking', coverageId: 'AC-1', requirement: 'Cover it.', evidence: [], requiredChange: 'Add it.' }]
+  }), 'utf8')
+
+  const script = path.join(repo, 'fake-review-planner.js')
+  await fs.writeFile(script, `
+    import fs from 'node:fs/promises'
+    let input = ''
+    process.stdin.on('data', chunk => { input += chunk })
+    process.stdin.on('end', async () => {
+      if (!input.includes('structured test')) process.exit(3)
+      await fs.appendFile(${JSON.stringify(ticket)}, '\\n<!-- review applied -->\\n')
+      process.stdout.write(JSON.stringify({ changed: ['01-native-fix.md'] }) + '\\n')
+    })
+  `, 'utf8')
+
+  await fs.writeFile(path.join(repo, 'autopai.json'), JSON.stringify({
+    runner: 'command',
+    runnerOptions: {
+      run: [process.execPath, script],
+      prompt: 'stdin'
+    },
+    baseBranch: 'develop',
+    releaseBranch: 'master',
+    stateDir: 'tickets/.autopai'
+  }), 'utf8')
+
+  const config = await loadConfig(repo)
+  const stateStore = new StateStore(config)
+  const state = await stateStore.create('approve', { feature })
+  state.phase = 'approved'
+  await stateStore.save(state)
+
+  const result = await runRevisePlan({
+    config,
+    stateStore,
+    options: { message: 'Apply the review.', reviewFile },
+    log: () => {}
+  })
+
+  assert.match(await fs.readFile(ticket, 'utf8'), /review applied/)
+  assert.deepEqual(result.changed, ['01-native-fix.md'])
+})
+
 test('revise-plan edits summary documents only when explicitly included', async t => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-revise-summary-'))
   t.after(() => fs.rm(repo, { recursive: true, force: true }))
@@ -241,6 +298,9 @@ test('revise-plan refuses a run that is not at the plan gate', async () => {
   assert.match(prompt, /includeSummary/)
   assert.match(prompt, /Never approve the plan/)
   assert.match(prompt, /Never edit source code/)
+  assert.match(prompt, /covers/)
+  assert.match(prompt, /self-audit/i)
+  assert.match(prompt, /review/)
   assert.match(agent, /autopai revise-plan/)
   assert.match(agent, /--include-summary/)
 })
