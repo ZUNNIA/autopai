@@ -1,6 +1,8 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from '../lib/git.js'
+import { readCliMessage } from '../lib/cli-message.js'
 import { runSession, deleteSession } from '../lib/session.js'
 import { scanBranch, formatViolations } from '../lib/policy.js'
 import { runGates, gateFailureText } from '../lib/gates.js'
@@ -210,6 +212,240 @@ export async function cleanupPrepareSessions({ config, state, log, removeSession
 function sameSession(left, right) {
   if (left.id && right.id) return left.id === right.id
   return Boolean(left.title && right.title && left.title === right.title)
+}
+
+/**
+ * Revises the ready-for-dev plan of a run paused at the plan gate. The planner
+ * edits only the current feature's ticket directory; the core validates the
+ * resulting contract and never approves the gate, starts dev, or changes the
+ * run phase.
+ */
+export async function runRevisePlan({ config, stateStore, options, log }) {
+  const message = await readCliMessage(options, 'Usage: autopai revise-plan --repo <path> [--include-summary] [--message <change>|--message-file <path>]')
+  const includeSummary = options.includeSummary === true
+
+  const state = await stateStore.load()
+  if (!state || state.mode !== 'approve' || state.phase !== 'approved' || currentGate(state) !== 'plan') {
+    throw new Error('There is no ready-for-dev plan awaiting review. Approve the backlog first.')
+  }
+
+  const feature = String(options.feature ?? state.feature ?? '').trim()
+  if (!feature) throw new Error('Specify --feature <slug> or run approve first.')
+
+  const readyDir = path.join(config.repoPath, config.ticketDirs.readyForDev, feature)
+  const tickets = await listTickets(readyDir)
+  if (tickets.length === 0) throw new Error(`No ready-for-dev tickets found in ${readyDir}.`)
+  await validateArtifactFiles(tickets.map(ticket => ticket.file), 'ready-for-dev')
+  assertUniqueTicketIds(tickets)
+  const requestedTicket = String(options.ticket ?? '').trim()
+  const targetTicket = requestedTicket ? findTicket(tickets, requestedTicket) : null
+  if (requestedTicket && !targetTicket) {
+    throw new Error(`No ready-for-dev ticket matches "${requestedTicket}" in ${readyDir}.`)
+  }
+  if (includeSummary && targetTicket) {
+    throw new Error('--include-summary cannot be combined with --ticket.')
+  }
+
+  const briefPath = path.join(config.repoPath, config.ticketDirs.backlog, feature, 'brief.md')
+  const backlogPath = path.join(config.repoPath, config.ticketDirs.backlog, feature, 'backlog.md')
+  const trackedBefore = trackedStatusWithoutTickets(await git.statusTrackedPorcelain(config.repoPath), config)
+  const summaryFiles = [
+    { file: briefPath, kind: 'brief' },
+    { file: backlogPath, kind: 'backlog' }
+  ]
+  const summaryBefore = new Map()
+  const summaryContent = new Map()
+  for (const summaryFile of summaryFiles) {
+    const content = await fs.readFile(summaryFile.file, 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return null
+      throw error
+    })
+    summaryContent.set(summaryFile.file, content)
+    summaryBefore.set(summaryFile.file, content === null
+      ? null
+      : crypto.createHash('sha256').update(content).digest('hex'))
+  }
+  const before = await ticketSnapshot(readyDir)
+
+  const artifacts = new Artifacts(config, `revise-plan-${Date.now()}`)
+  await artifacts.init()
+  const logFile = artifacts.path('planner-ready-for-dev-revision.log')
+  const execution = await runSession({
+    config,
+    prompt: 'ready-for-dev-revision',
+    agent: config.agents.planner,
+    payload: {
+      feature,
+      briefPath,
+      backlogPath,
+      readyDir,
+      message,
+      includeSummary,
+      targetTicket: targetTicket ? {
+        id: targetTicket.id,
+        title: targetTicket.title,
+        file: targetTicket.file
+      } : null,
+      tickets: tickets.map(ticket => ({
+        id: ticket.id,
+        title: ticket.title,
+        file: ticket.file
+      })),
+      billingCurrency: config.billingCurrency
+    },
+    title: `AutopAI plan revision ${feature}`,
+    logFile,
+    role: 'planner'
+  })
+
+  const plannerOutput = String(execution.stdout ?? '').trim()
+  const failureOutput = [String(execution.stderr ?? '').trim(), plannerOutput].filter(Boolean).join('\n')
+  if (execution.code !== 0) {
+    throw new Error(`The planner could not revise the plan.${failureOutput ? `\n${truncate(failureOutput, 6000)}` : ''}\nSee ${logFile}`)
+  }
+
+  const trackedAfter = trackedStatusWithoutTickets(await git.statusTrackedPorcelain(config.repoPath), config)
+  if (trackedAfter !== trackedBefore) {
+    throw new Error(`The planner modified tracked repository files during plan revision. See ${logFile}`)
+  }
+  const changedSummary = []
+  for (const summaryFile of summaryFiles) {
+    if (await fileHash(summaryFile.file) === summaryBefore.get(summaryFile.file)) continue
+    changedSummary.push(path.relative(config.repoPath, summaryFile.file).replaceAll('\\', '/'))
+  }
+  if (changedSummary.length > 0) {
+    const restoreSummary = async () => {
+      for (const summaryFile of summaryFiles) {
+        const relative = path.relative(config.repoPath, summaryFile.file).replaceAll('\\', '/')
+        if (!changedSummary.includes(relative)) continue
+        const content = summaryContent.get(summaryFile.file)
+        if (content === null) await fs.rm(summaryFile.file, { force: true })
+        else await fs.writeFile(summaryFile.file, content, 'utf8')
+      }
+    }
+    if (!includeSummary) {
+      await restoreSummary()
+      throw new Error(`The planner modified the brief or backlog during plan revision. See ${logFile}`)
+    }
+    try {
+      for (const summaryFile of summaryFiles) {
+        const relative = path.relative(config.repoPath, summaryFile.file).replaceAll('\\', '/')
+        if (!changedSummary.includes(relative)) continue
+        await validateArtifactFiles([summaryFile.file], summaryFile.kind)
+        if (summaryFile.kind === 'backlog') await validateBillingFiles([summaryFile.file])
+      }
+    } catch (error) {
+      await restoreSummary()
+      throw error
+    }
+  }
+
+  const revisedTickets = await listTickets(readyDir)
+  if (revisedTickets.length === 0) throw new Error(`Plan revision removed every ticket in ${readyDir}.`)
+  await validateArtifactFiles(revisedTickets.map(ticket => ticket.file), 'ready-for-dev')
+  assertUniqueTicketIds(revisedTickets)
+  const completed = await listTickets(path.join(config.repoPath, config.ticketDirs.done))
+  orderTickets(revisedTickets, { completed })
+  const billingReports = await validateBillingFiles(revisedTickets.map(ticket => ticket.file))
+
+  const after = await ticketSnapshot(readyDir)
+  const changed = changedTicketFiles(before, after)
+  if (targetTicket) {
+    const targetKey = path.relative(readyDir, targetTicket.file).replaceAll('\\', '/')
+    const outside = changed.filter(file => file !== targetKey)
+    if (outside.length > 0) {
+      throw new Error(`Targeted plan revision changed files outside ${targetKey}: ${outside.join(', ')}. See ${logFile}`)
+    }
+    if (!revisedTickets.some(ticket => ticket.id === targetTicket.id)) {
+      throw new Error(`Targeted plan revision removed ticket ${targetTicket.id}. See ${logFile}`)
+    }
+  }
+  await log?.(`Revised ${changed.length} plan ticket file(s) for ${feature}.`)
+  if (changedSummary.length > 0) await log?.(`Revised ${changedSummary.length} summary document(s) for ${feature}.`)
+  return {
+    feature,
+    readyDir,
+    message,
+    includeSummary,
+    targetTicket: targetTicket?.id ?? null,
+    changed,
+    summaryDocs: changedSummary,
+    tickets: revisedTickets.map(ticket => ({
+      id: ticket.id,
+      title: ticket.title,
+      file: path.relative(config.repoPath, ticket.file).replaceAll('\\', '/')
+    })),
+    plannerOutput,
+    logFile,
+    billingReports
+  }
+}
+
+function findTicket(tickets, value) {
+  const needle = String(value).trim().toLowerCase()
+  return tickets.find(ticket => {
+    const base = path.basename(ticket.file, '.md').toLowerCase()
+    return ticket.id.toLowerCase() === needle
+      || ticket.slug.toLowerCase() === needle
+      || ticket.branchSlug.toLowerCase() === needle
+      || base === needle
+      || base.startsWith(`${needle}-`)
+  }) ?? null
+}
+
+function assertUniqueTicketIds(tickets) {
+  const ids = new Map()
+  for (const ticket of tickets) {
+    const existing = ids.get(ticket.id)
+    if (existing) {
+      throw new Error(`Duplicate ticket id "${ticket.id}" in ${existing} and ${ticket.file}.`)
+    }
+    ids.set(ticket.id, ticket.file)
+  }
+}
+
+async function fileHash(file) {
+  try {
+    return crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex')
+  } catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+}
+
+async function ticketSnapshot(dir) {
+  const files = await listMarkdown(dir)
+  const snapshot = new Map()
+  for (const file of files) {
+    const key = path.relative(dir, file).replaceAll('\\', '/')
+    snapshot.set(key, crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex'))
+  }
+  return snapshot
+}
+
+function changedTicketFiles(before, after) {
+  const keys = new Set([...before.keys(), ...after.keys()])
+  return [...keys].filter(key => before.get(key) !== after.get(key)).sort()
+}
+
+/**
+ * Ticket files are local artifacts, so a tracked ticket edit is allowed while
+ * a tracked source or configuration edit is not. The filter only removes the
+ * configured backlog and ready-for-dev paths from the status comparison.
+ */
+function trackedStatusWithoutTickets(status, config) {
+  const prefixes = [
+    config.ticketDirs.backlog,
+    config.ticketDirs.readyForDev
+  ].map(value => String(value).replaceAll('\\', '/').replace(/\/+$/, '') + '/')
+  return String(status ?? '')
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .filter(line => {
+      const file = line.slice(3).trim().replace(/^"|"$/g, '').replaceAll('\\', '/')
+      return !prefixes.some(prefix => file.startsWith(prefix))
+    })
+    .join('\n')
 }
 
 export async function runDev({ config, stateStore, options, log }) {

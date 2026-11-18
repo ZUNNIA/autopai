@@ -26,7 +26,7 @@ The same workflow is available through slash commands or natural language. The o
 
 1. **Discuss the idea** with the operator. Nothing is written yet. Start with a plain message or `/autopai-plan "<idea>"`; the operator asks the questions that change the plan and proposes a short feature name. Open questions stay in the conversation; they are never written into the brief or backlog.
 2. **Formalize it** when you are ready: explicitly ask the operator to generate the brief and backlog. The operator records the agreed summary with `autopai plan propose`, then runs `autopai plan generate --confirm`; `prepare` writes the brief and backlog, keeps the two planner sessions open, and stops at the backlog gate. Review them or ask the operator for changes; the operator runs `autopai revise` against the retained backlog session, so you never paste the change yourself and the original prompt is not reloaded. `/autopai-plan` remains the same command; it only generates after your explicit confirmation. Both sessions are deleted only after the backlog approval succeeds.
-3. **Approve the backlog** to generate the ready-for-dev plan, review the technical tickets, then approve the plan.
+3. **Approve the backlog** to generate the ready-for-dev plan. Review the technical tickets; ask the operator for changes and it runs `autopai revise-plan` over the existing tickets without approving. When the plan is right, approve it explicitly.
 4. **Implement it.** Dev creates one branch and one pull request per ticket, runs the local gates and CI, merges only when they pass, and writes the manual QA checklist.
 5. **Verify and audit.** Review the QA checklist. If an item fails, report it to the operator; it runs `autopai qa-fix`, creates fix tickets for the current feature, and restarts dev. When QA passes, identify the pull requests of the new feature, promote the findings, and refactor them.
 6. **Repeat** with the next idea. Run `/autopai-release` when you decide to publish.
@@ -83,6 +83,8 @@ Generated tickets and findings declare whether a change increases billing. When 
 
 The brief and backlog sessions stay open after `prepare`. Review them or ask the operator for changes; the operator continues the retained backlog session with `autopai revise` and never re-runs `prepare` or reloads a core prompt. When `--approve backlog` completes successfully, the orchestrator deletes both prepare sessions. If the approval fails, both sessions stay open for another review. The operator conversation is not one of those sessions and is never deleted by AutopAI. If a prepare is interrupted after both files exist, `autopai status` reconnects the retained sessions and marks the backlog ready for review; it never approves.
 
+After `approve`, the run stops at the plan gate with ready-for-dev tickets. A change request at that point is applied with `autopai revise-plan`, which starts a planner revision over the existing tickets, validates the artifact contract, and stays at the plan gate. Use `--ticket <id>` to restrict the revision to one ticket; the core rejects changes to any other ticket. Use `--include-summary` only after explicit founder authorization to reconcile the current feature's brief and backlog; it cannot be combined with `--ticket`, and the core validates the summary documents. The command never edits source or configuration and never approves the plan.
+
 Add or remove gates in `autopai.json`, or ask the operator in natural language after re-running `/autopai-init` (for example, `/autopai-init "stop after promote"`). Use `--pause-after` to override the list for one run.
 
 ## When a ticket fails
@@ -106,7 +108,8 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
 | Discuss a feature | `/autopai-plan` | Share an idea, a design question, or a feature goal; the operator discusses first. |
 | Generate the brief and backlog | `/autopai-plan` after confirmation | Explicitly ask to generate, formalize, or prepare the brief and backlog. |
-| Revise a pending brief or backlog | Operator runs `autopai revise` | Ask for the change; the operator applies it in the retained backlog session. |
+| Revise a pending brief or backlog | Operator runs `autopai revise` | Ask for the change; the operator applies it in the retained backlog session. Multi-line changes use `--message-file`. |
+| Revise a ready-for-dev plan | Operator runs `autopai revise-plan` | Ask for the change while paused at the plan gate; use `--ticket` for one ticket and `--message-file` for multi-line changes. Use `--include-summary` only when the brief or backlog itself must be reconciled. The operator edits the existing tickets and never approves. |
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Adopt an existing branch | `/autopai-adopt` | "finish this branch and take it through CI" |
@@ -228,6 +231,7 @@ The same loop from the CLI:
 
 ```text
 autopai prepare --repo . --description "<idea>"
+autopai prepare --repo . --feature settings --description-file ./notes/settings.md
 autopai resume --repo . --approve backlog
 autopai resume --repo . --approve plan
 autopai resume --repo . --approve qa

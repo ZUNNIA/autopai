@@ -29,7 +29,7 @@ test('prints help including the config audit and revise command', () => {
   const output = execFileSync(process.execPath, [cli, 'help'], { encoding: 'utf8' })
   assert.match(output, /autopai config check/)
   assert.match(output, /audits autopai\.json/)
-  assert.match(output, /autopai revise --repo <path> --message <change>/)
+  assert.match(output, /autopai revise --repo <path> \[--message/)
   assert.match(output, /autopai qa-fix --repo <path> --message <failure>/)
   assert.match(output, /autopai resolve-conflicts --repo <path>/)
   assert.match(output, /autopai diagnostics --repo <path>/)
