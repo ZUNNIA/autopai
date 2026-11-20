@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import * as git from './git.js'
 
@@ -43,7 +44,13 @@ export async function cleanBranches({ config, branches, base, dryRun = false, lo
       throw new Error(`Remote branch origin/${branch} is not fully merged into origin/${baseBranch}; refusing to delete it.`)
     }
 
-    const otherWorktree = worktrees.find(entry => entry.branch === branch && !samePath(entry.path, repo))
+    let otherWorktree = null
+    for (const entry of worktrees) {
+      if (entry.branch === branch && !await samePath(entry.path, repo)) {
+        otherWorktree = entry
+        break
+      }
+    }
     if (otherWorktree) {
       throw new Error(`Branch ${branch} is checked out in another worktree at ${otherWorktree.path}; refusing to delete it.`)
     }
@@ -104,9 +111,11 @@ function unique(values) {
   return [...new Set(values)]
 }
 
-function samePath(left, right) {
-  const normalize = value => process.platform === 'win32'
-    ? path.resolve(value).toLowerCase()
-    : path.resolve(value)
-  return normalize(left) === normalize(right)
+async function samePath(left, right) {
+  const normalize = async value => {
+    const resolved = path.resolve(value)
+    const real = await fs.realpath(resolved).catch(() => resolved)
+    return process.platform === 'win32' ? real.toLowerCase() : real
+  }
+  return await normalize(left) === await normalize(right)
 }
