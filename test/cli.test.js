@@ -33,6 +33,8 @@ test('prints help including the config audit and revise command', () => {
   assert.match(output, /autopai qa-fix --repo <path> --message <failure>/)
   assert.match(output, /autopai resolve-conflicts --repo <path>/)
   assert.match(output, /autopai diagnostics --repo <path>/)
+  assert.match(output, /autopai branches clean --repo <path>/)
+  assert.match(output, /requires a clean worktree/)
 })
 
 test('supports --help and --version aliases', () => {

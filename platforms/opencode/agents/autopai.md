@@ -71,6 +71,7 @@ operational request into the exact CLI flags before running:
 - "adopt", "finish this branch", or "take this branch through CI and merge" → `autopai adopt --repo . [--branch <name>]`. Confirm the exact branch before running.
 - "promote the findings", "turn the findings into refactor tickets", or "create the refactor tickets" → `autopai promote --repo . [--feature <slug>] [--classification <names>] [--priority <names>]`. It uses the findings from the last audit; if there is no audit, run identify first.
 - "abort", "cancel the run", or "stop the current run" → `autopai abort --repo .`. Confirm first and report the final state. It does not touch the repository or the remote.
+- "clean branches", "delete this merged branch", or "update and delete the local and remote branch" → `autopai branches clean --repo . --branch <name> [--branch <name>] [--base <branch>] --confirm`. Confirm the exact branches, the base, and that it deletes both the local and remote copies. It requires a clean worktree, updates the base, and refuses any branch that is not fully merged. Use --dry-run first when the user wants a preview. Never run `git branch -d` or `git push --delete` directly.
 - "is autopai.json outdated", "audit the configuration", or "check the configuration" → `autopai config check --repo . --json`. This is read-only; reconcile only through `/autopai-init`.
 - "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
 - "fix the failures and continue" or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per repairable gate failure; it does not repair branch checkout, blocked dependency, executor, policy, or merge failures.
@@ -140,7 +141,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `identify`, `promote`, `prepare`, `approve`, `revise`, `revise-plan`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
+Commands: `adopt`, `branches clean`, `identify`, `promote`, `prepare`, `approve`, `revise`, `revise-plan`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
 
 ## Branch and dependency failures
 

@@ -528,6 +528,7 @@ autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classificat
 autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]
 autopai approve --repo <path> [--feature <slug>]
 autopai revise-plan --repo <path> [--feature <slug>] [--ticket <id>] [--include-summary] [--review-file <path>] [--message <change>|--message-file <path>]
+autopai branches clean --repo <path> --branch <name> [--branch <name>] [--base <branch>] [--dry-run] --confirm
 autopai dev --repo <path> [--feature <slug>]
 autopai refactor --repo <path> [--feature <slug>] [--classification <list>] [--priority <list>]
 autopai release --repo <path> --version <x.y.z>
@@ -548,6 +549,8 @@ autopai abort --repo <path>
 **Config reconcile.** `autopai config reconcile` previews additive schema defaults and `--apply` writes them. It preserves explicit values and never invents branches, commands, checks, coverage, or runner settings.
 
 **Plan revision.** `autopai revise-plan` applies a change to the ready-for-dev tickets of a run paused at the plan gate. Use `--message-file` for multi-line review text and `--review-file` for a structured plan-review result with coverage and gap history. It starts a planner session over the current tickets, validates the artifact contract and dependency graph, and leaves the gate untouched. The planner keeps the `covers` lists aligned with the acceptance-criterion ids and reports its own coverage check. With `--ticket <id>`, only that ticket may change and the core rejects any other ticket edit. With `--include-summary`, the planner may also reconcile the current feature brief and backlog after explicit founder authorization; the flag cannot be combined with `--ticket` and the core validates both summary documents. It never edits source, never regenerates the whole plan, and never approves the plan.
+
+**Branch cleanup.** `autopai branches clean` deletes stale branches that are already merged. It fetches and prunes origin, validates every requested branch against `origin/<base>`, switches to the base branch, fast-forwards it, and only then deletes the local branch and its remote copy. It refuses a dirty worktree, a branch checked out in another worktree, and any branch that is not fully merged. `--branch` may be repeated, `--base` defaults to the configured `baseBranch`, `--dry-run` previews the plan, and `--confirm` is required to delete. The command does not need an active run and never touches source or tickets.
 
 **Plan proposal.** `autopai plan propose` records an agreed feature summary without running a model. `autopai plan generate --confirm` refuses to run without the proposal and the explicit flag. `--description-file` keeps multi-line summaries intact on Windows.
 

@@ -9,6 +9,7 @@ import { reconcileConfig } from './lib/config-reconcile.js'
 import * as git from './lib/git.js'
 import { StateStore, mergeStateIssues, reconcileMergeState } from './lib/state.js'
 import { runAdopt } from './phases/adopt.js'
+import { runBranches } from './phases/branches.js'
 import { runResolveConflicts } from './phases/conflicts.js'
 import { runDiagnostics } from './phases/diagnostics.js'
 import { runIdentify } from './phases/identify.js'
@@ -80,6 +81,7 @@ async function main() {
     const ctx = { config, stateStore, options, log }
     let result
     if (command === 'adopt') result = await runAdopt(ctx)
+    else if (command === 'branches') result = await runBranches(ctx)
     else if (command === 'identify') result = await runIdentify(ctx)
     else if (command === 'promote') result = await runPromote(ctx)
     else if (command === 'prepare') result = await runPrepare(ctx)
@@ -439,6 +441,7 @@ function printHelp() {
 
 Usage:
   autopai adopt --repo <path> [--branch <name>] [--base <branch>] [--title <title>] [--dry-run]
+  autopai branches clean --repo <path> --branch <name> [--branch <name>] [--base <branch>] [--dry-run] --confirm
   autopai identify --repo <path> [--last <n>] [--scope branch:<name>] [--scope pr:<number>] [--scope dir:<path>] [--classification <list>] [--priority <list>] [--dry-run]
   autopai promote --repo <path> [--feature <slug>] [--chunk <name>] [--classification <list>] [--priority <list>]
   autopai prepare --repo <path> [--feature <slug>] [--description <text>|--description-file <path>]
@@ -476,6 +479,8 @@ ticket depends on a pending ticket outside the filter, the run stops and lists
 the dependency. Filters persist through resume.
 
 approve generates the ready-for-dev tickets and stops; dev implements them.
+
+branches clean updates the local base branch and deletes only branches fully merged into origin/<base>, both locally and on origin. It requires a clean worktree and --confirm; --dry-run previews the plan without changing anything.
 
 revise continues the retained backlog session with a review message. Use --message-file for multi-line changes. It never
 loads the original prompt, creates a new session, or approves the backlog.
