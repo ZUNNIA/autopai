@@ -110,6 +110,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/artifacts.js`
 - `src/lib/billing.js`
 - `src/lib/blockers.js`
+- `src/lib/branches.js`
 - `src/lib/chunks.js`
 - `src/lib/ci-failure.js`
 - `src/lib/cli-message.js`
@@ -148,6 +149,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 ### Phases
 
 - `src/phases/adopt.js`
+- `src/phases/branches.js`
 - `src/phases/conflicts.js`
 - `src/phases/diagnostics.js`
 - `src/phases/identify.js`
@@ -183,6 +185,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/billing-prompts.test.js`
 - `test/billing.test.js`
 - `test/blockers.test.js`
+- `test/branches.test.js`
 - `test/chunks.test.js`
 - `test/ci-failure.test.js`
 - `test/ci-fix.test.js`

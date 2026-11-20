@@ -24,6 +24,8 @@ test('the operator routes abort, adopt, and promote requests', async () => {
   assert.match(text, /"abort", "cancel the run", or "stop the current run" → `autopai abort --repo \.`/)
   assert.match(text, /"adopt", "finish this branch", or "take this branch through CI and merge" → `autopai adopt --repo \.[^`]*`/)
   assert.match(text, /"promote the findings", "turn the findings into refactor tickets"/)
+  assert.match(text, /"clean branches", "delete this merged branch"/)
+  assert.match(text, /autopai branches clean --repo \./)
 })
 
 test('the README lists the new slash wrappers', async () => {

@@ -113,6 +113,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Approve the backlog | `/autopai-resume --approve backlog` | "approve the backlog and generate the plan" |
 | Approve the plan | `/autopai-resume --approve plan` | "approve the plan and implement" |
 | Adopt an existing branch | `/autopai-adopt` | "finish this branch and take it through CI" |
+| Clean a merged branch | Operator runs `autopai branches clean` | Ask to delete the merged local and remote branch; the operator confirms the exact branches and runs the command. |
 | Review QA and audit | `/autopai-resume --approve qa` | "I reviewed QA; audit the feature" |
 | Fix failed QA | `/autopai-qa-fix "<failure>"` | Report the failed QA item; the operator creates fix tickets and restarts dev. |
 | Audit filtered debt | `/autopai-identify "only urgent code smells"` | "identify only urgent code smells" |

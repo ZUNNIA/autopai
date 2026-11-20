@@ -110,7 +110,7 @@ export function parseCliArgs(argv) {
       if (rest[index + 1] && !rest[index + 1].startsWith('--')) value = rest[++index]
       else value = true
     }
-    if (key === 'scope' || key === 'classification' || key === 'priority') {
+    if (key === 'scope' || key === 'classification' || key === 'priority' || (command === 'branches' && key === 'branch')) {
       options[key] = options[key] ? [].concat(options[key], value) : [value]
     } else {
       options[key] = value

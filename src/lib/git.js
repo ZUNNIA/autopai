@@ -67,6 +67,11 @@ export async function mergeBase(repo, left, right) {
   return result.stdout.trim()
 }
 
+export async function isAncestor(repo, ancestor, descendant) {
+  const result = await git(repo, ['merge-base', '--is-ancestor', ancestor, descendant], { allowFailure: true })
+  return result.code === 0
+}
+
 export async function diff(repo, range) {
   const result = await git(repo, ['diff', '--no-ext-diff', range])
   return result.stdout
@@ -266,6 +271,14 @@ export async function syncLocalBranch(repo, branch) {
   return result.code === 0
 }
 
+export async function fastForwardCurrent(repo, ref) {
+  const result = await git(repo, ['merge', '--ff-only', ref], { allowFailure: true })
+  return {
+    ok: result.code === 0,
+    error: result.code === 0 ? null : (result.stderr || result.stdout).trim()
+  }
+}
+
 export async function deleteLocalBranch(repo, branch) {
   const result = await git(repo, ['branch', '-d', branch], { allowFailure: true })
   return result.code === 0
@@ -280,7 +293,7 @@ export async function push(repo, branch) {
 }
 
 export async function deleteRemoteBranch(repo, branch) {
-  await git(repo, ['push', 'origin', '--delete', branch], { allowFailure: true })
+  return git(repo, ['push', 'origin', '--delete', branch], { allowFailure: true })
 }
 
 export async function listLocalBranches(repo) {

@@ -30,6 +30,7 @@ AutopAI is an external Node orchestrator that coordinates agentic coding tools t
 - `promote`: the planner turns the Identified findings of the last audit into ready-for-refactor tickets, one session per audit chunk. Every completed chunk is recorded in the state, so an interrupted promotion resumes without redoing finished work. The auditor never promotes its own findings.
 - `refactor`: executes ready-for-refactor tickets with the same gates. Refactors preserve the user-visible behavior unless the finding documents a UX defect.
 - `release`: updates the version manifest and changelog deterministically, opens a release pull request, merges, and tags.
+- `branches clean`: updates the local base branch and deletes only branches fully merged into it, locally and on origin. It is deterministic, requires a clean worktree and explicit confirmation, and runs outside any phase state.
 
 `run --from <phase> --to <phase>` chains any range of phases and stops after a phase whose gate is in `pauseAfter`.
 
