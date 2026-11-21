@@ -34,6 +34,7 @@ test('prints help including the config audit and revise command', () => {
   assert.match(output, /autopai resolve-conflicts --repo <path>/)
   assert.match(output, /autopai diagnostics --repo <path>/)
   assert.match(output, /autopai branches clean --repo <path>/)
+  assert.match(output, /autopai platform sync/)
   assert.match(output, /requires a clean worktree/)
 })
 

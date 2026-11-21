@@ -8,8 +8,8 @@ Do not recreate the files. Follow `README.md` and:
 
 1. Verify Node.js, Git, the GitHub CLI, and the target coding tool.
 2. Run `npm ci` and `npm link` inside the clone.
-3. Install the platform files for the target tool from `platforms/<tool>/`.
-4. Verify `autopai help`.
+3. Install the platform files for the target tool. For the bundled platform, run `autopai platform sync`; for another tool, copy from `platforms/<tool>/`.
+4. Verify `autopai help` and `autopai platform sync --dry-run`.
 5. In each target repository, generate `autopai.json` by inspecting it, then run `autopai status --repo .`.
 
 Copy the core, the prompts, the runners, and the platform files from the inventory below. Do not rewrite them.
@@ -121,6 +121,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/config-schema.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
+- `src/lib/platform-sync.js`
 - `src/lib/defaults.js`
 - `src/lib/diagnostics.js`
 - `src/lib/filters.js`
@@ -210,6 +211,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/platform-commands.test.js`
 - `test/platform-permissions.test.js`
 - `test/platform-plan-flow.test.js`
+- `test/platform-sync.test.js`
 - `test/policy.test.js`
 - `test/portable-paths.test.js`
 - `test/pr.test.js`

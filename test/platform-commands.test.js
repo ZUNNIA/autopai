@@ -34,3 +34,12 @@ test('the README lists the new slash wrappers', async () => {
     assert.ok(text.includes(command), command)
   }
 })
+
+test('the operator, init command, and README document platform sync', async () => {
+  const agent = await fs.readFile('platforms/opencode/agents/autopai.md', 'utf8')
+  const init = await fs.readFile('platforms/opencode/commands/autopai-init.md', 'utf8')
+  const readme = await fs.readFile('README.md', 'utf8')
+  assert.ok(agent.includes('autopai platform sync'))
+  assert.ok(init.includes('autopai platform sync'))
+  assert.ok(readme.includes('autopai platform sync'))
+})

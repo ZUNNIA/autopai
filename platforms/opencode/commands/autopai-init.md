@@ -27,7 +27,8 @@ Create it:
 8. Ensure the state directory and the ticket directories stay local, and add them to `.gitignore` when needed.
 9. Create `autopai.json` with the edit tool at the repository root once the values are resolved. Do not write it through the shell; `autopai config reconcile --apply` is the only CLI writer for schema defaults.
 10. Validate with `autopai config check --repo .` and `autopai status --repo .`.
-11. Report the final configuration and any remaining uncertainty.
+11. Run `autopai platform sync --json` to refresh the installed OpenCode commands, agents, and managed `AGENTS.md` block from the linked clone. Every overwrite and removal is backed up under the OpenCode configuration directory, and files that AutopAI does not own are never touched. Report created, updated, removed, and backed-up files, and relay any warnings. If the user asks to install or update the tool files without touching `autopai.json`, run the same command directly.
+12. Report the final configuration, the platform result, and any remaining uncertainty.
 
 ## When autopai.json exists
 
@@ -46,7 +47,8 @@ Reconcile it instead of recreating it:
 5. Deprecated fields (`autoMerge` and `approvalRequired`) are warnings: show them and ask before removing them. Do not add deprecated fields. Unknown keys are errors: if one is clearly a typo of a known field, propose the rename; otherwise ask before removing it.
 6. If the user made a request, apply it after the confirmation required for a destructive change, and reconcile the safe fields. Do not touch unrelated user choices.
 7. Validate with `autopai config check --repo .` and `autopai status --repo .`. Do not report success while the audit still has errors.
-8. Report a short before/after summary of what changed and what remains uncertain.
+8. Run `autopai platform sync --json` and report the installed command, agent, and `AGENTS.md` result. Use `--dry-run` when the user asks to preview the platform changes.
+9. Report a short before/after summary of what changed and what remains uncertain.
 
 A destructive change overwrites a valid value, removes a gate, changes a branch, path, or runner, or rewrites commands. Always show the current and proposed values and ask for the confirmation needed before writing, even when the user requested the change. Adding a gate or filling a missing field is safe and needs no confirmation.
 
@@ -64,4 +66,4 @@ Understand the intent; the phrases below are examples, not a required grammar.
 - Other schema fields are allowed: branches, commands, checks, coverage, runtime logs, protected paths, runner, runnerOptions, agents, models, ticketDirs, stateDir, and billingCurrency. The config audit lists the known fields; an unknown key is an error. Show the current and proposed values and ask for confirmation before a destructive change.
 - If the request or the repository is ambiguous, ask the questions needed. Never guess a configuration value.
 
-Do not edit source, tests, CI, ADRs, or `AGENTS.md`. Do not create tickets, branches, commits, or pull requests.
+Do not edit repository source, tests, CI, ADRs, or the repository `AGENTS.md`. The platform sync may update the managed block in the global OpenCode `AGENTS.md`. Do not create tickets, branches, commits, or pull requests.

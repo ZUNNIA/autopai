@@ -105,6 +105,7 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Step | Slash command | Natural language |
 | --- | --- | --- |
 | Initialize or adjust config | `/autopai-init` | `/autopai-init "stop after promote"` |
+| Install or refresh commands and agents | `autopai platform sync` | "update the installed commands" |
 | Audit config without writing | `autopai config check --repo .` | "check whether autopai.json is outdated" |
 | Discuss a feature | `/autopai-plan` | Share an idea, a design question, or a feature goal; the operator discusses first. |
 | Generate the brief and backlog | `/autopai-plan` after confirmation | Explicitly ask to generate, formalize, or prepare the brief and backlog. |
@@ -182,7 +183,15 @@ npm link
 
 `npm link` creates the `autopai` command. Run it again after moving the clone.
 
-2. Install the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`.
+2. Install or refresh the platform files for the coding tool you use. The bundled platform lives under `platforms/opencode/`.
+
+```text
+autopai platform sync
+```
+
+The command copies the AutopAI commands and agents into `~/.config/opencode/`, updates the managed block in `AGENTS.md`, and records a manifest. Every overwrite and removal is backed up under `~/.config/opencode/.autopai/backups/`, and files that AutopAI does not own are never touched. Use `--target <dir>` for a project-local installation, `--dry-run` to preview, or `--json` for the full report.
+
+A manual copy remains available as a fallback for the first bootstrap:
 
 ```powershell
 Copy-Item .\platforms\opencode\agents\*.md "$env:USERPROFILE\.config\opencode\agents\" -Force
@@ -197,8 +206,6 @@ cp platforms/opencode/commands/*.md ~/.config/opencode/commands/
 cp AGENTS.md ~/.config/opencode/AGENTS.md
 ```
 
-If `~/.config/opencode/AGENTS.md` already exists, merge the AutopAI section instead of overwriting the whole file.
-
 3. Verify the installation:
 
 ```text
@@ -207,7 +214,7 @@ autopai help
 
 ## Usage
 
-Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) creates `autopai.json` or reconciles the existing file. It runs `autopai config check` first and uses the deterministic report, so missing defaults, unknown fields, deprecated fields, and legacy agent names are visible before any write. Re-run it at any time to audit the configuration: it applies safe corrections, preserves your choices, and asks before an ambiguous or destructive change. You can also request an adjustment in natural language (`/autopai-init "stop after promote"`). No language or framework is assumed.
+Open a target repository in the coding tool and run `/autopai-init`. The operator agent (`autopai`) creates `autopai.json` or reconciles the existing file. It runs `autopai config check` first and uses the deterministic report, so missing defaults, unknown fields, deprecated fields, and legacy agent names are visible before any write. It then runs `autopai platform sync` to refresh the installed commands, agents, and managed `AGENTS.md` block. Re-run it at any time to audit the configuration and the platform files: it applies safe corrections, preserves your choices, backs up every overwrite, and asks before an ambiguous or destructive change. You can also request an adjustment in natural language (`/autopai-init "stop after promote"`). No language or framework is assumed.
 
 The assisted loop:
 
@@ -289,7 +296,8 @@ Add `src/runners/<tool>.js` only when the CLI needs custom parsing or a protocol
 
 - `autopai` is not found after `npm link`: check the npm global prefix with `npm prefix -g` and add its bin directory to `PATH`. On Windows the shim is `%APPDATA%\npm\autopai.cmd`.
 - Two clones are linked: only one can own the `autopai` command. Run `npm link` in the clone you want to keep.
-- The bundled platform commands do not appear: confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
+- The bundled platform commands do not appear: run `autopai platform sync`, confirm the files are in `%USERPROFILE%\.config\opencode\commands` or `~/.config/opencode/commands`, then restart the tool.
+- The installed commands or agents are outdated after a `git pull`: run `autopai platform sync` or `/autopai-init`. The CLI and `src/prompts/` are live through `npm link`; the platform files are copies and need the sync.
 - A ticket failed local gates: run `/autopai-resume --fix` for a repairable gate failure or `/autopai-resume` to retry; do not create a duplicate branch. The failed branch is reused. A branch checkout failure is not repaired by `--fix`: fix the checkout, worktree, lock, or tracked changes first.
 - A pull request has merge conflicts: run `autopai resolve-conflicts --pr <n>`, review the result, run the gates, then commit and push manually. Never use `--fix` for a merge conflict.
 - Build diagnostics: run `autopai diagnostics` to inspect compiler and restore warnings, including NuGet audit warnings, or `autopai diagnostics --fix` to repair them in a dedicated branch and pull request. Info diagnostics require `--severity info`, and a package-related fix may update package references.

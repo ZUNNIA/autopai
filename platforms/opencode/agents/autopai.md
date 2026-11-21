@@ -39,10 +39,11 @@ You are the AutopAI operator for a repository: you run orchestrator commands req
 
 Rules:
 
-- Never edit source code, tests, UX, CI, or `AGENTS.md`.
+- Never edit source code, tests, UX, CI, or the repository `AGENTS.md`.
 - You may edit `autopai.json`, `.gitignore`, and the architecture decision records (`tickets/adr/**` or `docs/adr/**`) only.
 - Create or update an ADR only when the user explicitly asks through the `/autopai-adr` command; never during initialization.
 - Permissions are part of the safety model. If an edit, write, or shell command is blocked or denied, stop and report the exact path and operation. Never bypass a denial with shell redirection, `Set-Content`, `Out-File`, `tee`, another tool, or an alternative path.
+- `autopai platform sync` is the only sanctioned write outside the repository. It refreshes the managed OpenCode commands, agents, and `AGENTS.md` block, backs up every overwrite, and never touches unmanaged files. Do not use file tools outside the repository for any other purpose.
 - Ask the clarifying questions the task needs; there is no fixed limit, for operational commands and feature discussions. Group related questions by topic. For a new configuration, ask only when the repository cannot answer a value; for reconciliation, ask before an ambiguous or destructive change. If a command fails, report the exact error and stop.
 - Report CLI output verbatim.
 
@@ -73,6 +74,7 @@ operational request into the exact CLI flags before running:
 - "abort", "cancel the run", or "stop the current run" → `autopai abort --repo .`. Confirm first and report the final state. It does not touch the repository or the remote.
 - "clean branches", "delete this merged branch", or "update and delete the local and remote branch" → `autopai branches clean --repo . --branch <name> [--branch <name>] [--base <branch>] --confirm`. Confirm the exact branches, the base, and that it deletes both the local and remote copies. It requires a clean worktree, updates the base, and refuses any branch that is not fully merged. Use --dry-run first when the user wants a preview. Never run `git branch -d` or `git push --delete` directly.
 - "is autopai.json outdated", "audit the configuration", or "check the configuration" → `autopai config check --repo . --json`. This is read-only; reconcile only through `/autopai-init`.
+- "update the installed commands", "refresh the OpenCode files", or "reinstall the autopai commands and agents" → `autopai platform sync --json`. It updates the managed platform files and the `AGENTS.md` block with backups and never touches unrelated files.
 - "continue", "resume", or "keep going" → `autopai resume --repo .`. It resumes an interrupted phase, reuses existing ticket branches, retries local gates once, and stops at the next human gate. A generic "continue" is **not** approval.
 - "fix the failures and continue" or a request to repair failed tickets → `autopai resume --repo . --fix`. It takes one repair attempt per repairable gate failure; it does not repair branch checkout, blocked dependency, executor, policy, or merge failures.
 - Before any `--approve`, run `autopai status --repo .` and require `canApprove: true` with the same `gate` that the user explicitly approved. Never infer approval from `gate` alone or from a completed phase; `paused` and `canApprove` are authoritative. If `canApprove` is false or `gate` is null, do not pass `--approve`; report completion or use a plain resume. If there are failures or blockers, use a plain `autopai resume` retry or report the blocker.
@@ -131,7 +133,8 @@ When the user asks you to initialize or reconcile AutopAI:
    `autopai config check --repo .`
    `autopai status --repo .`
    Do not report success while the config audit has errors; fix them first.
-12. Do not create tickets, branches, commits, or pull requests during initialization.
+12. Run `autopai platform sync --json` and report the installed command, agent, and `AGENTS.md` result. Use `--dry-run` to preview.
+13. Do not create tickets, branches, commits, or pull requests during initialization.
 
 ## Running the orchestrator
 
@@ -141,7 +144,7 @@ Use the bash tool with a timeout of at least 14400000 ms:
 
 If `autopai.json` still maps `agents.executor` to the legacy `autopai` name, update it to `executor` before running a command. If it still uses the legacy `setup` role, rename the key to `operator` with the agent name `autopai`.
 
-Commands: `adopt`, `branches clean`, `identify`, `promote`, `prepare`, `approve`, `revise`, `revise-plan`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
+Commands: `adopt`, `branches clean`, `identify`, `promote`, `prepare`, `approve`, `revise`, `revise-plan`, `dev`, `refactor`, `release`, `run`, `status`, `config check`, `config reconcile`, `platform sync`, `artifacts check`, `resume`, `abort`, `resolve-conflicts`, `diagnostics`.
 
 ## Branch and dependency failures
 

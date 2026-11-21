@@ -23,6 +23,7 @@ import { recoverPrepareReview } from './lib/prepare-review.js'
 import { clearPlanProposal, readPlanProposal, writePlanProposal } from './lib/plan.js'
 import { adrStatuses, createAdr } from './lib/adr.js'
 import { checkArtifacts } from './lib/artifact-check.js'
+import { syncPlatform } from './lib/platform-sync.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
 
@@ -39,6 +40,7 @@ async function main() {
   }
   if (command === 'adr') return runAdrCommand(repoPath, options)
   if (command === 'config') return runConfigCommand(repoPath, options)
+  if (command === 'platform') return runPlatformCommand(options)
 
   const config = await loadConfig(repoPath)
   const stateStore = new StateStore(config)
@@ -386,6 +388,30 @@ async function runConfigCommand(repoPath, options) {
   return report
 }
 
+async function runPlatformCommand(options) {
+  const action = String((options._ ?? [])[0] ?? '')
+  if (action !== 'sync') throw new Error('Usage: autopai platform sync [--target <dir>] [--dry-run] [--json]')
+
+  const report = await syncPlatform({
+    dryRun: options.dryRun === true,
+    ...(typeof options.target === 'string' ? { target: options.target } : {})
+  })
+  if (options.json === true) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    return report
+  }
+
+  process.stdout.write(`Platform: ${report.target}\n`)
+  process.stdout.write(`${report.dryRun ? 'DRY RUN' : 'UPDATED'}\n`)
+  for (const file of report.created) process.stdout.write(`CREATED ${file}\n`)
+  for (const file of report.updated) process.stdout.write(`UPDATED ${file}\n`)
+  for (const file of report.removed) process.stdout.write(`REMOVED ${file}\n`)
+  for (const file of report.backedUp) process.stdout.write(`BACKUP  ${file}\n`)
+  for (const warning of report.warnings) process.stdout.write(`WARN    ${warning}\n`)
+  process.stdout.write(`Agents: ${report.agents.action} ${report.agents.file}\n`)
+  return report
+}
+
 function failureGuidance(failures = []) {
   const repairable = failures.filter(failure => failure.repairable === true).length
   const branch = failures.filter(failure => failure.stage === 'branch').length
@@ -462,6 +488,7 @@ Usage:
   autopai artifacts check --repo <path> [--json]
   autopai config check --repo <path> [--json] [--strict]
   autopai config reconcile --repo <path> [--apply] [--json]
+  autopai platform sync [--target <dir>] [--dry-run] [--json]
   autopai resume --repo <path> [--approve <gate>] [--auto] [--pause-after <gates>] [--fix]
   autopai abort --repo <path>
 
@@ -539,6 +566,12 @@ autopai config reconcile applies only additive defaults that do not require
 repository-specific knowledge. It preserves explicit values, reports unknown
 keys, and never invents branches, commands, checks, coverage, or runner settings.
 Without --apply it prints the proposed changes and writes nothing.
+
+autopai platform sync refreshes the installed OpenCode commands, agents, and the
+managed AGENTS.md block from the linked clone. It overwrites only files recorded
+by its manifest or present in platforms/opencode/, backs up every overwrite and
+removal, and never touches unrelated files. --target overrides the default
+~/.config/opencode directory; --dry-run reports without writing.
 `)
 }
 
