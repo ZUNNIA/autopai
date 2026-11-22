@@ -70,24 +70,41 @@ export function validateUxProposalText(text, { file = '<memory>' } = {}) {
   return { file, kind: 'ux' }
 }
 
-export async function validateArtifactFiles(files, kind) {
-  const validators = {
-    brief: validateBriefText,
-    backlog: validateBacklogText,
-    identified: validateFindingText,
-    'ready-for-dev': validateReadyForDevText,
-    'ready-for-refactor': validateReadyForRefactorText,
-    'qa-fix': validateQaFixText,
-    ux: validateUxProposalText
-  }
-  const validate = validators[kind]
+const VALIDATORS = {
+  brief: validateBriefText,
+  backlog: validateBacklogText,
+  identified: validateFindingText,
+  'ready-for-dev': validateReadyForDevText,
+  'ready-for-refactor': validateReadyForRefactorText,
+  'qa-fix': validateQaFixText,
+  ux: validateUxProposalText
+}
+
+/**
+ * Validates every file and returns all contract errors instead of stopping at
+ * the first one. Callers that need a repair session use this report; callers
+ * that must fail fast keep using validateArtifactFiles.
+ */
+export async function inspectArtifactFiles(files, kind) {
+  const validate = VALIDATORS[kind]
   if (!validate) throw new Error(`Unknown artifact kind: ${kind}`)
 
   const reports = []
+  const errors = []
   for (const file of files) {
-    reports.push(validate(await fs.readFile(file, 'utf8'), { file }))
+    try {
+      reports.push(validate(await fs.readFile(file, 'utf8'), { file }))
+    } catch (error) {
+      errors.push({ file, message: error.message })
+    }
   }
-  return reports
+  return { ok: errors.length === 0, reports, errors }
+}
+
+export async function validateArtifactFiles(files, kind) {
+  const result = await inspectArtifactFiles(files, kind)
+  if (!result.ok) throw new Error(result.errors.map(item => item.message).join('\n'))
+  return result.reports
 }
 
 function requireSections(text, file, sections) {

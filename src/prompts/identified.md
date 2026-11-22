@@ -39,12 +39,12 @@ Select and briefly justify the type of debt:
 * [ ] 🏗️ **Architecture:** design principle violations, poorly distributed responsibility.
 * [ ] 📝 **Missing Documentation:** critical code without comments or outdated docs.
 
-Select and briefly justify the priority level:
-* [ ] 🔴 **Urgent:** causing recurring bugs, blocking features, or compromising security or performance.
-* [ ] 🟡 **Important:** hinders development, increases implementation time, or causes confusion.
-* [ ] 🔵 **Minor:** improves long-term maintainability without impacting the current pace.
+Select exactly one priority and write it as a labeled line:
+* `**Priority:** 🔴 **Urgent:** ...`
+* `**Priority:** 🟡 **Important:** ...`
+* `**Priority:** 🔵 **Minor:** ...`
 
-Check exactly one classification and exactly one priority. The priority may be a checked item such as `* [x] 🟡 **Important:** ...` or a labeled line such as `**Priority:** 🟡 **Important:** ...`. The top `Billing impact:` line may appear before the title or between the title and `## 0. Classification`; both placements are valid.
+Every finding must contain exactly one `**Priority:**` line. Do not use an option list for the priority, and never leave the priority empty. The classification still requires exactly one checked item. The top `Billing impact:` line may appear before the title or between the title and `## 0. Classification`; both placements are valid.
 
 ## 1. Objective
 Document and classify the detected debt before it becomes a real problem. It must be clear what is wrong, where it is, and what risk it implies.

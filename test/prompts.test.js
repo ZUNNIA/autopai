@@ -17,6 +17,17 @@ test('renderPrompt removes the placeholder when there is no payload', () => {
   assert.equal(renderPrompt('A {{PAYLOAD}} B', undefined), 'A  B')
 })
 
+test('renders the repair prompt with the invalid files payload', async () => {
+  const prompt = await loadPrompt('identified-repair', {
+    scope: 'ui-tests',
+    outputDir: 'tickets/identified/ui-tests',
+    invalidFiles: [{ file: '05.md', error: 'the finding must check exactly one priority.' }]
+  })
+  assert.match(prompt, /Technical Debt Ticket Repair/)
+  assert.match(prompt, /"invalidFiles"/)
+  assert.ok(!prompt.includes('{{PAYLOAD}}'))
+})
+
 test('open questions stay in the chat, not in artifacts', async () => {
   const brief = await fs.readFile('src/prompts/feature-brief.md', 'utf8')
   const backlog = await fs.readFile('src/prompts/backlog.md', 'utf8')

@@ -11,7 +11,8 @@ import { listCodeFiles } from '../lib/codefiles.js'
 import { chunkCodeFiles } from '../lib/chunks.js'
 import { normalizeFilters } from '../lib/filters.js'
 import { validateBillingFiles } from '../lib/billing.js'
-import { validateArtifactFiles } from '../lib/artifact-contracts.js'
+import { inspectArtifactFiles } from '../lib/artifact-contracts.js'
+import { archiveIdentifiedArtifacts } from '../lib/identify-artifacts.js'
 import { fromRepoRelative, toRepoRelative } from '../lib/portable-paths.js'
 import { filterFindingFiles } from '../lib/tickets.js'
 import { slugify, walkFiles, ensureDir } from '../lib/util.js'
@@ -113,8 +114,13 @@ export async function runIdentify({ config, stateStore, options, log }) {
     await log?.('Evidence gates already recorded; reusing the previous evidence.')
   }
 
+  const archive = resuming
+    ? null
+    : await archiveIdentifiedArtifacts({ config, artifacts, scopes: resolvedScopes, log })
+
   const pending = pendingScopes(resolvedScopes, state.completedPhases)
   const billingReports = []
+  const repairs = []
   for (const resolved of pending) {
     const outputDir = path.join(config.repoPath, config.ticketDirs.identified, resolved.name)
     await ensureDir(outputDir)
@@ -141,8 +147,36 @@ export async function runIdentify({ config, stateStore, options, log }) {
     if (execution.code !== 0) {
       throw new Error(`Auditor failed for scope ${resolved.name} with exit code ${execution.code}.`)
     }
-    const written = await walkFiles(outputDir, file => file.endsWith('.md'))
-    await validateArtifactFiles(written, 'identified')
+    let written = await walkFiles(outputDir, file => file.endsWith('.md'))
+    let validation = await inspectArtifactFiles(written, 'identified')
+    if (!validation.ok) {
+      const invalidFiles = validation.errors.map(item => ({
+        file: item.file,
+        error: item.message.startsWith(`${item.file}: `)
+          ? item.message.slice(item.file.length + 2)
+          : item.message
+      }))
+      await log?.(`Scope ${resolved.name}: ${invalidFiles.length} invalid findings; attempting one repair.`)
+      const repair = await runSession({
+        config,
+        prompt: 'identified-repair',
+        agent: config.agents.auditor,
+        payload: { scope: resolved.name, outputDir, invalidFiles },
+        title: `AutopAI identify ${resolved.name} repair`,
+        logFile: artifacts.path(`auditor-${slugify(resolved.name)}-repair.log`),
+        role: 'auditor'
+      })
+      if (repair.code !== 0) {
+        throw new Error(`Auditor repair failed for scope ${resolved.name} with exit code ${repair.code}.`)
+      }
+      written = await walkFiles(outputDir, file => file.endsWith('.md'))
+      validation = await inspectArtifactFiles(written, 'identified')
+      if (!validation.ok) {
+        throw new Error(`Scope ${resolved.name} still has invalid findings after repair:\n${validation.errors.map(item => item.message).join('\n')}`)
+      }
+      repairs.push({ scope: resolved.name, files: invalidFiles.length })
+      await log?.(`Scope ${resolved.name}: repaired ${invalidFiles.length} findings.`)
+    }
     billingReports.push(...await validateBillingFiles(written))
     resolved.tickets = await filterFindingFiles(written, filters)
     const excluded = written.length - resolved.tickets.length
@@ -174,6 +208,9 @@ export async function runIdentify({ config, stateStore, options, log }) {
     scopes: resolvedScopes.map(scope => ({ name: scope.name, tickets: (scope.tickets ?? []).length, files: scope.changedFiles.length })),
     evidence: evidenceFile,
     billingReports,
+    archive: archive?.root ?? null,
+    archived: archive?.archived.length ?? 0,
+    repairs,
     localOnly: true
   }
 }
