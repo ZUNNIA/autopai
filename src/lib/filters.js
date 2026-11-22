@@ -162,8 +162,16 @@ export function parseClassification(text) {
   return match ? normalizeClassification(match[1]) : null
 }
 
+/**
+ * Reads the checked priority from a Markdown debt document. Both the checked
+ * list form and a labeled Priority line are accepted, so a finding that writes
+ * "**Priority:** ... **Important:**" is validated by its meaning instead of
+ * failing on a formatting difference.
+ */
 export function parsePriority(text) {
-  const pattern = /^\s*[-*]\s*\[[xX]\]\s*.*?\*\*\s*(Urgent|Important|Minor)\s*:?\s*\*\*/im
-  const match = String(text ?? '').match(pattern)
+  const source = String(text ?? '')
+  const checked = source.match(/^\s*[-*]\s*\[[xX]\]\s*.*?\*\*\s*(Urgent|Important|Minor)\s*:?\s*\*\*/im)
+  const labeled = source.match(/^\s*(?:[-*]\s+)?(?:\*\*)?Priority:(?:\*\*)?\s*(?:.*?\*\*)?\s*(Urgent|Important|Minor)\b/im)
+  const match = checked ?? labeled
   return match ? normalizePriority(match[1]) : null
 }

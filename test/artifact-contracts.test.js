@@ -27,6 +27,12 @@ test('validates findings that declare classification, priority, and billing', ()
   assert.throws(() => validateFindingText(finding().replace('* [x] **Code Smell:**', '* [ ] **Code Smell:**')), /classification/)
 })
 
+test('accepts a labeled priority line in findings', () => {
+  const labeled = finding().replace('* [x] **Important:** costs time.', '**Priority:** 🟡 **Important:** costs time.')
+  assert.deepEqual(validateFindingText(labeled), { file: '<memory>', kind: 'identified' })
+  assert.throws(() => validateFindingText(finding().replace('* [x] **Important:** costs time.', '')), /priority/)
+})
+
 test('validates ready-for-dev, ready-for-refactor, and QA fix front matter', () => {
   assert.deepEqual(validateReadyForDevText(devTicket()), { file: '<memory>', kind: 'ready-for-dev' })
   assert.deepEqual(validateReadyForDevText(qaTicket()), { file: '<memory>', kind: 'qa-fix' })

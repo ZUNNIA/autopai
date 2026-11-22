@@ -54,6 +54,18 @@ test('supports the real audit body format with emoji and colons', () => {
   assert.equal(parsePriority(body), 'important')
 })
 
+test('reads a labeled priority line from a debt body', () => {
+  const body = [
+    '* [x] 🧩 **Code Smell:** one record.',
+    '**Priority:** 🟡 **Important:** it costs time.'
+  ].join('\n')
+  assert.equal(parseClassification(body), 'code-smell')
+  assert.equal(parsePriority(body), 'important')
+  assert.equal(parsePriority('**Priority:** Minor'), 'minor')
+  assert.equal(parsePriority('Priority: Urgent'), 'urgent')
+  assert.equal(parsePriority('**Priority:** unknown'), null)
+})
+
 test('combines filters with AND and lists with OR', () => {
   const filters = normalizeFilters({ classification: 'code-smell,architecture', priority: 'urgent,important' })
   assert.equal(matchesFilters({ classification: 'code-smell', priority: 'urgent' }, filters), true)
