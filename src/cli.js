@@ -23,6 +23,7 @@ import { recoverPrepareReview } from './lib/prepare-review.js'
 import { clearPlanProposal, readPlanProposal, writePlanProposal } from './lib/plan.js'
 import { adrStatuses, createAdr } from './lib/adr.js'
 import { checkArtifacts } from './lib/artifact-check.js'
+import { inspectTickets, readReconcilePlan, reconcileTickets } from './lib/ticket-reconcile.js'
 import { syncPlatform } from './lib/platform-sync.js'
 
 const PHASES = ['prepare', 'approve', 'dev', 'identify', 'promote', 'refactor', 'release', 'adopt']
@@ -54,6 +55,7 @@ async function main() {
   }
 
   if (command === 'plan') return runPlanCommand({ config, stateStore, options, log })
+  if (command === 'tickets') return runTicketsCommand({ config, stateStore, options, log })
 
   if (command === 'artifacts') {
     const action = String((options._ ?? [])[0] ?? '')
@@ -361,6 +363,83 @@ async function runPlanCommand({ config, stateStore, options, log }) {
   throw new Error('Usage: autopai plan propose --repo <path> --feature <slug> --description <text> OR autopai plan generate --repo <path> --feature <slug> --confirm')
 }
 
+async function runTicketsCommand({ config, stateStore, options, log }) {
+  const action = String((options._ ?? [])[0] ?? '')
+  if (action === 'inspect') {
+    const report = await inspectTickets(config)
+    if (options.json === true) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+    else printTicketsInspection(report)
+    return report
+  }
+
+  if (action === 'reconcile') {
+    if (options.plan === undefined || options.plan === true) {
+      throw new Error('Usage: autopai tickets reconcile --repo <path> --plan <file> [--apply --confirm] [--json]')
+    }
+    const planFile = path.resolve(String(options.plan))
+    const { raw } = await readReconcilePlan(planFile)
+    if (await stateStore.isActiveRun()) {
+      throw new Error('Another AutopAI run is active. Stop it before reconciling the ticket queue.')
+    }
+    const apply = options.apply === true
+    if (apply && options.confirm !== true) {
+      throw new Error('Applying a reconciliation plan requires --confirm.')
+    }
+    let result
+    if (apply) {
+      await stateStore.lock()
+      try {
+        result = await reconcileTickets(config, raw, { apply, confirm: true, planFile })
+      } finally {
+        await stateStore.unlock()
+      }
+    } else {
+      result = await reconcileTickets(config, raw, { planFile })
+    }
+    if (options.json === true) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+    else printTicketsReconciliation(result)
+    if (result.verification?.ok === false) process.exitCode = 1
+    return result
+  }
+
+  throw new Error('Usage: autopai tickets inspect --repo <path> [--json] OR autopai tickets reconcile --repo <path> --plan <file> [--apply --confirm] [--json]')
+}
+
+function printTicketsInspection(report) {
+  process.stdout.write(`Ready for refactor: ${report.readyForRefactor.length}\n`)
+  process.stdout.write(`Done: ${report.done.length}\n`)
+  process.stdout.write(`Identified findings: ${report.identified.length}\n`)
+  process.stdout.write(`Active blockers: ${report.blockers.length}\n`)
+  process.stdout.write(`Active run: ${report.activeRun}\n`)
+  process.stdout.write(`Unresolved dependencies: ${report.unresolvedDependencies.length}\n`)
+  for (const issue of report.unresolvedDependencies) {
+    process.stdout.write(`  ${issue.file}: ${issue.id} depends on ${issue.dependency}\n`)
+  }
+  if (report.duplicateIds.length > 0) {
+    process.stdout.write('Duplicate ids:\n')
+    for (const group of report.duplicateIds) {
+      process.stdout.write(`  ${group.key}: ${group.files.join(', ')}\n`)
+    }
+  }
+}
+
+function printTicketsReconciliation(result) {
+  process.stdout.write(`Plan operations: ${result.operations.length}\n`)
+  process.stdout.write(`Verification: ${result.verification?.ok === false ? 'failed' : 'ok'}\n`)
+  for (const operation of result.operations) {
+    const target = operation.to ? ` -> ${operation.to}` : ''
+    const idempotent = operation.idempotent ? ' (already applied)' : ''
+    process.stdout.write(`  ${operation.action ?? operation.kind}: ${operation.file}${target}${idempotent}\n`)
+  }
+  if (result.applied) {
+    process.stdout.write(`Applied: yes\n`)
+    process.stdout.write(`Backup: ${result.backupDir}\n`)
+    process.stdout.write(`Journal: ${result.journal}\n`)
+  } else {
+    process.stdout.write('Applied: no (dry run). Add --apply --confirm to write.\n')
+  }
+}
+
 async function runConfigCommand(repoPath, options) {
   const action = String((options._ ?? [])[0] ?? 'check')
 
@@ -486,6 +565,8 @@ Usage:
   autopai plan generate --repo <path> --feature <slug> --confirm
   autopai adr new --repo <path> --title <title> [--status <status>] [--content-file <path>] [--json]
   autopai artifacts check --repo <path> [--json]
+  autopai tickets inspect --repo <path> [--json]
+  autopai tickets reconcile --repo <path> --plan <file> [--apply --confirm] [--json]
   autopai config check --repo <path> [--json] [--strict]
   autopai config reconcile --repo <path> [--apply] [--json]
   autopai platform sync [--target <dir>] [--dry-run] [--json]
@@ -556,6 +637,14 @@ required.
 
 autopai artifacts check validates every local brief, backlog, finding, ticket,
 and UX proposal against its structural contract. It never writes.
+
+autopai tickets inspect reads the ready-for-refactor, done, identified and
+blocker state and prints a JSON report for a founder-approved reconciliation.
+autopai tickets reconcile validates a JSON plan and, with --apply --confirm,
+moves delivered duplicates to done, archives superseded pending tickets and
+stale findings, repairs depends_on, and archives resolved blockers. It locks the
+run, backs up every touched file, writes a journal, and verifies the final queue.
+A dry run is the default and writes nothing.
 
 autopai config check audits autopai.json against the schema without writing:
 it reports missing defaults, unknown or deprecated fields, invalid types, paths,
