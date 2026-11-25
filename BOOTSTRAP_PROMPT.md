@@ -8,8 +8,8 @@ Do not recreate the files. Follow `README.md` and:
 
 1. Verify Node.js, Git, the GitHub CLI, and the target coding tool.
 2. Run `npm ci` and `npm link` inside the clone.
-3. Install the platform files for the target tool. For the bundled platform, run `autopai platform sync`; for another tool, copy from `platforms/<tool>/`.
-4. Verify `autopai help` and `autopai platform sync --dry-run`.
+3. Install the platform files for the target tool from `platforms/<tool>/`.
+4. Verify `autopai help`.
 5. In each target repository, generate `autopai.json` by inspecting it, then run `autopai status --repo .`.
 
 Copy the core, the prompts, the runners, and the platform files from the inventory below. Do not rewrite them.
@@ -121,7 +121,6 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/config-schema.js`
 - `src/lib/config.js`
 - `src/lib/coverage.js`
-- `src/lib/platform-sync.js`
 - `src/lib/defaults.js`
 - `src/lib/diagnostics.js`
 - `src/lib/filters.js`
@@ -129,8 +128,10 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/gates.js`
 - `src/lib/git.js`
 - `src/lib/github.js`
+- `src/lib/identify-artifacts.js`
 - `src/lib/pauses.js`
 - `src/lib/plan.js`
+- `src/lib/platform-sync.js`
 - `src/lib/policy.js`
 - `src/lib/portable-paths.js`
 - `src/lib/pr.js`
@@ -143,6 +144,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/lib/session-retry.js`
 - `src/lib/session.js`
 - `src/lib/state.js`
+- `src/lib/ticket-reconcile.js`
 - `src/lib/tickets.js`
 - `src/lib/title.js`
 - `src/lib/util.js`
@@ -164,6 +166,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `src/prompts/ci-fix.md`
 - `src/prompts/diagnostics-fix.md`
 - `src/prompts/feature-brief.md`
+- `src/prompts/identified-repair.md`
 - `src/prompts/identified.md`
 - `src/prompts/qa-fix.md`
 - `src/prompts/ready-for-dev-revision.md`
@@ -205,6 +208,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/forbidden.test.js`
 - `test/gates.test.js`
 - `test/git.test.js`
+- `test/identify-artifacts.test.js`
 - `test/pauses.test.js`
 - `test/plan-revision.test.js`
 - `test/plan.test.js`
@@ -225,5 +229,7 @@ Copy every file below from the repository. Do not rewrite the contents.
 - `test/runners.test.js`
 - `test/session-retry.test.js`
 - `test/state.test.js`
+- `test/ticket-reconcile-cli.test.js`
+- `test/ticket-reconcile.test.js`
 - `test/tickets.test.js`
 - `test/title.test.js`
