@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { availableRunners, resolveRunner } from '../src/runners/index.js'
 import { buildArgs, buildContinueArgs, writePromptFile, pickSessionToDelete, uniqueSessionTitle } from '../src/runners/opencode.js'
+import { normalizeSession } from '../src/runners/common.js'
 
 test('resolves a configured runner', async () => {
   const runner = await resolveRunner({ runner: 'opencode' })
@@ -35,8 +36,6 @@ test('builds OpenCode arguments with agent and model, without the prompt', () =>
   assert.deepEqual(args, [
     'run',
     '--auto',
-    '--dir',
-    'C:/repo',
     '--title',
     'task',
     '--agent',
@@ -55,14 +54,13 @@ test('builds continuation arguments for the existing session without a prompt ti
   assert.deepEqual(args, [
     'run',
     '--auto',
-    '--dir',
-    'C:/repo',
     '--session',
     'ses_existing',
     '--agent',
     'planner'
   ])
   assert.ok(!args.includes('--title'))
+  assert.ok(!args.includes('--dir'))
 })
 
 test('writes the prompt next to the session log', async () => {
@@ -96,4 +94,33 @@ test('picks only an unambiguous session created by this run for cleanup', () => 
     { id: 'b', title, directory: 'C:\\repo', created: 210, updated: 210 }
   ], { title, directory: 'C:\\repo', since: 150 }), null)
   assert.equal(pickSessionToDelete([], { title, directory: 'C:\\repo', since: 0 }), null)
+})
+
+test('normalizes flat and nested session shapes', () => {
+  assert.deepEqual(normalizeSession({
+    id: 'flat',
+    title: 'Flat',
+    directory: 'C:\\repo',
+    created: 10,
+    updated: 20
+  }), {
+    id: 'flat',
+    title: 'Flat',
+    directory: 'C:\\repo',
+    created: 10,
+    updated: 20
+  })
+
+  assert.deepEqual(normalizeSession({
+    id: 'nested',
+    title: 'Nested',
+    location: { directory: 'C:\\repo' },
+    time: { created: 30, updated: 40 }
+  }), {
+    id: 'nested',
+    title: 'Nested',
+    directory: 'C:\\repo',
+    created: 30,
+    updated: 40
+  })
 })

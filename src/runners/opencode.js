@@ -1,5 +1,5 @@
 import { runCommand } from '../lib/runner.js'
-import { writePromptFile, uniqueSessionTitle, pickSessionToDelete, normalizeDirectory } from './common.js'
+import { writePromptFile, uniqueSessionTitle, pickSessionToDelete, normalizeSession } from './common.js'
 
 export { writePromptFile, uniqueSessionTitle, pickSessionToDelete } from './common.js'
 
@@ -9,7 +9,7 @@ export { writePromptFile, uniqueSessionTitle, pickSessionToDelete } from './comm
  * through stdin, which keeps every payload size off the command line.
  */
 export function buildArgs({ config, agent, title, role }) {
-  const args = ['run', '--auto', '--dir', config.repoPath, '--title', title]
+  const args = ['run', '--auto', '--title', title]
   if (agent) args.push('--agent', agent)
   const model = role ? config.models?.[role] : null
   if (model) args.push('--model', model)
@@ -22,7 +22,7 @@ export function buildArgs({ config, agent, title, role }) {
  * involved; the planner's original context remains authoritative.
  */
 export function buildContinueArgs({ config, sessionId, agent }) {
-  const args = ['run', '--auto', '--dir', config.repoPath, '--session', sessionId]
+  const args = ['run', '--auto', '--session', sessionId]
   if (agent) args.push('--agent', agent)
   return args
 }
@@ -34,7 +34,9 @@ async function listRunSessions(config) {
   })
   if (listed.code !== 0) return null
   try {
-    return JSON.parse(listed.stdout)
+    const parsed = JSON.parse(listed.stdout)
+    const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.sessions) ? parsed.sessions : []
+    return list.map(normalizeSession).filter(Boolean)
   } catch {
     return null
   }

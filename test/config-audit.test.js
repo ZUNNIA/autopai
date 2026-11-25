@@ -80,6 +80,19 @@ test('validates the command runner options', async () => {
   assert.match(invalidReport.errors.find(item => item.field === 'runnerOptions').message, /unknown placeholder/)
 })
 
+test('warns when an OpenCode command runner keeps the removed --dir flag', async () => {
+  const repo = await repoWith({
+    runner: 'command',
+    runnerOptions: {
+      run: ['opencode', 'run', '--auto', '--dir', '{repo}', '--title', '{title}'],
+      prompt: 'stdin'
+    }
+  })
+  const report = await auditConfig(repo)
+  assert.equal(report.ok, true)
+  assert.ok(report.warnings.some(warning => warning.code === 'legacy-runner-flag' && warning.field === 'runnerOptions.run'))
+})
+
 test('reports missing defaults without failing', async () => {
   const repo = await repoWith({ runner: 'opencode' })
   const report = await auditConfig(repo)
