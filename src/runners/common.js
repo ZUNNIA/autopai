@@ -30,10 +30,13 @@ export function pickSessionToDelete(sessions, { title, directory, since }) {
 
 export function normalizeSession(session) {
   if (!session || typeof session !== 'object') return null
+  const location = session.location && typeof session.location === 'object' ? session.location : null
+  const time = session.time && typeof session.time === 'object' ? session.time : null
   return {
     id: session.id ?? null,
     title: session.title ?? null,
-    directory: session.directory ?? null,
-    created: session.created ?? session.createdAt ?? session.updated ?? null
+    directory: session.directory ?? location?.directory ?? null,
+    created: session.created ?? session.createdAt ?? time?.created ?? session.updated ?? time?.updated ?? null,
+    updated: session.updated ?? time?.updated ?? null
   }
 }

@@ -273,6 +273,16 @@ function auditCommandRunnerOptions(report, value) {
     validateCommandRunnerOptions(value)
   } catch (error) {
     addError(report, 'invalid-command-runner', 'runnerOptions', error.message)
+    return
+  }
+  const keys = ['run', 'continue', 'list', 'delete']
+  const usesOpenCode = keys.some(key => Array.isArray(value?.[key])
+    && value[key].some(token => String(token).toLowerCase().includes('opencode')))
+  if (!usesOpenCode) return
+  for (const key of keys) {
+    if (Array.isArray(value?.[key]) && value[key].some(token => token === '--dir')) {
+      addWarning(report, 'legacy-runner-flag', `runnerOptions.${key}`, 'The --dir flag was removed from newer OpenCode releases; the runner already executes in the repository directory.')
+    }
   }
 }
 

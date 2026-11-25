@@ -128,6 +128,8 @@ The automatic gates are never bypassed, and a red branch is never pushed. A bran
 | Release | `/autopai-release <version>` | "release 1.3.0" |
 | Create an ADR | `/autopai-adr` | "record this architecture decision" |
 | Validate local artifacts | `autopai artifacts check` | "check the briefs and tickets" |
+| Inspect the refactor queue | `autopai tickets inspect --repo .` | "show duplicate refactor tickets and blockers" |
+| Reconcile the refactor queue | Operator runs `autopai tickets reconcile --plan <file> --apply --confirm` | "apply the approved ticket reconciliation plan" |
 | Abort the run | `/autopai-abort` | "stop the current run" |
 | Check progress | `/autopai-status` | "how is the run going?" |
 
