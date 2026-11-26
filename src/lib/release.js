@@ -5,6 +5,15 @@ import { stripTypePrefix } from './util.js'
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
 
+/**
+ * Builds the release branch ref from the semantic version. The Git artifact
+ * policy only accepts kebab-case segments, so the version dots become dashes
+ * and the tag prefix stays out of the branch name.
+ */
+export function releaseBranchName(version) {
+  return `chore/release-${String(version ?? '').trim().replace(/\./g, '-')}`
+}
+
 export async function prepareRelease({ config, version, log }) {
   if (!VERSION_PATTERN.test(String(version ?? ''))) {
     throw new Error('A semantic version in MAJOR.MINOR.PATCH format is required.')

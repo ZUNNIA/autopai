@@ -293,6 +293,7 @@ export async function pushOpenWaitMerge({
   artifacts,
   branch,
   baseBranch,
+  policyBaseBranch = baseBranch,
   title,
   prBody,
   state,
@@ -313,7 +314,7 @@ export async function pushOpenWaitMerge({
     return { prNumber: alreadyMerged.number, mergeCommit: view.mergeCommit.oid, title: alreadyMerged.title, checks: [] }
   }
 
-  const validation = await validateHead({ config, artifacts, baseBranch, branch, executorPayload, log })
+  const validation = await validateHead({ config, artifacts, baseBranch, policyBaseBranch, branch, executorPayload, log })
   if (validation.fixed) {
     const validationGates = await runGates({ config, artifacts, prefix: 'policy-fix', retries: config.localGateRetries })
     if (!validationGates.ok) {
@@ -440,7 +441,7 @@ export async function pushOpenWaitMerge({
     }
     await git.normalizeHeadCommitMessage({ repoPath: config.repoPath, log })
 
-    await validateHead({ config, artifacts, baseBranch, branch, executorPayload, log })
+    await validateHead({ config, artifacts, baseBranch, policyBaseBranch, branch, executorPayload, log })
     const gates = await runGates({ config, artifacts, prefix: `fix-${attempt}`, retries: config.localGateRetries })
     if (!gates.ok) {
       throw new Error(`Local gates failed after executor fix: ${gateFailureText(gates)}`)
@@ -506,10 +507,13 @@ async function cleanupAfterMerge({ config, branch, baseBranch, log }) {
 
 /**
  * Revalidates branch, commits, and added code against the Git artifact policy.
+ * The pull request target can differ from the branch the change was cut from,
+ * as in a release, so the policy ranges use their own base and never rescan
+ * history that the branch did not author.
  */
-export async function validateHead({ config, artifacts, baseBranch, branch, executorPayload, log }) {
-  const commitRange = `origin/${baseBranch}..${branch}`
-  const range = `origin/${baseBranch}...${branch}`
+export async function validateHead({ config, artifacts, baseBranch, policyBaseBranch = baseBranch, branch, executorPayload, log }) {
+  const commitRange = `origin/${policyBaseBranch}..${branch}`
+  const range = `origin/${policyBaseBranch}...${branch}`
   const commits = await git.logCommits(config.repoPath, commitRange)
   const diff = await git.diff(config.repoPath, range)
   const files = await git.diffNames(config.repoPath, range)
@@ -532,7 +536,7 @@ export async function validateHead({ config, artifacts, baseBranch, branch, exec
         mode: 'policy-fix',
         violations: message,
         branch,
-        baseBranch
+        baseBranch: policyBaseBranch
       },
       title: `AutopAI policy fix ${branch}`,
       logFile: artifacts.path('executor-policy.log'),

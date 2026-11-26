@@ -93,4 +93,4 @@ AutopAI is the `autopai` command, a Node orchestrator installed from the `ZUNNIA
 - **Agent scopes:** `planner` only writes `tickets/backlog/**`, `tickets/ready-for-dev/**`, and `tickets/ready-for-refactor/**`; `auditor` only writes `tickets/identified/**` and `tickets/ux/**` and is read-only over source and UX; `executor` writes source and tests only; `operator` (agent `autopai`) only maintains `autopai.json`, `.gitignore`, and the architecture decision records.
 - **Commit style:** `<type>: <subject>` with no scope parentheses, no ticket or ADR references, and no issue references.
 - **Tests:** AutopAI may modify, add, or remove tests; the CI build, test suite, and coverage threshold are the quality gates.
-- **Release:** release changes go through a `chore/release-v<version>` branch and a pull request into the release branch; tags are created after the merge.
+- **Release:** release changes go through a `chore/release-<version>` branch with the version dots replaced by dashes (for example `chore/release-1-4-0`) and a pull request into the release branch; tags are created after the merge.

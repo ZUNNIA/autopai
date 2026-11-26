@@ -307,7 +307,7 @@ Promotion is automatic: the auditor documents, the planner promotes, and every m
 **Flow.**
 
 1. Require `--version` in `MAJOR.MINOR.PATCH` format.
-2. Create `chore/release-v<version>` from the base branch.
+2. Create `chore/release-<version>` from the base branch, with the version dots replaced by dashes (for example `chore/release-1-4-0`) so the ref satisfies the branch naming policy.
 3. Update the supported version manifest and generate `CHANGELOG.md` deterministically from Conventional Commit subjects since the last tag. Supported manifests are `package.json`, `pyproject.toml`, `Cargo.toml`, `.csproj`, `Directory.Build.props`, and `VERSION`.
 4. Commit the release with `chore: release v<version>` and a generated prose body.
 5. Run the local gates, push, open the pull request **into `releaseBranch`** (not `baseBranch`), wait for CI, run the CI fix loop, and merge.
@@ -834,7 +834,7 @@ The first command audits only the last three merged pull requests and records on
 autopai run --repo . --from release --to release --version 1.4.0
 ```
 
-The Core updates the version and changelog deterministically on `chore/release-v1.4.0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
+The Core updates the version and changelog deterministically on `chore/release-1-4-0`, the orchestrator opens the pull request into `main`, waits for CI, merges, tags `v1.4.0`, and pushes the tag.
 
 ### 12.4 Walkthrough: blocked on an architecture decision
 
