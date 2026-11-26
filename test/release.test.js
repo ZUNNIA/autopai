@@ -3,7 +3,14 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { buildChangelog, detectVersionManifest, updateChangelog, updateVersionManifest } from '../src/lib/release.js'
+import { buildChangelog, detectVersionManifest, releaseBranchName, updateChangelog, updateVersionManifest } from '../src/lib/release.js'
+import { validateBranchName } from '../src/lib/policy.js'
+
+test('names the release branch with kebab-case version segments', () => {
+  assert.equal(releaseBranchName('1.0.0'), 'chore/release-1-0-0')
+  assert.equal(releaseBranchName('10.2.13'), 'chore/release-10-2-13')
+  assert.equal(validateBranchName(releaseBranchName('1.0.0')).length, 0)
+})
 
 test('detects and updates a package.json manifest', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'autopai-release-json-'))

@@ -18,7 +18,7 @@ import { selectPromotionGroups, stateFindingGroups } from '../lib/promotion.js'
 import { currentGate } from '../lib/pauses.js'
 import { validateBillingFiles } from '../lib/billing.js'
 import { validateArtifactFiles } from '../lib/artifact-contracts.js'
-import { prepareRelease } from '../lib/release.js'
+import { prepareRelease, releaseBranchName } from '../lib/release.js'
 import { mergePrepareSession, prepareSessionRecord, prepareSessionsToDelete, recoverPrepareReview } from '../lib/prepare-review.js'
 import { sessionRetryDelayMs, shouldRetrySession } from '../lib/session-retry.js'
 import { ensureDir, sleep, slugify, truncate } from '../lib/util.js'
@@ -930,7 +930,7 @@ export async function runRelease({ config, stateStore, options, log }) {
   const version = String(options.version ?? '').trim()
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('A semantic --version in MAJOR.MINOR.PATCH format is required.')
 
-  const branch = `chore/release-v${version}`
+  const branch = releaseBranchName(version)
   await git.fetch(config.repoPath)
   await git.createBranchFrom(config.repoPath, branch, config.baseBranch)
 
@@ -952,6 +952,7 @@ export async function runRelease({ config, stateStore, options, log }) {
     artifacts,
     branch,
     baseBranch: config.releaseBranch,
+    policyBaseBranch: config.baseBranch,
     title,
     prBody: generatePrBody({ commits, coverage: gates.coverage }),
     state,
